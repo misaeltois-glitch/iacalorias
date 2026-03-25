@@ -332,7 +332,7 @@ export default function Home() {
         position: 'sticky', top: 0, zIndex: 50,
         width: '100%', display: 'flex', justifyContent: 'center',
         borderBottom: '1px solid var(--border)',
-        background: 'rgba(var(--bg-rgb, 250,251,252), 0.85)',
+        background: 'var(--bg)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
       }}>
