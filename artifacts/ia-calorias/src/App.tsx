@@ -6,7 +6,10 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import ResetPassword from "@/pages/ResetPassword";
 import { AuthProvider } from "@/hooks/use-auth";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { useEffect } from "react";
+
+setAuthTokenGetter(() => localStorage.getItem("ia-calorias-auth-token"));
 
 const queryClient = new QueryClient({
   defaultOptions: {

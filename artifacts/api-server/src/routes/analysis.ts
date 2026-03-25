@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import multer from "multer";
 import { db, subscriptionsTable, analysesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, or, and, isNotNull } from "drizzle-orm";
 import OpenAI from "openai";
 import { randomUUID } from "crypto";
 import { AnalyzeFoodResponse, GetAnalysisHistoryResponse } from "@workspace/api-zod";
@@ -14,20 +14,34 @@ const LIMITED_PLAN_LIMIT = 20;
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-async function getOrCreateSub(sessionId: string) {
-  let sub = await db.query.subscriptionsTable.findFirst({
-    where: eq(subscriptionsTable.sessionId, sessionId),
-  });
-  if (!sub) {
-    await db.insert(subscriptionsTable).values({ sessionId, tier: "free", analysisCount: 0 });
-    sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.sessionId, sessionId) });
+async function resolveSub(userId?: string, sessionId?: string) {
+  if (userId) {
+    const sub = await db.query.subscriptionsTable.findFirst({
+      where: eq(subscriptionsTable.userId, userId),
+    });
+    if (sub) return sub;
   }
-  return sub!;
+  if (sessionId) {
+    let sub = await db.query.subscriptionsTable.findFirst({
+      where: eq(subscriptionsTable.sessionId, sessionId),
+    });
+    if (!sub) {
+      await db.insert(subscriptionsTable).values({ sessionId, userId: userId ?? null, tier: "free", analysisCount: 0 });
+      sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.sessionId, sessionId) });
+    } else if (userId && !sub.userId) {
+      await db.update(subscriptionsTable).set({ userId }).where(eq(subscriptionsTable.sessionId, sessionId));
+      sub = { ...sub, userId };
+    }
+    return sub!;
+  }
+  return null;
 }
 
 router.post("/", upload.single("image"), async (req: Request, res: Response) => {
   const sessionId = req.body.sessionId as string;
-  if (!sessionId) {
+  const userId = req.user?.userId;
+
+  if (!sessionId && !userId) {
     res.status(400).json({ error: "bad_request", message: "sessionId is required" });
     return;
   }
@@ -36,47 +50,31 @@ router.post("/", upload.single("image"), async (req: Request, res: Response) => 
     return;
   }
 
-  // Validate file size (4 MB for users, we allow 10 MB in multer for safety)
   if (req.file.size > 4 * 1024 * 1024) {
-    res.status(400).json({
-      error: "file_too_large",
-      message: "A imagem deve ter no máximo 4 MB. Reduza o tamanho e tente novamente.",
-    });
+    res.status(400).json({ error: "file_too_large", message: "A imagem deve ter no máximo 4 MB." });
     return;
   }
 
-  // Validate mime type
   const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
   if (!allowedTypes.includes(req.file.mimetype)) {
-    res.status(400).json({
-      error: "invalid_file_type",
-      message: "Formato não suportado. Envie uma imagem JPG, PNG ou WEBP.",
-    });
+    res.status(400).json({ error: "invalid_file_type", message: "Formato não suportado. Envie JPG, PNG ou WEBP." });
     return;
   }
 
-  const sub = await getOrCreateSub(sessionId);
+  const sub = await resolveSub(userId, sessionId);
+  if (!sub) {
+    res.status(400).json({ error: "bad_request", message: "sessionId is required" });
+    return;
+  }
+
   const tier = sub.tier as "free" | "limited" | "unlimited";
 
   if (tier === "free" && sub.analysisCount >= FREE_TRIAL_LIMIT) {
-    res.status(402).json({
-      error: "payment_required",
-      message: "Suas análises gratuitas acabaram.",
-      requiresUpgrade: true,
-      trialUsed: sub.analysisCount,
-      trialLimit: FREE_TRIAL_LIMIT,
-    });
+    res.status(402).json({ error: "payment_required", message: "Suas análises gratuitas acabaram.", requiresUpgrade: true, trialUsed: sub.analysisCount, trialLimit: FREE_TRIAL_LIMIT });
     return;
   }
-
   if (tier === "limited" && sub.analysisCount >= LIMITED_PLAN_LIMIT) {
-    res.status(402).json({
-      error: "payment_required",
-      message: "Você atingiu o limite mensal de análises do plano Limitado.",
-      requiresUpgrade: true,
-      trialUsed: sub.analysisCount,
-      trialLimit: LIMITED_PLAN_LIMIT,
-    });
+    res.status(402).json({ error: "payment_required", message: "Você atingiu o limite mensal.", requiresUpgrade: true, trialUsed: sub.analysisCount, trialLimit: LIMITED_PLAN_LIMIT });
     return;
   }
 
@@ -112,10 +110,7 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
         {
           role: "user",
           content: [
-            {
-              type: "image_url",
-              image_url: { url: `data:${mimeType};base64,${base64Image}` },
-            },
+            { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } },
             { type: "text", text: "Analise esta imagem e retorne as informações nutricionais como JSON." },
           ],
         },
@@ -132,44 +127,32 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
     };
 
     try {
-      const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      parsed = JSON.parse(cleaned);
+      parsed = JSON.parse(raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
     } catch {
       req.log.error({ raw }, "Failed to parse OpenAI response as JSON");
-      // Do NOT increment count — parse error is not the user's fault
-      res.status(422).json({
-        error: "parse_error",
-        message: "A IA não conseguiu processar a resposta. Tente com uma foto mais clara e bem iluminada.",
-      });
+      res.status(422).json({ error: "parse_error", message: "A IA não conseguiu processar a resposta. Tente com uma foto mais clara." });
       return;
     }
 
-    // If not food — do NOT increment count and return helpful message
     if (!parsed.isFood) {
       const detected = parsed.reason || "Conteúdo não identificado";
-      res.status(422).json({
-        error: "not_food",
-        message: `Nenhum alimento foi detectado na imagem. Detectado: ${detected}. Tire uma foto de um prato ou refeição.`,
-        detected,
-      });
+      res.status(422).json({ error: "not_food", message: `Nenhum alimento detectado. Detectado: ${detected}.`, detected });
       return;
     }
 
-    // Validate required food fields
     if (!parsed.dishName || parsed.calories == null || parsed.protein == null || parsed.carbs == null || parsed.fat == null) {
       req.log.error({ parsed }, "Missing required fields in AI response");
-      res.status(422).json({
-        error: "incomplete_analysis",
-        message: "Não foi possível obter todos os dados nutricionais. A foto pode estar muito escura, borrada ou com alimentos pouco visíveis.",
-      });
+      res.status(422).json({ error: "incomplete_analysis", message: "Não foi possível obter todos os dados nutricionais." });
       return;
     }
 
-    // All good — now save and increment count
     const analysisId = randomUUID();
+    const effectiveSessionId = sub.sessionId ?? sessionId;
+
     await db.insert(analysesTable).values({
       id: analysisId,
-      sessionId,
+      sessionId: effectiveSessionId,
+      userId: userId ?? null,
       dishName: parsed.dishName,
       calories: Math.round(parsed.calories),
       protein: parsed.protein,
@@ -182,14 +165,13 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
       confidence: parsed.confidence ?? null,
     });
 
-    await db
-      .update(subscriptionsTable)
+    await db.update(subscriptionsTable)
       .set({ analysisCount: sub.analysisCount + 1, updatedAt: new Date() })
-      .where(eq(subscriptionsTable.sessionId, sessionId));
+      .where(eq(subscriptionsTable.sessionId, sub.sessionId));
 
     const result = AnalyzeFoodResponse.parse({
       id: analysisId,
-      sessionId,
+      sessionId: effectiveSessionId,
       dishName: parsed.dishName,
       calories: Math.round(parsed.calories),
       macros: { protein: parsed.protein, carbs: parsed.carbs, fat: parsed.fat },
@@ -205,42 +187,39 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
     res.json(result);
   } catch (err: any) {
     req.log.error({ err }, "Error analyzing image");
-
-    // Handle OpenAI specific errors
     if (err?.status === 429) {
-      res.status(503).json({
-        error: "rate_limited",
-        message: "Muitas requisições simultâneas. Aguarde alguns segundos e tente novamente.",
-      });
+      res.status(503).json({ error: "rate_limited", message: "Muitas requisições simultâneas. Aguarde e tente novamente." });
       return;
     }
     if (err?.status === 400 && err?.message?.includes("image")) {
-      res.status(422).json({
-        error: "invalid_image",
-        message: "A imagem não pôde ser processada. Verifique se o arquivo não está corrompido e tente novamente.",
-      });
+      res.status(422).json({ error: "invalid_image", message: "A imagem não pôde ser processada. Tente outra foto." });
       return;
     }
-
-    res.status(500).json({
-      error: "internal_error",
-      message: "Ocorreu um erro inesperado. Tente novamente em instantes.",
-    });
+    res.status(500).json({ error: "internal_error", message: "Ocorreu um erro inesperado. Tente novamente." });
   }
 });
 
 router.get("/history", async (req: Request, res: Response) => {
   const sessionId = req.query.sessionId as string;
-  if (!sessionId) {
+  const userId = req.user?.userId;
+
+  let analyses;
+  if (userId) {
+    analyses = await db.query.analysesTable.findMany({
+      where: eq(analysesTable.userId, userId),
+      orderBy: (t, { desc }) => [desc(t.createdAt)],
+      limit: 20,
+    });
+  } else if (sessionId) {
+    analyses = await db.query.analysesTable.findMany({
+      where: eq(analysesTable.sessionId, sessionId),
+      orderBy: (t, { desc }) => [desc(t.createdAt)],
+      limit: 20,
+    });
+  } else {
     res.status(400).json({ error: "bad_request", message: "sessionId is required" });
     return;
   }
-
-  const analyses = await db.query.analysesTable.findMany({
-    where: eq(analysesTable.sessionId, sessionId),
-    orderBy: (t, { desc }) => [desc(t.createdAt)],
-    limit: 20,
-  });
 
   const result = GetAnalysisHistoryResponse.parse(
     analyses.map((a) => ({

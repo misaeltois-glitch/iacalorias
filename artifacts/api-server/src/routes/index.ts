@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { optionalAuth } from "../lib/auth-middleware.js";
 import healthRouter from "./health";
 import userRouter from "./user";
 import analysisRouter from "./analysis";
@@ -7,6 +8,8 @@ import goalsRouter from "./goals";
 import authRouter from "./auth";
 
 const router: IRouter = Router();
+
+router.use(optionalAuth);
 
 router.use(healthRouter);
 router.use("/auth", authRouter);

@@ -11,32 +11,61 @@ const router: IRouter = Router();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2025-02-24.acacia" });
 
-// Price IDs confirmados via Stripe API (acct_1TEV6P5gtu657TZj, test mode BRL)
-const PRICE_LIMITED = "price_1TEVxU5gtu657TZjDayM6rkR";   // R$29,90/mês
-const PRICE_UNLIMITED = "price_1TEVyY5gtu657TZjVELJthbH"; // R$49,90/mês
+const PRICE_LIMITED = "price_1TEVxU5gtu657TZjDayM6rkR";
+const PRICE_UNLIMITED = "price_1TEVyY5gtu657TZjVELJthbH";
 
 const FREE_TRIAL_LIMIT = 3;
 const LIMITED_PLAN_LIMIT = 20;
 
-async function getOrCreateSub(sessionId: string) {
-  let sub = await db.query.subscriptionsTable.findFirst({
-    where: eq(subscriptionsTable.sessionId, sessionId),
-  });
-  if (!sub) {
-    await db.insert(subscriptionsTable).values({ sessionId, tier: "free", analysisCount: 0 });
-    sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.sessionId, sessionId) });
+async function resolveSub(userId?: string, sessionId?: string) {
+  if (userId) {
+    const sub = await db.query.subscriptionsTable.findFirst({
+      where: eq(subscriptionsTable.userId, userId),
+    });
+    if (sub) return sub;
   }
-  return sub!;
+  if (sessionId) {
+    let sub = await db.query.subscriptionsTable.findFirst({
+      where: eq(subscriptionsTable.sessionId, sessionId),
+    });
+    if (!sub) {
+      await db.insert(subscriptionsTable).values({ sessionId, userId: userId ?? null, tier: "free", analysisCount: 0 });
+      sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.sessionId, sessionId) });
+    } else if (userId && !sub.userId) {
+      await db.update(subscriptionsTable).set({ userId }).where(eq(subscriptionsTable.sessionId, sessionId));
+      sub = { ...sub, userId };
+    }
+    return sub!;
+  }
+  return null;
 }
 
 router.get("/status", async (req: Request, res: Response) => {
   const sessionId = req.query.sessionId as string;
-  if (!sessionId) {
+  const userId = req.user?.userId;
+
+  if (!sessionId && !userId) {
     res.status(400).json({ error: "bad_request", message: "sessionId is required" });
     return;
   }
 
-  const sub = await getOrCreateSub(sessionId);
+  const sub = await resolveSub(userId, sessionId);
+  if (!sub) {
+    const tier = "free";
+    const result = GetSubscriptionStatusResponse.parse({
+      sessionId: sessionId ?? "",
+      tier,
+      analysisCount: 0,
+      analysisLimit: FREE_TRIAL_LIMIT,
+      trialRemaining: FREE_TRIAL_LIMIT,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      currentPeriodEnd: null,
+    });
+    res.json(result);
+    return;
+  }
+
   const tier = sub.tier as "free" | "limited" | "unlimited";
   const analysisLimit = tier === "limited" ? LIMITED_PLAN_LIMIT : tier === "unlimited" ? null : FREE_TRIAL_LIMIT;
   const trialRemaining = tier === "free" ? Math.max(0, FREE_TRIAL_LIMIT - sub.analysisCount) : 0;
@@ -57,6 +86,8 @@ router.get("/status", async (req: Request, res: Response) => {
 
 router.post("/checkout", async (req: Request, res: Response) => {
   const { sessionId, plan } = req.body;
+  const userId = req.user?.userId;
+
   if (!sessionId || !plan) {
     res.status(400).json({ error: "bad_request", message: "sessionId and plan are required" });
     return;
@@ -69,15 +100,20 @@ router.post("/checkout", async (req: Request, res: Response) => {
     : "http://localhost:80";
 
   try {
-    const sub = await getOrCreateSub(sessionId);
-    let customerId = sub.stripeCustomerId ?? undefined;
+    let sub = await resolveSub(userId, sessionId);
+    if (!sub) {
+      await db.insert(subscriptionsTable).values({ sessionId, userId: userId ?? null, tier: "free", analysisCount: 0 });
+      sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.sessionId, sessionId) });
+    }
+
+    let customerId = sub!.stripeCustomerId ?? undefined;
 
     if (!customerId) {
-      const customer = await stripe.customers.create({ metadata: { sessionId } });
+      const customer = await stripe.customers.create({ metadata: { sessionId, ...(userId ? { userId } : {}) } });
       customerId = customer.id;
       await db.update(subscriptionsTable)
         .set({ stripeCustomerId: customerId, updatedAt: new Date() })
-        .where(eq(subscriptionsTable.sessionId, sessionId));
+        .where(eq(subscriptionsTable.sessionId, sub!.sessionId));
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -87,7 +123,7 @@ router.post("/checkout", async (req: Request, res: Response) => {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${domain}/?checkout_success=true&session_id=${sessionId}`,
       cancel_url: `${domain}/?checkout_cancelled=true`,
-      metadata: { sessionId, plan },
+      metadata: { sessionId, plan, ...(userId ? { userId } : {}) },
     });
 
     const result = CreateCheckoutSessionResponse.parse({ url: session.url });
@@ -129,13 +165,7 @@ router.post("/webhook", async (req: Request, res: Response) => {
         }
 
         await db.update(subscriptionsTable)
-          .set({
-            tier: plan,
-            analysisCount: 0,
-            stripeSubscriptionId: stripeSubscriptionId ?? undefined,
-            currentPeriodEnd: currentPeriodEnd ?? undefined,
-            updatedAt: new Date(),
-          })
+          .set({ tier: plan, analysisCount: 0, stripeSubscriptionId: stripeSubscriptionId ?? undefined, currentPeriodEnd: currentPeriodEnd ?? undefined, updatedAt: new Date() })
           .where(eq(subscriptionsTable.sessionId, sessionId));
       }
     }
@@ -153,12 +183,7 @@ router.post("/webhook", async (req: Request, res: Response) => {
 
         if (sessionId) {
           await db.update(subscriptionsTable)
-            .set({
-              analysisCount: 0,
-              tier: plan ?? "limited",
-              currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
-              updatedAt: new Date(),
-            })
+            .set({ analysisCount: 0, tier: plan ?? "limited", currentPeriodEnd: new Date(stripeSub.current_period_end * 1000), updatedAt: new Date() })
             .where(eq(subscriptionsTable.sessionId, sessionId));
         }
       }

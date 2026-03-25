@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { db, subscriptionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { GetMeResponse } from "@workspace/api-zod";
@@ -8,24 +8,32 @@ const router: IRouter = Router();
 const FREE_TRIAL_LIMIT = 3;
 const LIMITED_PLAN_LIMIT = 20;
 
-router.get("/me", async (req, res) => {
+router.get("/me", async (req: Request, res: Response) => {
+  const userId = req.user?.userId;
   const sessionId = req.headers["x-session-id"] as string || req.query.sessionId as string;
-  if (!sessionId) {
-    res.status(401).json({ error: "unauthorized", message: "Session ID required" });
+
+  if (!userId && !sessionId) {
+    res.status(401).json({ error: "unauthorized", message: "Session ID or auth token required" });
     return;
   }
 
-  let sub = await db.query.subscriptionsTable.findFirst({
-    where: eq(subscriptionsTable.sessionId, sessionId),
-  });
+  let sub;
+
+  if (userId) {
+    sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.userId, userId) });
+  }
+
+  if (!sub && sessionId) {
+    sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.sessionId, sessionId) });
+    if (!sub) {
+      await db.insert(subscriptionsTable).values({ sessionId, userId: userId ?? null, tier: "free", analysisCount: 0 });
+      sub = { sessionId, userId: userId ?? null, tier: "free", analysisCount: 0, stripeCustomerId: null, stripeSubscriptionId: null, currentPeriodEnd: null, createdAt: new Date(), updatedAt: new Date() };
+    }
+  }
 
   if (!sub) {
-    await db.insert(subscriptionsTable).values({
-      sessionId,
-      tier: "free",
-      analysisCount: 0,
-    });
-    sub = { sessionId, tier: "free", analysisCount: 0, stripeCustomerId: null, stripeSubscriptionId: null, currentPeriodEnd: null, createdAt: new Date(), updatedAt: new Date() };
+    res.status(404).json({ error: "not_found", message: "Session not found" });
+    return;
   }
 
   const tier = sub.tier as "free" | "limited" | "unlimited";
