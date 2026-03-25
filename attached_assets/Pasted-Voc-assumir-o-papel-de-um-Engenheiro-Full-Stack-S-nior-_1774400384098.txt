@@ -1,0 +1,34 @@
+Você assumirá o papel de um Engenheiro Full-Stack Sênior e UI/UX Designer Especialista. Seu objetivo é gerar uma aplicação web SaaS (Software as a Service) de contagem de calorias baseada em visão computacional.
+
+# 1. VISÃO GERAL DO PROJETO
+Um site com design extremamente profissional, minimalista e moderno (estilo Apple/Vercel) onde o usuário faz o upload da foto do seu prato de comida, e a aplicação retorna uma estimativa de calorias (kcal) e macronutrientes. 
+
+# 2. STACK TECNOLÓGICA RECOMENDADA
+Por favor, use as seguintes tecnologias (se você achar que outra stack é melhor, justifique e peça minha aprovação antes de começar):
+* Pagamentos: Stripe (Stripe Checkout e Webhooks).
+* IA: OpenAI API (modelo gpt-4o ou equivalente com recurso de Vision).
+
+# 3. REGRAS DE NEGÓCIO E FUNCIONALIDADES
+A aplicação deve conter as seguintes lógicas rigorosas:
+
+## A. Sistema de Freemium e Paywall
+* Todo novo usuário ganha o status de "Free Trial".
+* O limite do Free Trial é de exatas 3 (três) análises de imagem.
+* Ao tentar fazer a 4ª análise, o sistema deve bloquear o envio e exibir um Modal (Popup) de Paywall bonito e persuasivo, impedindo o uso até que o pagamento seja feito.
+
+## B. Planos e Integração Stripe
+O Modal de Paywall deve oferecer dois planos (com integração ao Stripe Checkout):
+* Plano Limitado: R$ 29,90/mês. Dá direito a 20 análises de imagens mensais.
+* Plano Ilimitado: R$ 49,90/mês. Análises ilimitadas.
+* O banco de dados deve ser atualizado via Stripe Webhooks assim que o pagamento for confirmado, mudando o "tier" do usuário.
+
+## C. Lógica da IA (OpenAI Vision)
+* O usuário faz upload ou tira a foto.
+* O sistema mostra um estado de carregamento elegante (loading skeleton ou spinner).
+* A imagem é enviada à API da OpenAI com um system prompt estrito para analisar a comida e retornar EXCLUSIVAMENTE um formato JSON contendo: Nome do prato estimado, Kcal totais estimadas, Proteínas, Carboidratos e Gorduras.
+* A UI deve capturar esse JSON e renderizar em cards bonitos e fáceis de ler.
+
+# 4. DESIGN E UI/UX
+* Tema claro/escuro (Dark Mode).
+* Responsivo (Mobile-first, focado em celulares pois as pessoas tiram foto da comida com o celular).
+* Área de upload de imagem estilo "Drag and Drop" no desktop e botão grande de câmera no mobile. o nome do aplicativo sera IA calorias
