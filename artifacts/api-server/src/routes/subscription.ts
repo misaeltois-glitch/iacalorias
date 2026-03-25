@@ -79,7 +79,7 @@ router.get("/status", async (req: Request, res: Response) => {
     trialRemaining,
     stripeCustomerId: sub.stripeCustomerId,
     stripeSubscriptionId: sub.stripeSubscriptionId,
-    currentPeriodEnd: sub.currentPeriodEnd?.toISOString() ?? null,
+    currentPeriodEnd: sub.currentPeriodEnd ?? null,
   });
 
   res.json(result);
