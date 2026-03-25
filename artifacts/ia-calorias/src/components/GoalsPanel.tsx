@@ -46,15 +46,15 @@ interface MacroCardProps {
   config: MacroConfig;
   valuePerDay: number | null;
   mealsPerDay: number;
+  liveMealsPerDay: number;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onSave: (key: MacroKey, valuePerDay: number) => Promise<void>;
 }
 
-function MacroCard({ config, valuePerDay, mealsPerDay, viewMode, onViewModeChange, onSave }: MacroCardProps) {
+function MacroCard({ config, valuePerDay, mealsPerDay, liveMealsPerDay, viewMode, onViewModeChange, onSave }: MacroCardProps) {
   const mpd = Math.max(1, mealsPerDay);
   const perMeal = valuePerDay ? Math.round((valuePerDay / mpd) * 10) / 10 : null;
-  const perDay = viewMode === 'meal' && perMeal ? Math.round(perMeal * mpd) : valuePerDay;
 
   const displayValue = viewMode === 'day' ? (valuePerDay ?? '') : (perMeal ?? '');
   const [localValue, setLocalValue] = useState<string>(displayValue !== '' ? String(displayValue) : '');
@@ -66,6 +66,15 @@ function MacroCard({ config, valuePerDay, mealsPerDay, viewMode, onViewModeChang
     setLocalValue(v !== '' ? String(v) : '');
   }, [valuePerDay, mealsPerDay, viewMode]);
 
+  // Live equivalences — computed from what the user is currently typing
+  const liveMpd = Math.max(1, liveMealsPerDay);
+  const liveNum = parseFloat(localValue);
+  const livePerDay = !isNaN(liveNum) && liveNum > 0
+    ? (viewMode === 'day' ? liveNum : Math.round(liveNum * liveMpd))
+    : null;
+  const livePerMeal = !isNaN(liveNum) && liveNum > 0
+    ? (viewMode === 'meal' ? liveNum : Math.round((liveNum / liveMpd) * 10) / 10)
+    : null;
   const handleBlur = useCallback(async () => {
     const num = parseFloat(localValue);
     if (!localValue || isNaN(num) || num <= 0) return;
@@ -86,9 +95,6 @@ function MacroCard({ config, valuePerDay, mealsPerDay, viewMode, onViewModeChang
       saveTimer.current = setTimeout(() => setSaveState('idle'), 2000);
     }
   }, [localValue, viewMode, mpd, valuePerDay, config.key, onSave]);
-
-  const weekVal = valuePerDay ? Math.round(valuePerDay * 7) : null;
-  const monthVal = valuePerDay ? Math.round(valuePerDay * 30) : null;
 
   return (
     <div style={{
@@ -203,28 +209,24 @@ function MacroCard({ config, valuePerDay, mealsPerDay, viewMode, onViewModeChang
         </div>
       </div>
 
-      {/* Equivalences */}
-      {valuePerDay ? (
+      {/* Equivalences — live, computed from current input */}
+      {livePerDay ? (
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {viewMode === 'day' ? (
             <span style={{ fontSize: '11px', color: 'var(--text-2)', background: 'var(--bg-3)', padding: '3px 8px', borderRadius: '6px' }}>
-              = {perMeal}{config.unit}/refeição
+              = {livePerMeal}{config.unit}/refeição
             </span>
           ) : (
             <span style={{ fontSize: '11px', color: 'var(--text-2)', background: 'var(--bg-3)', padding: '3px 8px', borderRadius: '6px' }}>
-              = {valuePerDay}{config.unit}/dia
+              = {livePerDay}{config.unit}/dia
             </span>
           )}
-          {weekVal && (
-            <span style={{ fontSize: '11px', color: 'var(--text-2)', background: 'var(--bg-3)', padding: '3px 8px', borderRadius: '6px' }}>
-              {weekVal}{config.unit}/semana
-            </span>
-          )}
-          {monthVal && (
-            <span style={{ fontSize: '11px', color: 'var(--text-2)', background: 'var(--bg-3)', padding: '3px 8px', borderRadius: '6px' }}>
-              {monthVal}{config.unit}/mês
-            </span>
-          )}
+          <span style={{ fontSize: '11px', color: 'var(--text-2)', background: 'var(--bg-3)', padding: '3px 8px', borderRadius: '6px' }}>
+            {Math.round(livePerDay * 7)}{config.unit}/semana
+          </span>
+          <span style={{ fontSize: '11px', color: 'var(--text-2)', background: 'var(--bg-3)', padding: '3px 8px', borderRadius: '6px' }}>
+            {Math.round(livePerDay * 30)}{config.unit}/mês
+          </span>
         </div>
       ) : (
         <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>Insira um valor e saia do campo para salvar</span>
@@ -415,6 +417,7 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
                   config={cfg}
                   valuePerDay={goals[cfg.key]}
                   mealsPerDay={goals.mealsPerDay}
+                  liveMealsPerDay={parseInt(mealsPerDayLocal) || goals.mealsPerDay}
                   viewMode={viewModes[cfg.key]}
                   onViewModeChange={(mode) => setViewModes(prev => ({ ...prev, [cfg.key]: mode }))}
                   onSave={handleSaveMacro}
