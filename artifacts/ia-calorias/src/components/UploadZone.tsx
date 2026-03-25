@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, ImageIcon, Loader2, X } from 'lucide-react';
@@ -11,13 +11,10 @@ interface UploadZoneProps {
 export function UploadZone({ onAnalyze, isAnalyzing }: UploadZoneProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const processFile = (file: File) => {
     setSelectedFile(file);
-    const objectUrl = URL.createObjectURL(file);
-    setPreview(objectUrl);
+    setPreview(URL.createObjectURL(file));
   };
 
   const clearFile = (e: React.MouseEvent) => {
@@ -57,10 +54,6 @@ export function UploadZone({ onAnalyze, isAnalyzing }: UploadZoneProps) {
     return () => window.removeEventListener('paste', handlePaste);
   }, [isAnalyzing]);
 
-  const handleAnalyzeClick = () => {
-    if (selectedFile && !isAnalyzing) onAnalyze(selectedFile);
-  };
-
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       processFile(e.target.files[0]);
@@ -71,36 +64,17 @@ export function UploadZone({ onAnalyze, isAnalyzing }: UploadZoneProps) {
   return (
     <div className="w-full flex flex-col gap-4">
 
-      {/* Hidden inputs */}
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="sr-only"
-        onChange={handleFileInput}
-        disabled={isAnalyzing}
-      />
-      <input
-        ref={galleryInputRef}
-        type="file"
-        accept="image/*"
-        className="sr-only"
-        onChange={handleFileInput}
-        disabled={isAnalyzing}
-      />
-
       {/* ── Desktop Drop Zone (hidden on mobile) ─────────────────── */}
       <div className="hidden sm:block">
         <div
           {...getRootProps()}
           className={`
-            relative w-full rounded-3xl border-2 border-dashed transition-all duration-300 cursor-pointer
+            relative w-full rounded-3xl border-2 border-dashed transition-all duration-300
             ${isDragActive
               ? 'border-primary bg-primary/5 scale-[1.01]'
               : 'border-border bg-background-2 hover:border-primary/40 hover:bg-primary/5'
             }
-            ${preview ? 'p-1 border-solid' : 'p-8 min-h-[260px] flex flex-col items-center justify-center'}
+            ${preview ? 'p-1 border-solid cursor-default' : 'p-8 min-h-[260px] flex flex-col items-center justify-center cursor-pointer'}
           `}
           onClick={!preview ? open : undefined}
         >
@@ -144,6 +118,7 @@ export function UploadZone({ onAnalyze, isAnalyzing }: UploadZoneProps) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="flex flex-col items-center text-center w-full"
+                onClick={(e) => e.stopPropagation()}
               >
                 <div className="w-16 h-16 rounded-full border-2 border-border-strong flex items-center justify-center mb-4 text-muted-foreground">
                   <ImageIcon className="w-7 h-7" />
@@ -151,24 +126,39 @@ export function UploadZone({ onAnalyze, isAnalyzing }: UploadZoneProps) {
                 <h3 className="text-base font-semibold text-foreground mb-1">Clique aqui ou arraste uma foto</h3>
                 <p className="text-sm text-muted-foreground mb-6">JPG, PNG, WEBP · Máx. 4 MB · ou Cole (Ctrl+V)</p>
 
-                {/* Desktop action row */}
+                {/* Desktop action row — labels wrapping inputs directly */}
                 <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); open(); }}
-                    className="px-5 py-2 rounded-xl bg-transparent border border-primary text-primary font-semibold text-sm hover:bg-primary/10 transition-colors"
+                  <label
+                    className="px-5 py-2 rounded-xl bg-transparent border border-primary text-primary font-semibold text-sm hover:bg-primary/10 transition-colors cursor-pointer select-none"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     Escolher arquivo
-                  </button>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFileInput}
+                      disabled={isAnalyzing}
+                    />
+                  </label>
+
                   <span className="text-xs text-muted-foreground">ou</span>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); cameraInputRef.current?.click(); }}
-                    className="flex items-center gap-2 px-5 py-2 rounded-xl bg-background border border-border text-foreground font-semibold text-sm hover:bg-background-3 transition-colors"
+
+                  <label
+                    className="flex items-center gap-2 px-5 py-2 rounded-xl bg-background border border-border text-foreground font-semibold text-sm hover:bg-background-3 transition-colors cursor-pointer select-none"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <Camera className="w-4 h-4" />
                     Tirar foto
-                  </button>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={handleFileInput}
+                      disabled={isAnalyzing}
+                    />
+                  </label>
                 </div>
               </motion.div>
             )}
@@ -178,25 +168,37 @@ export function UploadZone({ onAnalyze, isAnalyzing }: UploadZoneProps) {
 
       {/* ── Mobile Actions (hidden on desktop) ───────────────────── */}
       <div className="sm:hidden flex gap-3 w-full">
-        <button
-          type="button"
-          onClick={() => cameraInputRef.current?.click()}
-          disabled={isAnalyzing}
-          className="flex-1 flex items-center justify-center gap-2 py-5 rounded-2xl font-semibold text-sm text-white transition-all active:scale-95 disabled:opacity-50"
+        {/* Tirar foto — label wrapping input com capture */}
+        <label
+          className={`flex-1 flex items-center justify-center gap-2 py-5 rounded-2xl font-semibold text-sm text-white cursor-pointer select-none transition-all active:scale-95 ${isAnalyzing ? 'opacity-50 pointer-events-none' : ''}`}
           style={{ background: 'linear-gradient(135deg, var(--accent), #059669)' }}
         >
           <Camera className="w-5 h-5" />
           Tirar foto
-        </button>
-        <button
-          type="button"
-          onClick={() => galleryInputRef.current?.click()}
-          disabled={isAnalyzing}
-          className="flex items-center justify-center gap-2 px-5 py-5 rounded-2xl bg-background-2 border border-border-strong text-foreground font-semibold text-sm hover:bg-background-3 transition-all active:scale-95 disabled:opacity-50"
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleFileInput}
+            disabled={isAnalyzing}
+          />
+        </label>
+
+        {/* Galeria — label wrapping input sem capture */}
+        <label
+          className={`flex items-center justify-center gap-2 px-5 py-5 rounded-2xl bg-background-2 border border-border-strong text-foreground font-semibold text-sm cursor-pointer select-none hover:bg-background-3 transition-all active:scale-95 ${isAnalyzing ? 'opacity-50 pointer-events-none' : ''}`}
         >
           <ImageIcon className="w-5 h-5" />
           Galeria
-        </button>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileInput}
+            disabled={isAnalyzing}
+          />
+        </label>
       </div>
 
       {/* ── Mobile Preview ────────────────────────────────────────── */}
@@ -222,7 +224,7 @@ export function UploadZone({ onAnalyze, isAnalyzing }: UploadZoneProps) {
 
       {/* ── Analyze Button ────────────────────────────────────────── */}
       <button
-        onClick={handleAnalyzeClick}
+        onClick={() => { if (selectedFile && !isAnalyzing) onAnalyze(selectedFile); }}
         disabled={!selectedFile || isAnalyzing}
         className={`
           w-full py-4 rounded-2xl font-semibold text-[17px] transition-all flex justify-center items-center gap-2
