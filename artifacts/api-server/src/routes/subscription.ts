@@ -11,6 +11,10 @@ const router: IRouter = Router();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2025-02-24.acacia" });
 
+// Price IDs confirmados via Stripe API (acct_1TEV6P5gtu657TZj, test mode BRL)
+const PRICE_LIMITED = "price_1TEVxU5gtu657TZjDayM6rkR";   // R$29,90/mês
+const PRICE_UNLIMITED = "price_1TEVyY5gtu657TZjVELJthbH"; // R$49,90/mês
+
 const FREE_TRIAL_LIMIT = 3;
 const LIMITED_PLAN_LIMIT = 20;
 
@@ -58,9 +62,7 @@ router.post("/checkout", async (req: Request, res: Response) => {
     return;
   }
 
-  const priceId = plan === "limited"
-    ? process.env.STRIPE_LIMITED_PRICE_ID!
-    : process.env.STRIPE_UNLIMITED_PRICE_ID!;
+  const priceId = plan === "limited" ? PRICE_LIMITED : PRICE_UNLIMITED;
 
   const domain = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
