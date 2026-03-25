@@ -165,7 +165,10 @@ router.get("/summary", async (req: Request, res: Response) => {
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
-  // Streak calculation: consecutive days (ending today) where calories >= 80% of daily goal
+  // Streak and daysOnTarget use an 80% threshold (not strict equality) so minor
+  // calorie deficits (e.g. being 10-20% under goal) still count as "dentro da meta".
+  // Over-goal days also count (the goal is to eat *at least* this amount, not stay under).
+  // Adjust this threshold if the product definition of "dentro da meta" changes.
   let streak = 0;
   if (goals?.calories && isPremium) {
     const streakTarget = goals.calories * 0.8;
