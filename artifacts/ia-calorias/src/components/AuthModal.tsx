@@ -123,8 +123,22 @@ export function AuthModal({ isOpen, onClose, onSuccess, sessionId, initialTab = 
           maxHeight: '90dvh', overflowY: 'auto',
         }}
       >
-        {/* Handle */}
-        <div style={{ width: '36px', height: '4px', borderRadius: '99px', background: 'var(--border-strong)', margin: '0 auto 24px' }} />
+        {/* Handle + close */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: '24px' }}>
+          <div style={{ width: '36px', height: '4px', borderRadius: '99px', background: 'var(--border-strong)' }} />
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)',
+              width: '30px', height: '30px', borderRadius: '50%',
+              background: 'var(--bg-3)', border: '1px solid var(--border)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--text-2)', fontSize: '16px', lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        </div>
 
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
