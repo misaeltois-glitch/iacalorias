@@ -24,20 +24,20 @@ async function resolveSub(userId?: string, sessionId?: string) {
     });
     if (sub) return sub;
   }
-  if (sessionId) {
-    let sub = await db.query.subscriptionsTable.findFirst({
-      where: eq(subscriptionsTable.sessionId, sessionId),
-    });
-    if (!sub) {
-      await db.insert(subscriptionsTable).values({ sessionId, userId: userId ?? null, tier: "free", analysisCount: 0 });
-      sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.sessionId, sessionId) });
-    } else if (userId && !sub.userId) {
-      await db.update(subscriptionsTable).set({ userId }).where(eq(subscriptionsTable.sessionId, sessionId));
-      sub = { ...sub, userId };
-    }
-    return sub!;
+  const effectiveSessionId = sessionId ?? (userId ? `user-${userId}` : undefined);
+  if (!effectiveSessionId) return null;
+
+  let sub = await db.query.subscriptionsTable.findFirst({
+    where: eq(subscriptionsTable.sessionId, effectiveSessionId),
+  });
+  if (!sub) {
+    await db.insert(subscriptionsTable).values({ sessionId: effectiveSessionId, userId: userId ?? null, tier: "free", analysisCount: 0 });
+    sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.sessionId, effectiveSessionId) });
+  } else if (userId && !sub.userId) {
+    await db.update(subscriptionsTable).set({ userId }).where(eq(subscriptionsTable.sessionId, effectiveSessionId));
+    sub = { ...sub, userId };
   }
-  return null;
+  return sub!;
 }
 
 router.get("/status", async (req: Request, res: Response) => {
