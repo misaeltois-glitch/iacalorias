@@ -83,11 +83,15 @@ function UsageBar({ used, max, onClick }: { used: number; max: number; onClick: 
           width: `${pct}%`, transition: 'width 0.5s ease',
         }} />
       </div>
-      {used >= max && (
+      {used >= max ? (
         <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: 600 }}>
-          Limite atingido — Faça upgrade para continuar ✨
+          ⚠️ Limite atingido — Faça upgrade para continuar
         </span>
-      )}
+      ) : used === max - 1 ? (
+        <span style={{ fontSize: '11px', color: '#F59E0B', fontWeight: 600 }}>
+          ⏳ Só 1 análise gratuita restante!
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -401,7 +405,30 @@ export default function Home() {
                       <div style={{ padding: '8px 12px 10px', borderBottom: '1px solid var(--border)', marginBottom: '4px' }}>
                         <div style={{ fontSize: '11px', color: 'var(--text-2)', marginBottom: '2px' }}>Conectado como</div>
                         <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)', wordBreak: 'break-all' }}>{user?.email}</div>
+                        <div style={{ marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700,
+                          background: subStatus?.tier === 'unlimited' ? 'rgba(139,92,246,0.12)' : subStatus?.tier === 'limited' ? 'rgba(245,158,11,0.12)' : 'var(--bg-3)',
+                          color: subStatus?.tier === 'unlimited' ? '#8B5CF6' : subStatus?.tier === 'limited' ? '#F59E0B' : 'var(--text-2)',
+                          border: `1px solid ${subStatus?.tier === 'unlimited' ? 'rgba(139,92,246,0.25)' : subStatus?.tier === 'limited' ? 'rgba(245,158,11,0.25)' : 'var(--border)'}`,
+                        }}>
+                          {subStatus?.tier === 'unlimited' ? '👑 Ilimitado' : subStatus?.tier === 'limited' ? '⚡ Limitado' : '🆓 Gratuito'}
+                        </div>
                       </div>
+                      {subStatus?.tier === 'limited' && (
+                        <button
+                          onClick={() => { setShowUserMenu(false); setPaywallDisableClose(false); setShowPaywall(true); }}
+                          style={{
+                            width: '100%', padding: '8px 12px',
+                            background: 'rgba(13,159,110,0.08)', border: 'none', color: '#0D9F6E',
+                            fontSize: '13px', fontWeight: 600, cursor: 'pointer', borderRadius: '10px',
+                            display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left',
+                            marginBottom: '2px',
+                          }}
+                        >
+                          <Crown size={13} />
+                          Upgrade para Ilimitado
+                        </button>
+                      )}
                       <button
                         onClick={handleLogout}
                         style={{
@@ -494,10 +521,20 @@ export default function Home() {
                 boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
               }}>
                 <div style={{ marginBottom: '14px' }}>
-                  <h2 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '3px' }}>
-                    Analise sua refeição
-                  </h2>
-                  <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                    <h2 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
+                      Analise sua refeição
+                    </h2>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      padding: '3px 9px', borderRadius: '99px',
+                      background: 'rgba(13,159,110,0.1)', border: '1px solid rgba(13,159,110,0.18)',
+                      fontSize: '11px', fontWeight: 600, color: '#0D9F6E',
+                    }}>
+                      🌿 +12.500 análises realizadas
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '13px', color: 'var(--text-2)', marginTop: '6px' }}>
                     Tire uma foto ou escolha da galeria
                   </p>
                 </div>
@@ -614,6 +651,48 @@ export default function Home() {
               style={{ width: '100%', paddingTop: '8px' }}
             >
               <ResultCard result={currentResult} onReset={() => { setCurrentResult(null); setPhotoUrl(undefined); }} photoUrl={photoUrl} />
+
+              {/* Post-result save CTA — anonymous only */}
+              {!isAuthenticated && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  style={{
+                    marginTop: '12px',
+                    padding: '18px 20px', borderRadius: '20px',
+                    background: 'linear-gradient(135deg, rgba(13,159,110,0.10), rgba(59,130,246,0.08))',
+                    border: '1px solid rgba(13,159,110,0.25)',
+                    display: 'flex', flexDirection: 'column', gap: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '24px' }}>💾</span>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)' }}>
+                        Salve esta análise!
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '2px' }}>
+                        Crie uma conta grátis e nunca perca seu histórico
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setShowAuth(true); }}
+                    style={{
+                      width: '100%', padding: '13px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+                      color: '#fff', border: 'none',
+                      fontSize: '14px', fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Criar conta gratuita →
+                  </button>
+                </motion.div>
+              )}
+
               {goalsLoaded && isPremium && (
                 <div style={{ marginTop: '20px' }}>
                   <DailyProgress

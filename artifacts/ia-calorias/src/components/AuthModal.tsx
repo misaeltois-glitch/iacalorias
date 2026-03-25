@@ -140,6 +140,27 @@ export function AuthModal({ isOpen, onClose, onSuccess, sessionId, initialTab = 
           </h2>
         </div>
 
+        {/* Benefits strip — only on register */}
+        {tab === 'register' && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: '8px',
+            padding: '14px 16px', borderRadius: '14px',
+            background: 'rgba(13,159,110,0.07)', border: '1px solid rgba(13,159,110,0.18)',
+            marginBottom: '16px',
+          }}>
+            {[
+              { icon: '💾', text: 'Histórico completo de todas as refeições' },
+              { icon: '📊', text: 'Acompanhe macros e metas diárias' },
+              { icon: '🔥', text: 'Sequência de dias e analytics detalhados' },
+            ].map(({ icon, text }) => (
+              <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '16px', flexShrink: 0 }}>{icon}</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-1)', fontWeight: 500 }}>{text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Tabs (only for login/register) */}
         {tab !== 'forgot' && (
           <div style={{
