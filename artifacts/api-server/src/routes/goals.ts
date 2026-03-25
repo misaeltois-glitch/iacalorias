@@ -8,7 +8,10 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 async function resolveSubTier(userId?: string, sessionId?: string): Promise<"free" | "limited" | "unlimited"> {
   if (userId) {
-    const sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.userId, userId) });
+    const sub = await db.query.subscriptionsTable.findFirst({
+      where: eq(subscriptionsTable.userId, userId),
+      orderBy: (t, { desc }) => [desc(t.updatedAt)],
+    });
     if (sub) return sub.tier as "free" | "limited" | "unlimited";
   }
   if (sessionId) {

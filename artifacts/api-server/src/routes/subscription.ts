@@ -21,6 +21,7 @@ async function resolveSub(userId?: string, sessionId?: string) {
   if (userId) {
     const sub = await db.query.subscriptionsTable.findFirst({
       where: eq(subscriptionsTable.userId, userId),
+      orderBy: (t, { desc }) => [desc(t.updatedAt)],
     });
     if (sub) return sub;
   }

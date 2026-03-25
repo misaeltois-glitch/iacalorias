@@ -168,21 +168,66 @@ router.post("/logout", (_req: Request, res: Response) => {
 });
 
 // ─── Data migration helper ────────────────────────────────────────────────────
+const TIER_RANK: Record<string, number> = { free: 0, limited: 1, unlimited: 2 };
+
 async function migrateAnonymousData(sessionId: string, userId: string): Promise<void> {
-  // Set userId on analyses (keep sessionId intact for compatibility)
+  // Always tag analyses — they are additive with no conflict risk
   await db.update(analysesTable)
     .set({ userId })
     .where(and(eq(analysesTable.sessionId, sessionId), isNull(analysesTable.userId)));
 
-  // Set userId on subscription
-  await db.update(subscriptionsTable)
-    .set({ userId })
-    .where(and(eq(subscriptionsTable.sessionId, sessionId), isNull(subscriptionsTable.userId)));
+  // Subscription: if user already has a userId row, merge without creating a duplicate
+  const sessionSub = await db.query.subscriptionsTable.findFirst({
+    where: and(eq(subscriptionsTable.sessionId, sessionId), isNull(subscriptionsTable.userId)),
+  });
 
-  // Set userId on goals
-  await db.update(goalsTable)
-    .set({ userId })
-    .where(and(eq(goalsTable.sessionId, sessionId), isNull(goalsTable.userId)));
+  if (sessionSub) {
+    const existingUserSub = await db.query.subscriptionsTable.findFirst({
+      where: eq(subscriptionsTable.userId, userId),
+      orderBy: (t, { desc }) => [desc(t.updatedAt)],
+    });
+
+    if (existingUserSub) {
+      // User already has a canonical row — promote tier if session row has better paid status
+      const sessionRank = TIER_RANK[sessionSub.tier] ?? 0;
+      const existingRank = TIER_RANK[existingUserSub.tier] ?? 0;
+      if (sessionRank > existingRank) {
+        await db.update(subscriptionsTable)
+          .set({
+            tier: sessionSub.tier,
+            analysisCount: existingUserSub.analysisCount + sessionSub.analysisCount,
+            stripeCustomerId: sessionSub.stripeCustomerId ?? existingUserSub.stripeCustomerId,
+            stripeSubscriptionId: sessionSub.stripeSubscriptionId ?? existingUserSub.stripeSubscriptionId,
+            currentPeriodEnd: sessionSub.currentPeriodEnd ?? existingUserSub.currentPeriodEnd,
+            updatedAt: new Date(),
+          })
+          .where(eq(subscriptionsTable.sessionId, existingUserSub.sessionId));
+      }
+      // Do NOT tag sessionSub.userId to avoid a second userId row
+    } else {
+      // No canonical row yet — simply tag the session row with userId
+      await db.update(subscriptionsTable)
+        .set({ userId })
+        .where(eq(subscriptionsTable.sessionId, sessionId));
+    }
+  }
+
+  // Goals: if user already has goals, skip migration to avoid overwriting
+  const sessionGoals = await db.query.goalsTable.findFirst({
+    where: and(eq(goalsTable.sessionId, sessionId), isNull(goalsTable.userId)),
+  });
+
+  if (sessionGoals) {
+    const existingUserGoals = await db.query.goalsTable.findFirst({
+      where: eq(goalsTable.userId, userId),
+    });
+
+    if (!existingUserGoals) {
+      await db.update(goalsTable)
+        .set({ userId })
+        .where(eq(goalsTable.sessionId, sessionId));
+    }
+  }
 }
 
 export default router;
