@@ -1,11 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, TrendingUp, Flame, Zap, Wheat, Droplets, Leaf, CalendarDays, Trophy, Lock } from 'lucide-react';
+import { X, TrendingUp, CalendarDays, Trophy, Lock, Flame } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell,
 } from 'recharts';
 
-type Period = 'week' | 'month';
+type Period = 'day' | 'week' | 'month';
+
+interface DayData {
+  date: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  mealsCount: number;
+}
 
 interface AnalyticsSummary {
   period: Period;
@@ -15,7 +25,7 @@ interface AnalyticsSummary {
   daysWithData: number;
   totals: { calories: number; protein: number; carbs: number; fat: number; fiber: number; meals: number };
   dailyAvg: { calories: number; protein: number; carbs: number; fat: number; fiber: number } | null;
-  days: { date: string; calories: number; protein: number; carbs: number; fat: number; fiber: number; mealsCount: number }[];
+  days: DayData[];
   streak: number;
   daysOnTarget: number;
   goals: { calories: number | null; protein: number | null; carbs: number | null; fat: number | null; fiber: number | null; mealsPerDay: number } | null;
@@ -120,17 +130,11 @@ function SkeletonBlock({ h = 20, w = '100%', r = 8 }: { h?: number; w?: string |
   );
 }
 
-const CustomBar = (props: any) => {
-  const { x, y, width, height, goalValue, value } = props;
-  if (!height || height <= 0) return null;
-  const isOver = goalValue && value > goalValue * 1.1;
-  const fill = isOver ? '#ef4444' : '#6366f1';
-  return <rect x={x} y={y} width={width} height={height} fill={fill} rx={3} ry={3} />;
-};
-
 const CustomTooltip = ({ active, payload, label, goalValue }: any) => {
   if (!active || !payload?.length) return null;
-  const cal = payload[0]?.value ?? 0;
+  const consumed = (payload.find((p: any) => p.dataKey === 'consumed')?.value ?? 0) as number;
+  const excess = (payload.find((p: any) => p.dataKey === 'excess')?.value ?? 0) as number;
+  const total = consumed + excess;
   return (
     <div style={{
       background: 'var(--bg-surface)',
@@ -141,15 +145,88 @@ const CustomTooltip = ({ active, payload, label, goalValue }: any) => {
       color: 'var(--text-1)',
       boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
     }}>
-      <div style={{ fontWeight: 700 }}>{label}</div>
-      <div style={{ color: '#6366f1' }}>{Math.round(cal)} kcal</div>
-      {goalValue && <div style={{ color: 'var(--text-3)' }}>Meta: {goalValue} kcal</div>}
+      <div style={{ fontWeight: 700, marginBottom: '4px' }}>{label}</div>
+      <div style={{ color: '#6366f1' }}>{Math.round(total)} kcal consumidas</div>
+      {goalValue ? (
+        <div style={{ color: 'var(--text-3)' }}>Meta: {goalValue} kcal</div>
+      ) : null}
+      {excess > 0 && goalValue ? (
+        <div style={{ color: '#ef4444' }}>+{Math.round(excess)} acima</div>
+      ) : null}
     </div>
   );
 };
 
+function StackedCaloriesChart({ days, period, goalCalories }: {
+  days: DayData[]; period: Period; goalCalories: number | null;
+}) {
+  const chartData = days.map(d => {
+    const cal = d.calories;
+    if (!goalCalories) {
+      return { ...d, label: formatDateLabel(d.date, period), consumed: cal, remaining: 0, excess: 0 };
+    }
+    const consumed = Math.min(cal, goalCalories);
+    const remaining = Math.max(0, goalCalories - cal);
+    const excess = Math.max(0, cal - goalCalories);
+    return { ...d, label: formatDateLabel(d.date, period), consumed, remaining, excess };
+  });
+
+  return (
+    <div style={{
+      background: 'var(--bg-2)',
+      borderRadius: '16px', border: '1.5px solid var(--border)',
+      padding: '16px',
+    }}>
+      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '12px' }}>
+        Calorias por dia
+      </div>
+      <ResponsiveContainer width="100%" height={140}>
+        <BarChart data={chartData} barCategoryGap="30%" margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+          <XAxis
+            dataKey="label"
+            tick={{ fontSize: 10, fill: 'var(--text-3)' }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fontSize: 9, fill: 'var(--text-3)' }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)}
+          />
+          <Tooltip content={<CustomTooltip goalValue={goalCalories} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+          {goalCalories && (
+            <ReferenceLine y={goalCalories} stroke="#6366f1" strokeDasharray="4 3" strokeWidth={1.5} />
+          )}
+          <Bar dataKey="consumed" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} />
+          <Bar dataKey="remaining" stackId="a" fill="rgba(99,102,241,0.15)" radius={[0, 0, 0, 0]} />
+          <Bar dataKey="excess" stackId="a" fill="#ef4444" radius={[3, 3, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#6366f1' }} />
+          <span style={{ fontSize: '10px', color: 'var(--text-3)' }}>Consumido</span>
+        </div>
+        {goalCalories && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(99,102,241,0.35)' }} />
+              <span style={{ fontSize: '10px', color: 'var(--text-3)' }}>Restante</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#ef4444' }} />
+              <span style={{ fontSize: '10px', color: 'var(--text-3)' }}>Acima da meta</span>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade }: AnalyticsPanelProps) {
-  const [period, setPeriod] = useState<Period>('week');
+  const [period, setPeriod] = useState<Period>('day');
   const [data, setData] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -176,13 +253,9 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
     setPeriod(p);
   };
 
-  const chartData = (data?.days ?? []).map(d => ({
-    ...d,
-    label: formatDateLabel(d.date, period),
-  }));
-
   const goalCalories = data?.goals?.calories ?? null;
   const hasData = (data?.totals?.meals ?? 0) > 0;
+  const showChart = (period === 'week' || period === 'month') && hasData && isPremium;
 
   return (
     <AnimatePresence>
@@ -259,24 +332,28 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
 
               {/* Period selector */}
               <div style={{
-                display: 'flex', gap: '6px',
+                display: 'flex', gap: '4px',
                 background: 'var(--bg-3)', borderRadius: '10px', padding: '3px',
               }}>
-                {(['week', 'month'] as Period[]).map(p => (
+                {([
+                  { key: 'day' as Period, label: 'Hoje' },
+                  { key: 'week' as Period, label: 'Semana' },
+                  { key: 'month' as Period, label: 'Mês' },
+                ] as const).map(({ key, label }) => (
                   <button
-                    key={p}
-                    onClick={() => handlePeriod(p)}
+                    key={key}
+                    onClick={() => handlePeriod(key)}
                     style={{
-                      flex: 1, padding: '8px', borderRadius: '8px',
+                      flex: 1, padding: '8px 6px', borderRadius: '8px',
                       border: 'none', cursor: 'pointer',
-                      fontSize: '13px', fontWeight: 600,
+                      fontSize: '12px', fontWeight: 600,
                       transition: 'all 0.15s',
-                      background: period === p ? 'var(--bg-surface)' : 'transparent',
-                      color: period === p ? 'var(--text-1)' : 'var(--text-3)',
-                      boxShadow: period === p ? '0 1px 4px rgba(0,0,0,0.15)' : 'none',
+                      background: period === key ? 'var(--bg-surface)' : 'transparent',
+                      color: period === key ? 'var(--text-1)' : 'var(--text-3)',
+                      boxShadow: period === key ? '0 1px 4px rgba(0,0,0,0.15)' : 'none',
                     }}
                   >
-                    {p === 'week' ? 'Esta semana' : 'Este mês'}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -304,17 +381,17 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <StatCard
                       icon={<CalendarDays style={{ width: '14px', height: '14px' }} />}
-                      label="Dias com refeições"
-                      value={`${data.daysWithData} de ${data.daysInPeriod}`}
+                      label={period === 'day' ? 'Refeições hoje' : 'Dias com refeições'}
+                      value={period === 'day' ? String(data.totals.meals) : `${data.daysWithData} de ${data.daysInPeriod}`}
                       color="#6366f1"
                     />
                     <StatCard
                       icon={<Trophy style={{ width: '14px', height: '14px' }} />}
-                      label={data.goals?.calories ? 'Dias dentro da meta' : 'Total de refeições'}
-                      value={data.goals?.calories ? `${data.daysOnTarget} de ${data.daysWithData}` : String(data.totals.meals)}
+                      label={data.goals?.calories && period !== 'day' ? 'Dias dentro da meta' : 'Total de refeições'}
+                      value={data.goals?.calories && period !== 'day' ? `${data.daysOnTarget} de ${data.daysWithData}` : String(data.totals.meals)}
                       color="#f59e0b"
                     />
-                    {data.streak > 0 && (
+                    {data.streak > 0 && period === 'day' && (
                       <div style={{ gridColumn: '1 / -1' }}>
                         <StatCard
                           icon={<Flame style={{ width: '14px', height: '14px' }} />}
@@ -327,50 +404,14 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                     )}
                   </div>
 
-                  {/* Bar chart */}
-                  <div style={{
-                    background: 'var(--bg-2)',
-                    borderRadius: '16px', border: '1.5px solid var(--border)',
-                    padding: '16px',
-                  }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '12px' }}>
-                      Calorias por dia
-                    </div>
-                    <ResponsiveContainer width="100%" height={140}>
-                      <BarChart data={chartData} barCategoryGap="30%" margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                        <XAxis
-                          dataKey="label"
-                          tick={{ fontSize: 10, fill: 'var(--text-3)' }}
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <YAxis
-                          tick={{ fontSize: 9, fill: 'var(--text-3)' }}
-                          axisLine={false}
-                          tickLine={false}
-                          tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)}
-                        />
-                        <Tooltip content={<CustomTooltip goalValue={goalCalories} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                        {goalCalories && (
-                          <ReferenceLine y={goalCalories} stroke="#6366f1" strokeDasharray="4 3" strokeWidth={1.5} />
-                        )}
-                        <Bar dataKey="calories" radius={[3, 3, 0, 0]} shape={<CustomBar goalValue={goalCalories} />}>
-                          {chartData.map((entry, i) => (
-                            <Cell
-                              key={i}
-                              fill={goalCalories && entry.calories > goalCalories * 1.1 ? '#ef4444' : '#6366f1'}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                    {goalCalories && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }}>
-                        <div style={{ width: '20px', height: '2px', background: '#6366f1', borderRadius: '1px', borderStyle: 'dashed' }} />
-                        <span style={{ fontSize: '10px', color: 'var(--text-3)' }}>Meta diária: {goalCalories} kcal</span>
-                      </div>
-                    )}
-                  </div>
+                  {/* Stacked bar chart — week/month only */}
+                  {showChart && (
+                    <StackedCaloriesChart
+                      days={data.days}
+                      period={period}
+                      goalCalories={goalCalories}
+                    />
+                  )}
 
                   {/* Macro progress cards */}
                   <div style={{
@@ -380,7 +421,7 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                     display: 'flex', flexDirection: 'column', gap: '14px',
                   }}>
                     <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)' }}>
-                      Macros totais do período
+                      {period === 'day' ? 'Macros de hoje' : 'Macros totais do período'}
                     </div>
                     {[
                       { label: 'Calorias', emoji: '🔥', color: '#f97316', key: 'calories' as const, unit: 'kcal' },
@@ -391,7 +432,9 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                     ].map(({ label, emoji, color, key, unit }) => {
                       const current = key === 'calories' ? data.totals[key] : (data.totals[key] as number);
                       const dailyGoal = data.goals?.[key] ?? null;
-                      const periodGoal = dailyGoal && data.daysInPeriod ? dailyGoal * data.daysInPeriod : null;
+                      const periodGoal = dailyGoal
+                        ? (period === 'day' ? dailyGoal : dailyGoal * data.daysInPeriod)
+                        : null;
                       return (
                         <MacroBar
                           key={key}
@@ -406,8 +449,8 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                     })}
                   </div>
 
-                  {/* Daily averages */}
-                  {data.dailyAvg && (
+                  {/* Daily averages — week/month only */}
+                  {data.dailyAvg && period !== 'day' && (
                     <div style={{
                       background: 'var(--bg-2)',
                       borderRadius: '16px', border: '1.5px solid var(--border)',
@@ -444,7 +487,7 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                       padding: '16px',
                     }}>
                       <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '12px' }}>
-                        Refeições do período
+                        Refeições {period === 'day' ? 'de hoje' : 'do período'}
                         <span style={{
                           marginLeft: '8px', fontSize: '10px', fontWeight: 600,
                           padding: '2px 7px', borderRadius: '99px',

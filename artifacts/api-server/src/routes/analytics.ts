@@ -38,11 +38,12 @@ function toLocalDateStr(date: Date, tzOffset = 0): string {
   return d.toISOString().slice(0, 10);
 }
 
-// GET /api/analytics/summary?sessionId=&period=week|month&date=YYYY-MM-DD
+// GET /api/analytics/summary?sessionId=&period=day|week|month&date=YYYY-MM-DD
 router.get("/summary", async (req: Request, res: Response) => {
   const sessionId = req.query.sessionId as string | undefined;
   const userId = req.user?.userId;
-  const period = (req.query.period as string) === "month" ? "month" : "week";
+  const rawPeriod = (req.query.period as string) ?? "week";
+  const period: "day" | "week" | "month" = rawPeriod === "month" ? "month" : rawPeriod === "day" ? "day" : "week";
   const dateParam = req.query.date as string | undefined;
 
   if (!sessionId && !userId) {
@@ -60,7 +61,11 @@ router.get("/summary", async (req: Request, res: Response) => {
   let periodEnd: Date;
   let daysInPeriod: number;
 
-  if (period === "month") {
+  if (period === "day") {
+    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+    daysInPeriod = 1;
+  } else if (period === "month") {
     periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
     periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
     daysInPeriod = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 0).getDate();
