@@ -199,7 +199,7 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
       servingSize: parsed.servingSize ?? null,
       confidence: parsed.confidence ?? null,
       imageUrl: null,
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     });
 
     res.json(result);
@@ -255,7 +255,7 @@ router.get("/history", async (req: Request, res: Response) => {
       servingSize: a.servingSize ?? null,
       confidence: a.confidence ?? null,
       imageUrl: a.imageUrl ?? null,
-      createdAt: a.createdAt.toISOString(),
+      createdAt: a.createdAt,
     }))
   );
 
