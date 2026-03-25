@@ -21,21 +21,27 @@ import {
 import type { AnalysisResult } from '@workspace/api-client-react/src/generated/api.schemas';
 
 const BASE = import.meta.env.BASE_URL ?? '/';
+const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
+
+function authHeaders(): HeadersInit {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 async function fetchGoals(sessionId: string) {
-  const r = await fetch(`${BASE}api/goals?sessionId=${sessionId}`);
+  const r = await fetch(`${BASE}api/goals?sessionId=${sessionId}`, { headers: authHeaders() });
   if (!r.ok) return null;
   return r.json();
 }
 async function saveGoals(sessionId: string, goals: CalculatedGoals) {
   await fetch(`${BASE}api/goals`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ sessionId, ...goals, restrictions: goals.restrictions }),
   });
 }
 async function fetchDailySummary(sessionId: string) {
-  const r = await fetch(`${BASE}api/goals/daily-summary?sessionId=${sessionId}`);
+  const r = await fetch(`${BASE}api/goals/daily-summary?sessionId=${sessionId}`, { headers: authHeaders() });
   if (!r.ok) return null;
   return r.json();
 }
