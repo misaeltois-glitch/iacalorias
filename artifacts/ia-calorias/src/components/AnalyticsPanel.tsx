@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, TrendingUp, CalendarDays, Trophy, Lock, Flame } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell,
+  type TooltipProps,
 } from 'recharts';
+import { type ValueType, type NameType } from 'recharts/types/component/DefaultTooltipContent';
 
 type Period = 'day' | 'week' | 'month';
 
@@ -15,6 +17,26 @@ interface DayData {
   fat: number;
   fiber: number;
   mealsCount: number;
+}
+
+interface MealItem {
+  id: string;
+  dishName: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number | null;
+  healthScore: number | null;
+  createdAt: string;
+}
+
+interface Pagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasMore: boolean;
 }
 
 interface AnalyticsSummary {
@@ -29,7 +51,8 @@ interface AnalyticsSummary {
   streak: number;
   daysOnTarget: number;
   goals: { calories: number | null; protein: number | null; carbs: number | null; fat: number | null; fiber: number | null; mealsPerDay: number } | null;
-  meals: { id: string; dishName: string; calories: number; protein: number; carbs: number; fat: number; fiber: number | null; healthScore: number | null; createdAt: string }[];
+  meals: MealItem[];
+  pagination: Pagination;
   isPremium: boolean;
   requiresUpgrade: boolean;
 }
@@ -130,10 +153,19 @@ function SkeletonBlock({ h = 20, w = '100%', r = 8 }: { h?: number; w?: string |
   );
 }
 
-const CustomTooltip = ({ active, payload, label, goalValue }: any) => {
+interface TooltipPayloadEntry {
+  dataKey?: string | number;
+  value?: ValueType;
+}
+
+interface CustomTooltipProps extends TooltipProps<ValueType, NameType> {
+  goalValue?: number | null;
+}
+
+const CustomTooltip = ({ active, payload, label, goalValue }: CustomTooltipProps) => {
   if (!active || !payload?.length) return null;
-  const consumed = (payload.find((p: any) => p.dataKey === 'consumed')?.value ?? 0) as number;
-  const excess = (payload.find((p: any) => p.dataKey === 'excess')?.value ?? 0) as number;
+  const consumed = (payload.find((p: TooltipPayloadEntry) => p.dataKey === 'consumed')?.value ?? 0) as number;
+  const excess = (payload.find((p: TooltipPayloadEntry) => p.dataKey === 'excess')?.value ?? 0) as number;
   const total = consumed + excess;
   return (
     <div style={{
@@ -229,28 +261,47 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
   const [period, setPeriod] = useState<Period>('day');
   const [data, setData] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const fetchData = useCallback(async (p: Period) => {
+  const fetchData = useCallback(async (p: Period, page = 1) => {
     if (!sessionId) return;
-    setLoading(true);
+    if (page === 1) setLoading(true);
+    else setLoadingMore(true);
     try {
-      const r = await fetch(`${BASE}api/analytics/summary?sessionId=${sessionId}&period=${p}`, {
-        headers: authHeaders(),
-      });
-      if (r.ok) setData(await r.json());
+      const r = await fetch(
+        `${BASE}api/analytics/summary?sessionId=${sessionId}&period=${p}&page=${page}&pageSize=20`,
+        { headers: authHeaders() },
+      );
+      if (!r.ok) return;
+      const json: AnalyticsSummary = await r.json();
+      if (page === 1) {
+        setData(json);
+      } else {
+        setData(prev => prev ? {
+          ...prev,
+          meals: [...prev.meals, ...json.meals],
+          pagination: json.pagination,
+        } : json);
+      }
     } catch {
       // silent
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [sessionId]);
 
   useEffect(() => {
-    if (isOpen) fetchData(period);
+    if (isOpen) fetchData(period, 1);
   }, [isOpen, period, fetchData]);
 
   const handlePeriod = (p: Period) => {
     setPeriod(p);
+  };
+
+  const handleLoadMore = () => {
+    if (!data?.pagination.hasMore || loadingMore) return;
+    fetchData(period, data.pagination.page + 1);
   };
 
   const goalCalories = data?.goals?.calories ?? null;
@@ -527,6 +578,24 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                           </div>
                         ))}
                       </div>
+
+                      {/* Load more */}
+                      {data.pagination?.hasMore && (
+                        <button
+                          onClick={handleLoadMore}
+                          disabled={loadingMore}
+                          style={{
+                            width: '100%', marginTop: '8px',
+                            padding: '10px', borderRadius: '10px',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-3)', color: 'var(--text-2)',
+                            fontSize: '13px', fontWeight: 600, cursor: loadingMore ? 'default' : 'pointer',
+                            opacity: loadingMore ? 0.6 : 1,
+                          }}
+                        >
+                          {loadingMore ? 'Carregando...' : `Carregar mais (${data.pagination.total - data.meals.length} restantes)`}
+                        </button>
+                      )}
                     </div>
                   )}
                 </>

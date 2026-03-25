@@ -221,8 +221,16 @@ router.get("/summary", async (req: Request, res: Response) => {
     }
   }
 
-  // Meals list (compact, most recent first)
-  const mealsList = analyses.slice(0, isPremium ? 50 : 5).map(a => ({
+  // Pagination for meals list
+  const pageSize = Math.min(Math.max(1, parseInt((req.query.pageSize as string) ?? "20")), 50);
+  const page = Math.max(1, parseInt((req.query.page as string) ?? "1"));
+  const freeMealsLimit = 5;
+  const totalMeals = analyses.length;
+  const effectiveTotal = isPremium ? totalMeals : Math.min(totalMeals, freeMealsLimit);
+  const offset = isPremium ? (page - 1) * pageSize : 0;
+  const effectivePageSize = isPremium ? pageSize : freeMealsLimit;
+
+  const mealsList = analyses.slice(offset, offset + effectivePageSize).map(a => ({
     id: a.id,
     dishName: a.dishName,
     calories: a.calories,
@@ -233,6 +241,14 @@ router.get("/summary", async (req: Request, res: Response) => {
     healthScore: a.healthScore ?? null,
     createdAt: a.createdAt,
   }));
+
+  const pagination = {
+    page: isPremium ? page : 1,
+    pageSize: effectivePageSize,
+    total: effectiveTotal,
+    totalPages: Math.ceil(effectiveTotal / effectivePageSize),
+    hasMore: isPremium ? offset + effectivePageSize < effectiveTotal : false,
+  };
 
   const dailyGoals = goals ? {
     calories: goals.calories ?? null,
@@ -256,6 +272,7 @@ router.get("/summary", async (req: Request, res: Response) => {
     daysOnTarget,
     goals: dailyGoals,
     meals: mealsList,
+    pagination,
     isPremium,
     requiresUpgrade: !isPremium,
   });
