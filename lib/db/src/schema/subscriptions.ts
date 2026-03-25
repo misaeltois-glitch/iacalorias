@@ -6,6 +6,7 @@ export type Tier = "free" | "limited" | "unlimited";
 
 export const subscriptionsTable = pgTable("subscriptions", {
   sessionId: text("session_id").primaryKey(),
+  userId: text("user_id"),
   tier: text("tier").notNull().default("free"),
   analysisCount: integer("analysis_count").notNull().default(0),
   stripeCustomerId: text("stripe_customer_id"),

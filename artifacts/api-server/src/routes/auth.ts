@@ -1,0 +1,188 @@
+import { Router, type IRouter, type Request, type Response } from "express";
+import bcrypt from "bcryptjs";
+import { randomUUID, randomBytes } from "crypto";
+import { db, usersTable, subscriptionsTable, analysesTable, goalsTable } from "@workspace/db";
+import { eq, and, isNull } from "drizzle-orm";
+import { signToken, verifyToken } from "../lib/jwt.js";
+import { sendPasswordResetEmail } from "../lib/email.js";
+
+const router: IRouter = Router();
+
+const SALT_ROUNDS = 12;
+
+// ─── POST /api/auth/register ─────────────────────────────────────────────────
+router.post("/register", async (req: Request, res: Response) => {
+  const { email, password, sessionId } = req.body as { email?: string; password?: string; sessionId?: string };
+
+  if (!email || !password) {
+    res.status(400).json({ error: "bad_request", message: "Email e senha são obrigatórios." });
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400).json({ error: "bad_request", message: "Email inválido." });
+    return;
+  }
+  if (password.length < 6) {
+    res.status(400).json({ error: "bad_request", message: "A senha deve ter pelo menos 6 caracteres." });
+    return;
+  }
+
+  const existing = await db.query.usersTable.findFirst({ where: eq(usersTable.email, email.toLowerCase()) });
+  if (existing) {
+    res.status(409).json({ error: "email_taken", message: "Este email já está em uso." });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+  const userId = randomUUID();
+
+  await db.insert(usersTable).values({ id: userId, email: email.toLowerCase(), passwordHash });
+
+  // Migrate anonymous data to new account
+  if (sessionId) {
+    await migrateAnonymousData(sessionId, userId);
+  }
+
+  const token = signToken({ userId, email: email.toLowerCase() });
+  res.status(201).json({ token, user: { id: userId, email: email.toLowerCase() } });
+});
+
+// ─── POST /api/auth/login ─────────────────────────────────────────────────────
+router.post("/login", async (req: Request, res: Response) => {
+  const { email, password, sessionId } = req.body as { email?: string; password?: string; sessionId?: string };
+
+  if (!email || !password) {
+    res.status(400).json({ error: "bad_request", message: "Email e senha são obrigatórios." });
+    return;
+  }
+
+  const user = await db.query.usersTable.findFirst({ where: eq(usersTable.email, email.toLowerCase()) });
+  if (!user) {
+    res.status(401).json({ error: "invalid_credentials", message: "Email ou senha incorretos." });
+    return;
+  }
+
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) {
+    res.status(401).json({ error: "invalid_credentials", message: "Email ou senha incorretos." });
+    return;
+  }
+
+  // Migrate anonymous data if sessionId provided
+  if (sessionId) {
+    await migrateAnonymousData(sessionId, user.id);
+  }
+
+  const token = signToken({ userId: user.id, email: user.email });
+  res.json({ token, user: { id: user.id, email: user.email } });
+});
+
+// ─── GET /api/auth/me ─────────────────────────────────────────────────────────
+router.get("/me", async (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    res.status(401).json({ error: "unauthorized", message: "Token necessário." });
+    return;
+  }
+  const payload = verifyToken(authHeader.slice(7));
+  if (!payload) {
+    res.status(401).json({ error: "invalid_token", message: "Token inválido ou expirado." });
+    return;
+  }
+
+  const user = await db.query.usersTable.findFirst({ where: eq(usersTable.id, payload.userId) });
+  if (!user) {
+    res.status(404).json({ error: "not_found", message: "Usuário não encontrado." });
+    return;
+  }
+
+  res.json({ id: user.id, email: user.email, createdAt: user.createdAt.toISOString() });
+});
+
+// ─── POST /api/auth/forgot-password ──────────────────────────────────────────
+router.post("/forgot-password", async (req: Request, res: Response) => {
+  const { email } = req.body as { email?: string };
+  if (!email) {
+    res.status(400).json({ error: "bad_request", message: "Email é obrigatório." });
+    return;
+  }
+
+  const user = await db.query.usersTable.findFirst({ where: eq(usersTable.email, email.toLowerCase()) });
+
+  // Always return success to prevent email enumeration
+  const GENERIC_RESPONSE = { message: "Se este email estiver cadastrado, você receberá um link de redefinição em breve." };
+
+  if (!user) {
+    res.json(GENERIC_RESPONSE);
+    return;
+  }
+
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await db.update(usersTable)
+    .set({ resetToken: token, resetTokenExpiresAt: expiresAt, updatedAt: new Date() })
+    .where(eq(usersTable.id, user.id));
+
+  try {
+    await sendPasswordResetEmail(user.email, token, req.log);
+  } catch (err) {
+    req.log.error({ err }, "Failed to send password reset email");
+  }
+
+  res.json(GENERIC_RESPONSE);
+});
+
+// ─── POST /api/auth/reset-password ───────────────────────────────────────────
+router.post("/reset-password", async (req: Request, res: Response) => {
+  const { token, password } = req.body as { token?: string; password?: string };
+
+  if (!token || !password) {
+    res.status(400).json({ error: "bad_request", message: "Token e nova senha são obrigatórios." });
+    return;
+  }
+  if (password.length < 6) {
+    res.status(400).json({ error: "bad_request", message: "A senha deve ter pelo menos 6 caracteres." });
+    return;
+  }
+
+  const user = await db.query.usersTable.findFirst({ where: eq(usersTable.resetToken, token) });
+
+  if (!user || !user.resetTokenExpiresAt || user.resetTokenExpiresAt < new Date()) {
+    res.status(400).json({ error: "invalid_token", message: "Link de redefinição inválido ou expirado. Solicite um novo." });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+  await db.update(usersTable)
+    .set({ passwordHash, resetToken: null, resetTokenExpiresAt: null, updatedAt: new Date() })
+    .where(eq(usersTable.id, user.id));
+
+  res.json({ message: "Senha alterada com sucesso. Faça login com sua nova senha." });
+});
+
+// ─── POST /api/auth/logout ────────────────────────────────────────────────────
+router.post("/logout", (_req: Request, res: Response) => {
+  // JWT is stateless — client deletes the token
+  res.json({ message: "Logout realizado." });
+});
+
+// ─── Data migration helper ────────────────────────────────────────────────────
+async function migrateAnonymousData(sessionId: string, userId: string): Promise<void> {
+  // Set userId on analyses (keep sessionId intact for compatibility)
+  await db.update(analysesTable)
+    .set({ userId })
+    .where(and(eq(analysesTable.sessionId, sessionId), isNull(analysesTable.userId)));
+
+  // Set userId on subscription
+  await db.update(subscriptionsTable)
+    .set({ userId })
+    .where(and(eq(subscriptionsTable.sessionId, sessionId), isNull(subscriptionsTable.userId)));
+
+  // Set userId on goals
+  await db.update(goalsTable)
+    .set({ userId })
+    .where(and(eq(goalsTable.sessionId, sessionId), isNull(goalsTable.userId)));
+}
+
+export default router;

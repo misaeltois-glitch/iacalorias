@@ -29,6 +29,12 @@ pnpm workspace monorepo using TypeScript. This is **IA Calorias** — an AI-powe
 - **AI Analysis**: Upload food photo → OpenAI GPT-4o returns dish name, kcal, protein, carbs, fat as JSON
 - **Subscription management**: Stripe Checkout sessions + Webhooks update DB tier
 - **Dark/Light mode**: System preference + toggle
+- **Authentication**: Email/password auth (register, login, logout, forgot/reset password) with JWT
+  - JWT stored in `localStorage` key `ia-calorias-auth-token`
+  - Auth state shared via React Context (`AuthProvider` in `App.tsx`)
+  - Anonymous session data migrated to user account on login/register
+  - Password reset via email link (Resend API or console log in dev)
+- **LGPD Consent**: Full-screen popup on first visit, stored in `localStorage` key `lgpd-accepted`
 
 ## Structure
 
@@ -60,6 +66,9 @@ artifacts-monorepo/
 - `STRIPE_LIMITED_PRICE_ID` — Stripe Price ID for R$29,90/mês plan
 - `STRIPE_UNLIMITED_PRICE_ID` — Stripe Price ID for R$49,90/mês plan
 - `DATABASE_URL` — PostgreSQL connection string (auto-provisioned by Replit)
+- `JWT_SECRET` — Secret for signing JWTs (falls back to hardcoded dev string if absent)
+- `RESEND_API_KEY` — (optional) Resend API key for password reset emails; logs link to console if absent
+- `APP_URL` — (optional) Base URL for password reset links (default: `https://iaicalorias.replit.app`)
 
 ## API Endpoints
 
@@ -72,6 +81,12 @@ All under `/api`:
 - `GET /subscription/status?sessionId=xxx` — subscription info
 - `POST /subscription/checkout` — create Stripe checkout session
 - `POST /subscription/webhook` — Stripe webhook handler
+- `POST /auth/register` — create account (email, password, sessionId → token + user)
+- `POST /auth/login` — sign in (email, password, sessionId → token + user)
+- `POST /auth/logout` — sign out
+- `GET /auth/me` — get current user (Bearer token required)
+- `POST /auth/forgot-password` — send reset email
+- `POST /auth/reset-password` — apply new password (token + password)
 
 ## TypeScript & Composite Projects
 

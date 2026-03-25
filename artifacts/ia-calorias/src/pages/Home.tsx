@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Moon, Sun, PieChart, Settings } from 'lucide-react';
+import { Moon, Sun, PieChart, Settings, LogIn, LogOut, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/hooks/use-session';
+import { useAuth } from '@/hooks/use-auth';
 
 import { UploadZone } from '@/components/UploadZone';
 import { ResultCard } from '@/components/ResultCard';
 import { PaywallModal } from '@/components/PaywallModal';
 import { OnboardingModal, type CalculatedGoals } from '@/components/OnboardingModal';
 import { DailyProgress } from '@/components/DailyProgress';
+import { AuthModal } from '@/components/AuthModal';
+import { LGPDConsentPopup, useLGPDConsent } from '@/components/LGPDConsentPopup';
 
 import {
   useAnalyzeFood,
@@ -19,7 +22,6 @@ import type { AnalysisResult } from '@workspace/api-client-react/src/generated/a
 
 const BASE = import.meta.env.BASE_URL ?? '/';
 
-// ── Simple fetchers (goals API não está no codegen, chamada manual) ──────────
 async function fetchGoals(sessionId: string) {
   const r = await fetch(`${BASE}api/goals?sessionId=${sessionId}`);
   if (!r.ok) return null;
@@ -41,13 +43,16 @@ async function fetchDailySummary(sessionId: string) {
 export default function Home() {
   const { toast } = useToast();
   const sessionId = useSession();
+  const { user, isAuthenticated, logout } = useAuth();
+  const { accepted: lgpdAccepted, accept: acceptLGPD } = useLGPDConsent();
 
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [currentResult, setCurrentResult] = useState<AnalysisResult | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
-  // Goals & daily summary state
   const [savedGoals, setSavedGoals] = useState<any>(null);
   const [dailySummary, setDailySummary] = useState<any>(null);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
@@ -60,7 +65,6 @@ export default function Home() {
   const analyzeMutation = useAnalyzeFood();
   const isPremium = subStatus?.tier === 'limited' || subStatus?.tier === 'unlimited';
 
-  // ── Load goals & daily summary when premium ───────────────────────────────
   const refreshSummary = useCallback(async () => {
     if (!sessionId || !isPremium) return;
     const summary = await fetchDailySummary(sessionId);
@@ -76,11 +80,9 @@ export default function Home() {
     else if (sessionId && !isPremium) setGoalsLoaded(true);
   }, [sessionId, isPremium, refreshSummary]);
 
-  // ── Theme & URL params ────────────────────────────────────────────────────
   useEffect(() => {
     const t = document.documentElement.getAttribute('data-theme') || 'dark';
     setTheme(t as 'light' | 'dark');
-
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout_success') === 'true') {
       toast({ title: "Assinatura confirmada!", description: "Seu plano foi ativado. Aproveite!" });
@@ -96,7 +98,6 @@ export default function Home() {
     setTheme(next);
   };
 
-  // ── Error messages ────────────────────────────────────────────────────────
   const getErrorMessage = (error: any): { title: string; description: string } => {
     const body = error?.response?.data ?? error?.data ?? {};
     const code = body?.error;
@@ -112,11 +113,9 @@ export default function Home() {
     return msgs[code] ?? { title: "Erro na análise", description: body?.message || "Ocorreu um erro inesperado." };
   };
 
-  // ── Analyze food ──────────────────────────────────────────────────────────
   const handleAnalyze = async (file: File) => {
     if (!sessionId) return;
     if (subStatus?.tier === 'free' && subStatus.trialRemaining <= 0) { setShowPaywall(true); return; }
-
     analyzeMutation.mutate({ data: { image: file, sessionId } }, {
       onSuccess: async (data) => {
         setCurrentResult(data);
@@ -133,16 +132,26 @@ export default function Home() {
     });
   };
 
-  // ── Save goals from onboarding ────────────────────────────────────────────
   const handleGoalsSave = async (goals: CalculatedGoals) => {
     if (!sessionId) return;
     await saveGoals(sessionId, goals);
     setShowOnboarding(false);
-    toast({ title: "Metas salvas! 🎯", description: "Seu progresso diário já está ativo." });
+    toast({ title: "Metas salvas!", description: "Seu progresso diário já está ativo." });
     await refreshSummary();
   };
 
-  // ── Usage pill ────────────────────────────────────────────────────────────
+  const handleAuthSuccess = () => {
+    refetchStatus();
+    refreshSummary();
+    toast({ title: "Bem-vindo!", description: "Login realizado com sucesso." });
+  };
+
+  const handleLogout = async () => {
+    setShowUserMenu(false);
+    await logout();
+    toast({ title: "Até logo!", description: "Você saiu da sua conta." });
+  };
+
   const renderUsagePill = () => {
     if (!subStatus) return null;
     if (subStatus.tier === 'free') return (
@@ -166,6 +175,9 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background relative flex flex-col items-center">
 
+      {/* LGPD Popup */}
+      {!lgpdAccepted && <LGPDConsentPopup onAccept={acceptLGPD} />}
+
       {/* Header */}
       <header className="sticky top-0 z-50 w-full flex justify-center border-b border-border/40 glass">
         <div className="w-full max-w-[720px] px-4 h-[60px] flex items-center justify-between">
@@ -188,6 +200,70 @@ export default function Home() {
                 <Settings className="w-4 h-4" />
               </button>
             )}
+
+            {/* Auth button / user menu */}
+            {isAuthenticated ? (
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowUserMenu(v => !v)}
+                  title={user?.email}
+                  className="p-2 rounded-full text-muted-foreground hover:bg-background-2 transition-colors"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <User className="w-4 h-4" />
+                </button>
+                {showUserMenu && (
+                  <>
+                    <div
+                      style={{ position: 'fixed', inset: 0, zIndex: 100 }}
+                      onClick={() => setShowUserMenu(false)}
+                    />
+                    <div style={{
+                      position: 'absolute', right: 0, top: '42px',
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '12px', padding: '8px',
+                      minWidth: '200px', zIndex: 101,
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                    }}>
+                      <div style={{
+                        padding: '8px 12px 10px',
+                        borderBottom: '1px solid var(--border)',
+                        marginBottom: '4px',
+                      }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-2)', marginBottom: '2px' }}>Conectado como</div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-1)', wordBreak: 'break-all' }}>
+                          {user?.email}
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleLogout}
+                        style={{
+                          width: '100%', padding: '8px 12px',
+                          background: 'none', border: 'none',
+                          color: '#f87171', fontSize: '14px',
+                          cursor: 'pointer', borderRadius: '8px',
+                          display: 'flex', alignItems: 'center', gap: '8px',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <LogOut style={{ width: '14px', height: '14px' }} />
+                        Sair da conta
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAuth(true)}
+                title="Entrar"
+                className="p-2 rounded-full text-muted-foreground hover:bg-background-2 transition-colors"
+              >
+                <LogIn className="w-4 h-4" />
+              </button>
+            )}
+
             <button onClick={toggleTheme} className="p-2 rounded-full text-muted-foreground hover:bg-background-2 transition-colors">
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
@@ -207,13 +283,11 @@ export default function Home() {
               exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
               className="flex flex-col items-center w-full mt-4 md:mt-10"
             >
-              {/* Eyebrow */}
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-background-2 text-xs font-medium text-muted-foreground mb-8">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                 GPT-4o Vision · Análise instantânea
               </div>
 
-              {/* Hero */}
               <div className="text-center mb-10">
                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-foreground leading-[1.1]">
                   Fotografe seu prato.<br />
@@ -224,9 +298,36 @@ export default function Home() {
                 </p>
               </div>
 
+              {/* CTA for non-authenticated users */}
+              {!isAuthenticated && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  marginBottom: '16px',
+                  padding: '10px 16px',
+                  background: 'var(--bg-2)',
+                  borderRadius: '12px',
+                  border: '1px solid var(--border)',
+                }}>
+                  <User style={{ width: '16px', height: '16px', color: 'var(--text-2)', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', color: 'var(--text-2)' }}>
+                    Salve seu progresso criando uma conta grátis
+                  </span>
+                  <button
+                    onClick={() => setShowAuth(true)}
+                    style={{
+                      padding: '5px 12px', borderRadius: '8px',
+                      background: 'var(--accent)', color: '#fff',
+                      border: 'none', fontSize: '12px', fontWeight: 600,
+                      cursor: 'pointer', flexShrink: 0,
+                    }}
+                  >
+                    Entrar
+                  </button>
+                </div>
+              )}
+
               <UploadZone onAnalyze={handleAnalyze} isAnalyzing={analyzeMutation.isPending} />
 
-              {/* Daily Progress Panel (premium only, below upload) */}
               {goalsLoaded && (
                 <div className="w-full mt-8">
                   <DailyProgress
@@ -249,8 +350,6 @@ export default function Home() {
               className="w-full"
             >
               <ResultCard result={currentResult} onReset={() => setCurrentResult(null)} />
-
-              {/* Show daily progress after result too */}
               {goalsLoaded && isPremium && (
                 <div className="mt-6">
                   <DailyProgress
@@ -309,6 +408,12 @@ export default function Home() {
         isOpen={showOnboarding}
         onComplete={handleGoalsSave}
         onSkip={() => setShowOnboarding(false)}
+      />
+      <AuthModal
+        isOpen={showAuth}
+        onClose={() => setShowAuth(false)}
+        onSuccess={handleAuthSuccess}
+        sessionId={sessionId}
       />
     </div>
   );

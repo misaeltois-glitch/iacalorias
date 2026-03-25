@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 export const analysesTable = pgTable("analyses", {
   id: text("id").primaryKey(),
   sessionId: text("session_id").notNull(),
+  userId: text("user_id"),
   dishName: text("dish_name").notNull(),
   calories: integer("calories").notNull(),
   protein: real("protein").notNull(),
