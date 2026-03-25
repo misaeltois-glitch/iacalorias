@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 
 type Tab = 'login' | 'register' | 'forgot';
@@ -21,6 +22,8 @@ export function AuthModal({ isOpen, onClose, onSuccess, sessionId, initialTab = 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   if (!isOpen) return null;
 
@@ -239,11 +242,16 @@ export function AuthModal({ isOpen, onClose, onSuccess, sessionId, initialTab = 
             </div>
             <div>
               <label style={{ fontSize: '13px', color: 'var(--text-2)', display: 'block', marginBottom: '6px' }}>Senha</label>
-              <input
-                type="password" value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••" required autoComplete="current-password"
-                style={inputStyle}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••" required autoComplete="current-password"
+                  style={{ ...inputStyle, paddingRight: '42px' }}
+                />
+                <button type="button" onClick={() => setShowPassword(v => !v)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', alignItems: 'center', padding: 0 }}>
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
             <button
               type="button"
@@ -283,19 +291,29 @@ export function AuthModal({ isOpen, onClose, onSuccess, sessionId, initialTab = 
             </div>
             <div>
               <label style={{ fontSize: '13px', color: 'var(--text-2)', display: 'block', marginBottom: '6px' }}>Senha</label>
-              <input
-                type="password" value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="Mínimo 6 caracteres" required autoComplete="new-password"
-                style={inputStyle}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres" required autoComplete="new-password"
+                  style={{ ...inputStyle, paddingRight: '42px' }}
+                />
+                <button type="button" onClick={() => setShowPassword(v => !v)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', alignItems: 'center', padding: 0 }}>
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
             <div>
               <label style={{ fontSize: '13px', color: 'var(--text-2)', display: 'block', marginBottom: '6px' }}>Confirmar senha</label>
-              <input
-                type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="••••••••" required autoComplete="new-password"
-                style={inputStyle}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••" required autoComplete="new-password"
+                  style={{ ...inputStyle, paddingRight: '42px' }}
+                />
+                <button type="button" onClick={() => setShowConfirmPassword(v => !v)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', alignItems: 'center', padding: 0 }}>
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
             <button type="submit" disabled={loading} style={primaryBtnStyle}>
               {loading ? 'Criando conta...' : 'Criar conta grátis'}
