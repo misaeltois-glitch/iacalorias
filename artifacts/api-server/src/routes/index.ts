@@ -6,6 +6,7 @@ import analysisRouter from "./analysis";
 import subscriptionRouter from "./subscription";
 import goalsRouter from "./goals";
 import authRouter from "./auth";
+import analyticsRouter from "./analytics";
 
 const router: IRouter = Router();
 
@@ -17,5 +18,6 @@ router.use("/user", userRouter);
 router.use("/analysis", analysisRouter);
 router.use("/subscription", subscriptionRouter);
 router.use("/goals", goalsRouter);
+router.use("/analytics", analyticsRouter);
 
 export default router;

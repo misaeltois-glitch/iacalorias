@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Moon, Sun, PieChart, Settings, LogIn, LogOut, User } from 'lucide-react';
+import { Moon, Sun, PieChart, Settings, LogIn, LogOut, User, BarChart2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/hooks/use-session';
 import { useAuth } from '@/hooks/use-auth';
@@ -11,6 +11,7 @@ import { PaywallModal } from '@/components/PaywallModal';
 import { OnboardingModal, type CalculatedGoals } from '@/components/OnboardingModal';
 import { GoalsPanel } from '@/components/GoalsPanel';
 import { DailyProgress } from '@/components/DailyProgress';
+import { AnalyticsPanel } from '@/components/AnalyticsPanel';
 import { AuthModal } from '@/components/AuthModal';
 import { LGPDConsentPopup, useLGPDConsent } from '@/components/LGPDConsentPopup';
 
@@ -56,6 +57,7 @@ export default function Home() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showGoalsPanel, setShowGoalsPanel] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -204,6 +206,16 @@ export default function Home() {
 
           <div className="flex items-center gap-2">
             {renderUsagePill()}
+
+            {/* Analytics button — visible for all users */}
+            <button
+              onClick={() => setShowAnalytics(true)}
+              title="Ver análises"
+              className="p-2 rounded-full text-muted-foreground hover:bg-background-2 transition-colors"
+            >
+              <BarChart2 className="w-4 h-4" />
+            </button>
+
             {isPremium && (
               <button
                 onClick={() => setShowGoalsPanel(true)}
@@ -418,6 +430,15 @@ export default function Home() {
         </div>
 
       </main>
+
+      {/* Analytics Panel */}
+      <AnalyticsPanel
+        isOpen={showAnalytics}
+        onClose={() => setShowAnalytics(false)}
+        sessionId={sessionId}
+        isPremium={isPremium}
+        onUpgrade={() => { setShowAnalytics(false); setShowPaywall(true); }}
+      />
 
       {/* Modals */}
       <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} sessionId={sessionId} />
