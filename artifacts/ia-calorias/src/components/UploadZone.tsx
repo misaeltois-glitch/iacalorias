@@ -1,20 +1,52 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, ImageIcon, Loader2, X } from 'lucide-react';
+import { Camera, ImageIcon, X } from 'lucide-react';
 
 interface UploadZoneProps {
   onAnalyze: (file: File) => void;
+  onFileSelected?: (file: File, previewUrl: string) => void;
   isAnalyzing: boolean;
+  usageLabel?: string;
 }
 
-export function UploadZone({ onAnalyze, isAnalyzing }: UploadZoneProps) {
+function ShimmerSkeleton() {
+  return (
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px', padding: '24px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="shimmer-bg" style={{ width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0 }} />
+        <div className="shimmer-bg" style={{ flex: 1, height: '20px', borderRadius: '8px' }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        {[0,1,2,3].map(i => (
+          <div key={i} style={{ padding: '16px', borderRadius: '16px', border: '1px solid var(--border)' }}>
+            <div className="shimmer-bg" style={{ width: '32px', height: '32px', borderRadius: '8px', marginBottom: '8px' }} />
+            <div className="shimmer-bg" style={{ width: '60%', height: '14px', borderRadius: '6px', marginBottom: '6px' }} />
+            <div className="shimmer-bg" style={{ width: '100%', height: '6px', borderRadius: '99px' }} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', color: 'var(--text-2)', fontSize: '14px' }}>
+        <div style={{
+          width: '18px', height: '18px', borderRadius: '50%',
+          border: '2px solid var(--accent)', borderTopColor: 'transparent',
+          animation: 'spin 0.7s linear infinite',
+        }} />
+        Analisando com IA...
+      </div>
+    </div>
+  );
+}
+
+export function UploadZone({ onAnalyze, onFileSelected, isAnalyzing, usageLabel }: UploadZoneProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const processFile = (file: File) => {
+    const url = URL.createObjectURL(file);
     setSelectedFile(file);
-    setPreview(URL.createObjectURL(file));
+    setPreview(url);
+    onFileSelected?.(file, url);
   };
 
   const clearFile = (e: React.MouseEvent) => {
@@ -36,7 +68,6 @@ export function UploadZone({ onAnalyze, isAnalyzing }: UploadZoneProps) {
     noKeyboard: true,
   });
 
-  // Ctrl+V paste
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       if (isAnalyzing) return;
@@ -61,21 +92,25 @@ export function UploadZone({ onAnalyze, isAnalyzing }: UploadZoneProps) {
     }
   };
 
-  return (
-    <div className="w-full flex flex-col gap-4">
+  if (isAnalyzing) {
+    return <ShimmerSkeleton />;
+  }
 
-      {/* ── Desktop Drop Zone (hidden on mobile) ─────────────────── */}
+  return (
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+      {/* Desktop drop zone */}
       <div className="hidden sm:block">
         <div
           {...getRootProps()}
-          className={`
-            relative w-full rounded-3xl border-2 border-dashed transition-all duration-300
-            ${isDragActive
-              ? 'border-primary bg-primary/5 scale-[1.01]'
-              : 'border-border bg-background-2 hover:border-primary/40 hover:bg-primary/5'
-            }
-            ${preview ? 'p-1 border-solid cursor-default' : 'p-8 min-h-[260px] flex flex-col items-center justify-center cursor-pointer'}
-          `}
+          style={{
+            width: '100%', borderRadius: '24px',
+            border: `2px dashed ${isDragActive ? 'var(--accent)' : preview ? 'transparent' : 'var(--border-strong)'}`,
+            background: isDragActive ? 'rgba(13,159,110,0.05)' : preview ? 'transparent' : 'var(--bg-2)',
+            transition: 'all 0.25s',
+            cursor: preview ? 'default' : 'pointer',
+            ...(preview ? { padding: '4px' } : { padding: '36px 24px', minHeight: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }),
+          }}
           onClick={!preview ? open : undefined}
         >
           <input {...getInputProps()} />
@@ -83,81 +118,85 @@ export function UploadZone({ onAnalyze, isAnalyzing }: UploadZoneProps) {
           <AnimatePresence mode="wait">
             {preview ? (
               <motion.div
-                key="preview-desktop"
+                key="preview"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="relative w-full h-[300px] rounded-[22px] overflow-hidden"
+                style={{ position: 'relative', width: '100%', height: '280px', borderRadius: '20px', overflow: 'hidden' }}
               >
-                <img src={preview} alt="Preview" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end p-4">
-                  <span className="text-white text-sm font-medium bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-lg truncate max-w-[80%]">
+                <img src={preview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: 'linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 60%)',
+                  display: 'flex', alignItems: 'flex-end', padding: '16px',
+                }}>
+                  <span style={{
+                    color: '#fff', fontSize: '13px', fontWeight: 500,
+                    background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)',
+                    padding: '5px 12px', borderRadius: '8px',
+                    maxWidth: '80%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
                     {selectedFile?.name}
                   </span>
                 </div>
-                {!isAnalyzing && (
-                  <button
-                    onClick={clearFile}
-                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-                {isAnalyzing && (
-                  <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center">
-                    <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
-                    <span className="font-semibold text-foreground">Analisando com IA...</span>
-                    <span className="text-sm text-muted-foreground mt-1">Isso leva alguns segundos</span>
-                  </div>
-                )}
+                <button
+                  onClick={clearFile}
+                  style={{
+                    position: 'absolute', top: '12px', right: '12px',
+                    width: '32px', height: '32px', borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+                    border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff',
+                  }}
+                >
+                  <X size={14} />
+                </button>
               </motion.div>
             ) : (
               <motion.div
-                key="placeholder-desktop"
+                key="placeholder"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex flex-col items-center text-center w-full"
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="w-16 h-16 rounded-full border-2 border-border-strong flex items-center justify-center mb-4 text-muted-foreground">
-                  <ImageIcon className="w-7 h-7" />
+                <div style={{
+                  width: '64px', height: '64px', borderRadius: '50%',
+                  border: '2px solid var(--border-strong)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginBottom: '16px', color: 'var(--text-3)',
+                }}>
+                  <ImageIcon size={28} />
                 </div>
-                <h3 className="text-base font-semibold text-foreground mb-1">Clique aqui ou arraste uma foto</h3>
-                <p className="text-sm text-muted-foreground mb-6">JPG, PNG, WEBP · Máx. 4 MB · ou Cole (Ctrl+V)</p>
-
-                {/* Desktop action row — labels wrapping inputs directly */}
-                <div className="flex items-center gap-3">
-                  <label
-                    className="px-5 py-2 rounded-xl bg-transparent border border-primary text-primary font-semibold text-sm hover:bg-primary/10 transition-colors cursor-pointer select-none"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px' }}>
+                  Clique ou arraste uma foto
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '20px' }}>
+                  JPG, PNG, WEBP · Máx. 4 MB · ou Cole (Ctrl+V)
+                </p>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <label style={{
+                    padding: '9px 18px', borderRadius: '12px',
+                    border: '1.5px solid var(--accent)', color: 'var(--accent)',
+                    fontSize: '14px', fontWeight: 600, cursor: 'pointer', background: 'transparent',
+                    transition: 'background 0.15s',
+                  }}
+                  onClick={(e) => e.stopPropagation()}>
                     Escolher arquivo
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleFileInput}
-                      disabled={isAnalyzing}
-                    />
+                    <input type="file" accept="image/*" className="hidden" onChange={handleFileInput} />
                   </label>
-
-                  <span className="text-xs text-muted-foreground">ou</span>
-
-                  <label
-                    className="flex items-center gap-2 px-5 py-2 rounded-xl bg-background border border-border text-foreground font-semibold text-sm hover:bg-background-3 transition-colors cursor-pointer select-none"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Camera className="w-4 h-4" />
+                  <label style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '9px 18px', borderRadius: '12px',
+                    border: '1.5px solid var(--border-strong)', color: 'var(--text-1)',
+                    fontSize: '14px', fontWeight: 600, cursor: 'pointer', background: 'var(--bg)',
+                  }}
+                  onClick={(e) => e.stopPropagation()}>
+                    <Camera size={15} />
                     Tirar foto
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={handleFileInput}
-                      disabled={isAnalyzing}
-                    />
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileInput} />
                   </label>
                 </div>
               </motion.div>
@@ -166,87 +205,104 @@ export function UploadZone({ onAnalyze, isAnalyzing }: UploadZoneProps) {
         </div>
       </div>
 
-      {/* ── Mobile Actions (hidden on desktop) ───────────────────── */}
-      <div className="sm:hidden flex gap-3 w-full">
-        {/* Tirar foto — label wrapping input com capture */}
-        <label
-          className={`flex-1 flex items-center justify-center gap-2 py-5 rounded-2xl font-semibold text-sm text-white cursor-pointer select-none transition-all active:scale-95 ${isAnalyzing ? 'opacity-50 pointer-events-none' : ''}`}
-          style={{ background: 'linear-gradient(135deg, var(--accent), #059669)' }}
-        >
-          <Camera className="w-5 h-5" />
-          Tirar foto
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handleFileInput}
-            disabled={isAnalyzing}
-          />
-        </label>
-
-        {/* Galeria — label wrapping input sem capture */}
-        <label
-          className={`flex items-center justify-center gap-2 px-5 py-5 rounded-2xl bg-background-2 border border-border-strong text-foreground font-semibold text-sm cursor-pointer select-none hover:bg-background-3 transition-all active:scale-95 ${isAnalyzing ? 'opacity-50 pointer-events-none' : ''}`}
-        >
-          <ImageIcon className="w-5 h-5" />
-          Galeria
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileInput}
-            disabled={isAnalyzing}
-          />
-        </label>
-      </div>
-
-      {/* ── Mobile Preview ────────────────────────────────────────── */}
-      {preview && (
-        <div className="sm:hidden relative w-full aspect-square rounded-3xl overflow-hidden border border-border-strong">
-          <img src={preview} alt="Preview mobile" className="w-full h-full object-cover" />
-          {!isAnalyzing && (
+      {/* Mobile: camera card */}
+      <div className="sm:hidden" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {!preview ? (
+          <div style={{
+            padding: '24px', borderRadius: '20px',
+            background: 'var(--bg-2)', border: '1px solid var(--border)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+          }}>
+            <div
+              className="pulse-camera"
+              style={{
+                width: '72px', height: '72px', borderRadius: '50%',
+                background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Camera size={28} color="#fff" strokeWidth={1.8} />
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '4px' }}>
+                Analise sua refeição
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text-2)' }}>
+                Tire uma foto ou escolha da galeria
+              </div>
+              {usageLabel && (
+                <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '6px' }}>
+                  {usageLabel}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '4/3', borderRadius: '20px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+            <img src={preview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             <button
               onClick={clearFile}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white"
+              style={{
+                position: 'absolute', top: '10px', right: '10px',
+                width: '32px', height: '32px', borderRadius: '50%',
+                background: 'rgba(0,0,0,0.5)', border: 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', cursor: 'pointer',
+              }}
             >
-              <X className="w-4 h-4" />
+              <X size={14} />
             </button>
-          )}
-          {isAnalyzing && (
-            <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center">
-              <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
-              <span className="font-semibold text-sm">Analisando com IA...</span>
-            </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* ── Analyze Button ────────────────────────────────────────── */}
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <label style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            padding: '16px', borderRadius: '16px',
+            background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+            color: '#fff', fontSize: '15px', fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(13,159,110,0.3)',
+          }}>
+            <Camera size={18} />
+            Tirar foto
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileInput} disabled={isAnalyzing} />
+          </label>
+          <label style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+            padding: '16px 18px', borderRadius: '16px',
+            background: 'var(--bg-2)', border: '1.5px solid var(--border-strong)',
+            color: 'var(--text-1)', fontSize: '15px', fontWeight: 600,
+            cursor: 'pointer',
+          }}>
+            <ImageIcon size={18} />
+            Galeria
+            <input type="file" accept="image/*" className="hidden" onChange={handleFileInput} disabled={isAnalyzing} />
+          </label>
+        </div>
+      </div>
+
+      {/* Analyze button */}
       <button
         onClick={() => { if (selectedFile && !isAnalyzing) onAnalyze(selectedFile); }}
         disabled={!selectedFile || isAnalyzing}
-        className={`
-          w-full py-4 rounded-2xl font-semibold text-[17px] transition-all flex justify-center items-center gap-2
-          ${selectedFile && !isAnalyzing
-            ? 'text-white shadow-lg hover:opacity-90 active:scale-[0.98]'
-            : 'bg-background-3 text-muted-foreground cursor-not-allowed'}
-        `}
-        style={selectedFile && !isAnalyzing ? {
-          background: 'linear-gradient(135deg, var(--accent), #059669 50%, #0284c7)',
-          boxShadow: '0 4px 24px var(--accent-glow)',
-        } : {}}
+        style={{
+          width: '100%', padding: '16px', borderRadius: '16px',
+          fontSize: '16px', fontWeight: 700,
+          cursor: selectedFile && !isAnalyzing ? 'pointer' : 'not-allowed',
+          border: 'none', transition: 'all 0.2s',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          ...(selectedFile && !isAnalyzing ? {
+            background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+            color: '#fff',
+            boxShadow: '0 6px 24px rgba(13,159,110,0.35)',
+          } : {
+            background: 'var(--bg-3)',
+            color: 'var(--text-3)',
+          }),
+        }}
       >
-        {isAnalyzing ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            Analisando...
-          </>
-        ) : selectedFile ? (
-          'Analisar foto →'
-        ) : (
-          'Analisar foto'
-        )}
+        {selectedFile ? 'Analisar foto →' : 'Analisar foto'}
       </button>
 
     </div>

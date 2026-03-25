@@ -21,14 +21,18 @@ pnpm workspace monorepo using TypeScript. This is **IA Calorias** — an AI-powe
 
 ## Application Features
 
-- **Free Trial**: 3 free analyses per session (stored by sessionId in localStorage)
-- **Paywall**: Modal shown on 4th analysis attempt with two plan options
+- **Free Trial**: 3 free analyses per session (stored by sessionId in localStorage + IndexedDB + Cookie — multi-layer anti-bypass)
+- **Device Fingerprint**: SHA-256 hash of canvas, WebGL, audio, hardware signals — used as anonymous sessionId fallback if all layers cleared
+- **Paywall**: Modal shown on 4th analysis attempt with two plan options; disableClose=true when limit reached for anonymous users
 - **Plans**:
   - Limitado: R$29,90/mês — 20 analyses/month
   - Ilimitado: R$49,90/mês — unlimited analyses
 - **AI Analysis**: Upload food photo → OpenAI GPT-4o returns dish name, kcal, protein, carbs, fat as JSON
 - **Subscription management**: Stripe Checkout sessions + Webhooks update DB tier
 - **Dark/Light mode**: System preference + toggle
+- **Onboarding**: Splash screen (2s) → 3-slide carousel → home (first visit only, flag: `ia-calorias-onboarded`)
+- **Bottom Navigation**: 5-tab bottom nav (Home, Histórico, Analisar, Metas, Perfil); appears on all screens
+- **Design System**: Plus Jakarta Sans font + DM Mono for numbers; green palette #0D9F6E; shimmer/stagger/count-up animations
 - **Authentication**: Email/password auth (register, login, logout, forgot/reset password) with JWT
   - JWT stored in `localStorage` key `ia-calorias-auth-token`
   - Auth state shared via React Context (`AuthProvider` in `App.tsx`)

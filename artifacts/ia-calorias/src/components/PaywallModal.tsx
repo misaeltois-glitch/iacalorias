@@ -5,9 +5,11 @@ interface PaywallModalProps {
   isOpen: boolean;
   onClose: () => void;
   sessionId: string;
+  disableClose?: boolean;
+  onShowAuth?: () => void;
 }
 
-export function PaywallModal({ isOpen, onClose, sessionId }: PaywallModalProps) {
+export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowAuth }: PaywallModalProps) {
   const [loadingPlan, setLoadingPlan] = useState<'limited' | 'unlimited' | null>(null);
   const checkoutMutation = useCreateCheckoutSession();
 
@@ -31,7 +33,7 @@ export function PaywallModal({ isOpen, onClose, sessionId }: PaywallModalProps) 
         WebkitBackdropFilter: 'blur(10px)',
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (!disableClose && e.target === e.currentTarget) onClose(); }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -175,6 +177,21 @@ export function PaywallModal({ isOpen, onClose, sessionId }: PaywallModalProps) 
             </button>
           </div>
         </div>
+
+        {onShowAuth && (
+          <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+            <button
+              onClick={() => { onClose(); onShowAuth(); }}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text-2)', fontSize: '13px', fontWeight: 500,
+                textDecoration: 'underline', textDecorationStyle: 'dotted',
+              }}
+            >
+              Já tenho conta → Fazer login
+            </button>
+          </div>
+        )}
 
         {/* Footer */}
         <p style={{

@@ -1,178 +1,263 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Info, CheckCircle2, RotateCcw } from 'lucide-react';
+import { RotateCcw, Sparkles } from 'lucide-react';
 import type { AnalysisResult } from '@workspace/api-client-react/src/generated/api.schemas';
 
 interface ResultCardProps {
   result: AnalysisResult;
   onReset: () => void;
+  photoUrl?: string;
 }
 
-export function ResultCard({ result, onReset }: ResultCardProps) {
+const MACROS = [
+  { key: 'protein', label: 'Proteínas', emoji: '🥩', color: '#EF4444', bg: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.20)' },
+  { key: 'carbs',   label: 'Carboidratos', emoji: '🍞', color: '#F59E0B', bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.20)' },
+  { key: 'fiber',   label: 'Fibras', emoji: '🥬', color: '#10B981', bg: 'rgba(16,185,129,0.10)', border: 'rgba(16,185,129,0.20)' },
+  { key: 'fat',     label: 'Gorduras', emoji: '🫒', color: '#8B5CF6', bg: 'rgba(139,92,246,0.10)', border: 'rgba(139,92,246,0.20)' },
+] as const;
+
+function AnimatedBar({ color, targetPct, delay }: { color: string; targetPct: number; delay: number }) {
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setWidth(targetPct), delay);
+    return () => clearTimeout(t);
+  }, [targetPct, delay]);
+  return (
+    <div style={{ width: '100%', height: '6px', borderRadius: '99px', background: 'var(--bg-3)', overflow: 'hidden' }}>
+      <div style={{
+        height: '100%', borderRadius: '99px', background: color,
+        width: `${width}%`, transition: 'width 0.8s cubic-bezier(0.4,0,0.2,1)',
+      }} />
+    </div>
+  );
+}
+
+function CountUpNumber({ value, suffix = '' }: { value: number; suffix?: string }) {
+  const [displayed, setDisplayed] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const duration = 900;
+    const raf = requestAnimationFrame(function tick() {
+      const elapsed = Date.now() - start;
+      const progress = Math.min(1, elapsed / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayed(Math.round(eased * value));
+      if (progress < 1) requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{displayed}{suffix}</>;
+}
+
+export function ResultCard({ result, onReset, photoUrl }: ResultCardProps) {
+  const macroValues = {
+    protein: result.macros.protein,
+    carbs: result.macros.carbs,
+    fiber: result.fiber ?? 0,
+    fat: result.macros.fat,
+  };
+
+  const maxMacro = Math.max(...Object.values(macroValues), 1);
+  const getPct = (v: number) => Math.min(100, (v / maxMacro) * 100);
+
+  const healthScore = result.healthScore ?? 0;
+  const circumference = 2 * Math.PI * 36;
+  const strokeOffset = circumference - (healthScore / 10) * circumference;
+
   const container = {
     hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
+    show: { opacity: 1, transition: { staggerChildren: 0.12 } },
   };
-
   const item = {
-    hidden: { opacity: 0, y: 10 },
-    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    hidden: { opacity: 0, y: 16 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 280, damping: 24 } },
   };
-
-  const healthScore = result.healthScore || 0;
-  const circumference = 2 * Math.PI * 40;
-  const strokeDashoffset = circumference - (healthScore / 10) * circumference;
-
-  const maxMacro = Math.max(result.macros.protein, result.macros.carbs, result.macros.fat, result.fiber || 0, 100);
-  const getProgress = (val: number) => Math.min(100, (val / maxMacro) * 100);
 
   return (
-    <motion.div 
+    <motion.div
       variants={container}
       initial="hidden"
       animate="show"
-      className="w-full space-y-4"
+      style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}
     >
-      {/* Hero Result Card */}
-      <motion.div variants={item} className="p-6 md:p-8 rounded-3xl bg-background-2 border border-border flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
-        <div className="space-y-3 w-full text-center md:text-left">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-background border border-border text-xs font-medium text-muted-foreground mx-auto md:mx-0">
-            <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
-            Prato identificado
+      {/* Hero Card */}
+      <motion.div variants={item} style={{
+        borderRadius: '24px',
+        background: 'var(--bg-2)',
+        border: '1px solid var(--border)',
+        overflow: 'hidden',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
+      }}>
+        {photoUrl && (
+          <div style={{ width: '100%', aspectRatio: '16/9', overflow: 'hidden' }}>
+            <img
+              src={photoUrl}
+              alt="Prato analisado"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
           </div>
-          
-          <h2 className="text-2xl md:text-4xl font-bold text-foreground leading-tight">
+        )}
+
+        <div style={{ padding: '20px 22px 22px' }}>
+          <div style={{ marginBottom: '6px' }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '5px',
+              padding: '3px 10px', borderRadius: '99px',
+              background: 'rgba(13,159,110,0.1)', color: '#0D9F6E',
+              fontSize: '11px', fontWeight: 700, letterSpacing: '0.3px',
+            }}>
+              <Sparkles size={10} />
+              PRATO IDENTIFICADO
+            </span>
+          </div>
+          <h2 style={{
+            fontSize: '22px', fontWeight: 800, color: 'var(--text-1)',
+            letterSpacing: '-0.4px', marginBottom: '12px', lineHeight: 1.2,
+          }}>
             {result.dishName}
           </h2>
-          
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-            {result.servingSize && (
-              <span className="px-3 py-1 rounded-full bg-background border border-border text-sm text-muted-foreground">
-                {result.servingSize}
-              </span>
-            )}
-            {result.confidence && (
-              <span className="px-3 py-1 rounded-full bg-background border border-border text-sm text-muted-foreground">
-                Confiança: {result.confidence}
-              </span>
-            )}
-          </div>
-        </div>
 
-        <div className="shrink-0 flex items-center justify-center w-32 h-32 md:w-40 md:h-40 rounded-full bg-green-500/10 border-4 border-green-500/20 text-center flex-col">
-          <span className="text-4xl md:text-5xl font-bold text-primary tracking-tight">
-            {result.calories}
-          </span>
-          <span className="text-sm font-semibold text-primary/70 uppercase">
-            kcal
-          </span>
-        </div>
-      </motion.div>
-
-      {/* Macros Grid */}
-      <motion.div variants={item} className="grid grid-cols-2 gap-4">
-        {/* Protein */}
-        <div className="p-5 rounded-2xl bg-background-2 border border-border">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-sm font-medium text-foreground flex items-center gap-1.5">
-              🥩 Proteínas
-            </span>
-            <span className="font-bold text-foreground">{result.macros.protein}g</span>
-          </div>
-          <div className="w-full h-2.5 rounded-full bg-background overflow-hidden">
-            <div className="h-full bg-green-500 rounded-full transition-all duration-1000" style={{ width: `${getProgress(result.macros.protein)}%` }} />
-          </div>
-        </div>
-
-        {/* Carbs */}
-        <div className="p-5 rounded-2xl bg-background-2 border border-border">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-sm font-medium text-foreground flex items-center gap-1.5">
-              🌾 Carboidratos
-            </span>
-            <span className="font-bold text-foreground">{result.macros.carbs}g</span>
-          </div>
-          <div className="w-full h-2.5 rounded-full bg-background overflow-hidden">
-            <div className="h-full bg-amber-500 rounded-full transition-all duration-1000" style={{ width: `${getProgress(result.macros.carbs)}%` }} />
-          </div>
-        </div>
-
-        {/* Fat */}
-        <div className="p-5 rounded-2xl bg-background-2 border border-border">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-sm font-medium text-foreground flex items-center gap-1.5">
-              🫒 Gorduras
-            </span>
-            <span className="font-bold text-foreground">{result.macros.fat}g</span>
-          </div>
-          <div className="w-full h-2.5 rounded-full bg-background overflow-hidden">
-            <div className="h-full bg-rose-500 rounded-full transition-all duration-1000" style={{ width: `${getProgress(result.macros.fat)}%` }} />
-          </div>
-        </div>
-
-        {/* Fiber */}
-        <div className="p-5 rounded-2xl bg-background-2 border border-border">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-sm font-medium text-foreground flex items-center gap-1.5">
-              🥦 Fibras
-            </span>
-            <span className="font-bold text-foreground">{result.fiber || 0}g</span>
-          </div>
-          <div className="w-full h-2.5 rounded-full bg-background overflow-hidden">
-            <div className="h-full bg-cyan-500 rounded-full transition-all duration-1000" style={{ width: `${getProgress(result.fiber || 0)}%` }} />
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Health & Tip Row */}
-      <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-4">
-        {/* Health Score */}
-        <div className="p-5 rounded-2xl bg-background-2 border border-border flex flex-col items-center justify-center min-w-[160px]">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Score de Saúde</span>
-          <div className="relative w-24 h-24 flex items-center justify-center">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="40" className="stroke-border" strokeWidth="8" fill="none" />
-              <circle 
-                cx="50" cy="50" r="40" 
-                className="stroke-primary" 
-                strokeWidth="8" fill="none" 
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-              />
-            </svg>
-            <div className="absolute flex items-baseline gap-0.5">
-              <span className="text-2xl font-bold text-foreground">{healthScore}</span>
-              <span className="text-xs text-muted-foreground font-medium">/10</span>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {result.servingSize && (
+                <span style={{
+                  padding: '4px 10px', borderRadius: '99px',
+                  background: 'var(--bg-3)', border: '1px solid var(--border)',
+                  fontSize: '12px', color: 'var(--text-2)',
+                }}>
+                  {result.servingSize}
+                </span>
+              )}
+              {result.confidence && (
+                <span style={{
+                  padding: '4px 10px', borderRadius: '99px',
+                  background: 'var(--bg-3)', border: '1px solid var(--border)',
+                  fontSize: '12px', color: 'var(--text-2)',
+                }}>
+                  Confiança: {result.confidence}
+                </span>
+              )}
+            </div>
+            <div style={{ textAlign: 'center', flexShrink: 0 }}>
+              <div style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: '40px', fontWeight: 700, lineHeight: 1,
+                background: 'linear-gradient(135deg, #0D9F6E, #3B82F6)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}>
+                <CountUpNumber value={result.calories} />
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-2)', fontWeight: 600, letterSpacing: '0.5px' }}>
+                KCAL
+              </div>
             </div>
           </div>
         </div>
+      </motion.div>
 
-        {/* Nutrition Tip */}
-        <div className="p-5 rounded-2xl bg-background-2 border border-border flex flex-col justify-center">
-          <div className="flex items-center gap-2 mb-2">
-            <Info className="w-5 h-5 text-primary" />
-            <h4 className="font-semibold text-foreground">Dica Nutricional</h4>
+      {/* Macros 2x2 Grid */}
+      <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        {MACROS.map(({ key, label, emoji, color, bg, border }, i) => {
+          const val = macroValues[key];
+          return (
+            <div key={key} style={{
+              padding: '16px', borderRadius: '18px',
+              background: bg, border: `1px solid ${border}`,
+              display: 'flex', flexDirection: 'column', gap: '10px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '18px' }}>{emoji}</span>
+                <span style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: '18px', fontWeight: 700, color,
+                }}>
+                  <CountUpNumber value={val} suffix="g" />
+                </span>
+              </div>
+              <div>
+                <AnimatedBar color={color} targetPct={getPct(val)} delay={200 + i * 100} />
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: 600, color, opacity: 0.9 }}>{label}</span>
+            </div>
+          );
+        })}
+      </motion.div>
+
+      {/* Health Score + Tip */}
+      <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '10px' }}>
+        <div style={{
+          padding: '16px 20px', borderRadius: '18px',
+          background: 'var(--bg-2)', border: '1px solid var(--border)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+          minWidth: '110px',
+        }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.5px' }}>
+            SCORE
+          </span>
+          <div style={{ position: 'relative', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }} viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="36" fill="none" stroke="var(--bg-3)" strokeWidth="7" />
+              <circle
+                cx="40" cy="40" r="36" fill="none"
+                stroke="#0D9F6E" strokeWidth="7"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeOffset}
+                strokeLinecap="round"
+              />
+            </svg>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '1px' }}>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '22px', fontWeight: 700, color: 'var(--text-1)' }}>
+                {healthScore}
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-2)' }}>/10</span>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {result.nutritionTip || "Não há dicas adicionais para esta refeição."}
+          <span style={{ fontSize: '11px', color: 'var(--text-2)', fontWeight: 500 }}>Saúde</span>
+        </div>
+
+        <div style={{
+          padding: '16px', borderRadius: '18px',
+          background: 'var(--bg-2)', border: '1px solid var(--border)',
+          display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '6px',
+        }}>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: '#0D9F6E', letterSpacing: '0.3px' }}>
+            💡 DICA NUTRICIONAL
+          </span>
+          <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.55 }}>
+            {result.nutritionTip ?? 'Não há dicas adicionais para esta refeição.'}
           </p>
         </div>
       </motion.div>
 
-      <motion.div variants={item} className="pt-4">
-        <button 
+      {/* Footer */}
+      <motion.div variants={item} style={{
+        textAlign: 'center',
+        fontSize: '11px', color: 'var(--text-3)', fontWeight: 500, letterSpacing: '0.3px',
+        paddingBottom: '4px',
+      }}>
+        Analisado por IA · Precisão estimada: ~85%
+      </motion.div>
+
+      {/* Reset Button */}
+      <motion.div variants={item}>
+        <button
           onClick={onReset}
-          className="w-full py-4 rounded-2xl font-semibold text-[15px] bg-background-2 border border-border text-foreground hover:bg-background-3 transition-colors flex items-center justify-center gap-2"
+          style={{
+            width: '100%', padding: '15px',
+            borderRadius: '16px',
+            background: 'var(--bg-2)', border: '1px solid var(--border)',
+            color: 'var(--text-1)', fontSize: '15px', fontWeight: 600,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-3)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-2)')}
         >
-          <RotateCcw className="w-4 h-4" />
+          <RotateCcw size={16} />
           Analisar outra foto
         </button>
       </motion.div>
-
     </motion.div>
   );
 }

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Moon, Sun, PieChart, Settings, LogIn, LogOut, User, BarChart2 } from 'lucide-react';
+import { Moon, Sun, PieChart, Settings, LogIn, LogOut, User, BarChart2, Crown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/hooks/use-session';
 import { useAuth } from '@/hooks/use-auth';
@@ -14,6 +14,9 @@ import { DailyProgress } from '@/components/DailyProgress';
 import { AnalyticsPanel } from '@/components/AnalyticsPanel';
 import { AuthModal } from '@/components/AuthModal';
 import { LGPDConsentPopup, useLGPDConsent } from '@/components/LGPDConsentPopup';
+import { SplashScreen } from '@/components/SplashScreen';
+import { OnboardingCarousel } from '@/components/OnboardingCarousel';
+import { BottomNav, type BottomNavTab } from '@/components/BottomNav';
 
 import {
   useAnalyzeFood,
@@ -26,6 +29,7 @@ type Period = 'day' | 'week' | 'month';
 
 const BASE = import.meta.env.BASE_URL ?? '/';
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
+const ONBOARDED_KEY = 'ia-calorias-onboarded';
 
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -46,6 +50,48 @@ async function fetchDailySummary(sessionId: string, period: Period = 'day') {
   return r.json();
 }
 
+function getHourGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Bom dia';
+  if (h < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+function UsageBar({ used, max, onClick }: { used: number; max: number; onClick: () => void }) {
+  const pct = Math.min(100, (used / max) * 100);
+  const color = pct === 0 ? '#10B981' : pct <= 33 ? '#10B981' : pct <= 66 ? '#F59E0B' : '#EF4444';
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%', padding: '10px 14px', borderRadius: '12px',
+        background: 'var(--bg-2)', border: '1px solid var(--border)',
+        cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '6px',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '12px', color: 'var(--text-2)', fontWeight: 500 }}>
+          Análises gratuitas
+        </span>
+        <span style={{ fontSize: '12px', fontWeight: 700, color }}>
+          {used}/{max} usadas
+        </span>
+      </div>
+      <div style={{ width: '100%', height: '5px', borderRadius: '99px', background: 'var(--bg-3)' }}>
+        <div style={{
+          height: '100%', borderRadius: '99px', background: color,
+          width: `${pct}%`, transition: 'width 0.5s ease',
+        }} />
+      </div>
+      {used >= max && (
+        <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: 600 }}>
+          Limite atingido — Faça upgrade para continuar ✨
+        </span>
+      )}
+    </button>
+  );
+}
+
 export default function Home() {
   const { toast } = useToast();
   const sessionId = useSession();
@@ -54,25 +100,36 @@ export default function Home() {
 
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [currentResult, setCurrentResult] = useState<AnalysisResult | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallDisableClose, setPaywallDisableClose] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showGoalsPanel, setShowGoalsPanel] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
+  const [showSplash, setShowSplash] = useState(false);
+  const [showCarousel, setShowCarousel] = useState(false);
+
   const [savedGoals, setSavedGoals] = useState<any>(null);
   const [dailySummary, setDailySummary] = useState<any>(null);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
   const [period, setPeriod] = useState<Period>('day');
 
+  const [activeTab, setActiveTab] = useState<BottomNavTab>('home');
+
+  const prevTrialRemaining = useRef<number | null>(null);
+
   const { data: subStatus, refetch: refetchStatus } = useGetSubscriptionStatus(
     { sessionId },
-    { query: { enabled: true } }
+    { query: { enabled: !!sessionId } }
   );
 
   const analyzeMutation = useAnalyzeFood();
   const isPremium = subStatus?.tier === 'limited' || subStatus?.tier === 'unlimited';
+  const trialRemaining = subStatus?.trialRemaining ?? 3;
+  const trialUsed = Math.max(0, 3 - trialRemaining);
 
   const refreshSummary = useCallback(async (p?: Period) => {
     if (!sessionId || !isPremium) return;
@@ -99,7 +156,28 @@ export default function Home() {
       window.history.replaceState({}, document.title, window.location.pathname);
       refetchStatus();
     }
+
+    const alreadyOnboarded = localStorage.getItem(ONBOARDED_KEY);
+    if (!alreadyOnboarded) {
+      setShowSplash(true);
+    }
   }, []);
+
+  useEffect(() => {
+    if (subStatus?.tier === 'free' && prevTrialRemaining.current !== null) {
+      const prev = prevTrialRemaining.current;
+      const curr = subStatus.trialRemaining;
+      if (curr < prev) {
+        const used = 3 - curr;
+        if (curr === 2) toast({ title: `${used} de 3 análises gratuitas usadas`, description: 'Restam 2 análises.' });
+        if (curr === 1) toast({ title: `${used} de 3 análises gratuitas usadas`, description: 'Última análise gratuita restante!' });
+        if (curr === 0) toast({ title: 'Análises gratuitas esgotadas', description: 'Faça upgrade para continuar.' });
+      }
+    }
+    if (subStatus?.trialRemaining !== undefined) {
+      prevTrialRemaining.current = subStatus.trialRemaining;
+    }
+  }, [subStatus?.trialRemaining]);
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -130,7 +208,11 @@ export default function Home() {
 
   const handleAnalyze = async (file: File) => {
     if (!sessionId) return;
-    if (subStatus?.tier === 'free' && subStatus.trialRemaining <= 0) { setShowPaywall(true); return; }
+    if (subStatus?.tier === 'free' && subStatus.trialRemaining <= 0) {
+      setPaywallDisableClose(true);
+      setShowPaywall(true);
+      return;
+    }
     analyzeMutation.mutate({ data: { image: file, sessionId } }, {
       onSuccess: async (data) => {
         setCurrentResult(data);
@@ -140,11 +222,19 @@ export default function Home() {
       onError: (error: any) => {
         const status = error?.response?.status ?? error?.status;
         const body = error?.response?.data ?? error?.data ?? {};
-        if (status === 402 || body?.requiresUpgrade) { setShowPaywall(true); return; }
+        if (status === 402 || body?.requiresUpgrade) {
+          setPaywallDisableClose(true);
+          setShowPaywall(true);
+          return;
+        }
         const { title, description } = getErrorMessage(error);
         toast({ title, description, variant: "destructive" });
       },
     });
+  };
+
+  const handleFileSelected = (_file: File, url: string) => {
+    setPhotoUrl(url);
   };
 
   const handleGoalsSave = async (goals: CalculatedGoals) => {
@@ -167,112 +257,161 @@ export default function Home() {
     toast({ title: "Até logo!", description: "Você saiu da sua conta." });
   };
 
+  const handleSplashDone = () => {
+    setShowSplash(false);
+    setShowCarousel(true);
+  };
+
+  const handleCarouselDone = () => {
+    setShowCarousel(false);
+    localStorage.setItem(ONBOARDED_KEY, 'true');
+  };
+
+  const handleTabChange = (tab: BottomNavTab) => {
+    setActiveTab(tab);
+    if (tab === 'home') { setCurrentResult(null); }
+    if (tab === 'history') { setShowAnalytics(true); }
+    if (tab === 'analyze') { setCurrentResult(null); }
+    if (tab === 'goals') { isPremium ? setShowGoalsPanel(true) : setShowPaywall(true); }
+    if (tab === 'profile') { isAuthenticated ? setShowUserMenu(v => !v) : setShowAuth(true); }
+  };
+
   const renderUsagePill = () => {
     if (!subStatus) return null;
     if (subStatus.tier === 'free') return (
-      <button onClick={() => setShowPaywall(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-sm font-medium border border-green-500/20 hover:bg-green-500/20 transition-colors">
-        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+      <button onClick={() => setShowPaywall(true)} style={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        padding: '5px 12px', borderRadius: '99px',
+        background: 'rgba(13,159,110,0.1)', color: '#0D9F6E',
+        fontSize: '12px', fontWeight: 700, border: '1px solid rgba(13,159,110,0.2)',
+        cursor: 'pointer',
+      }}>
+        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0D9F6E', display: 'inline-block', animation: 'ping 1.5s cubic-bezier(0,0,0.2,1) infinite' }} />
         {subStatus.trialRemaining} de 3 grátis
       </button>
     );
     if (subStatus.tier === 'limited') return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-sm font-medium border border-amber-500/20">
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        padding: '5px 12px', borderRadius: '99px',
+        background: 'rgba(245,158,11,0.1)', color: '#F59E0B',
+        fontSize: '12px', fontWeight: 700, border: '1px solid rgba(245,158,11,0.2)',
+      }}>
         {subStatus.analysisCount}/20
       </div>
     );
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 text-sm font-medium border border-purple-500/20">
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        padding: '5px 12px', borderRadius: '99px',
+        background: 'rgba(139,92,246,0.1)', color: '#8B5CF6',
+        fontSize: '12px', fontWeight: 700, border: '1px solid rgba(139,92,246,0.2)',
+      }}>
         ✦ Ilimitado
       </div>
     );
   };
 
-  return (
-    <div className="min-h-screen bg-background relative flex flex-col items-center">
+  const greeting = getHourGreeting();
+  const displayName = user?.email?.split('@')[0] ?? null;
 
-      {/* LGPD Popup */}
+  return (
+    <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+
+      {/* Splash + Onboarding */}
+      <AnimatePresence>
+        {showSplash && <SplashScreen key="splash" onDone={handleSplashDone} />}
+        {showCarousel && <OnboardingCarousel key="carousel" onDone={handleCarouselDone} />}
+      </AnimatePresence>
+
+      {/* LGPD */}
       {!lgpdAccepted && <LGPDConsentPopup onAccept={acceptLGPD} />}
 
       {/* Header */}
-      <header className="sticky top-0 z-50 w-full flex justify-center border-b border-border/40 glass">
-        <div className="w-full max-w-[720px] px-4 h-[60px] flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentResult(null)}>
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white">
-              <PieChart className="w-5 h-5" />
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        width: '100%', display: 'flex', justifyContent: 'center',
+        borderBottom: '1px solid var(--border)',
+        background: 'rgba(var(--bg-rgb, 250,251,252), 0.85)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+      }}>
+        <div style={{
+          width: '100%', maxWidth: '720px', padding: '0 16px',
+          height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+            onClick={() => { setCurrentResult(null); setActiveTab('home'); }}
+          >
+            <div style={{
+              width: '32px', height: '32px', borderRadius: '10px',
+              background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <PieChart size={18} color="#fff" strokeWidth={2} />
             </div>
-            <span className="font-semibold text-foreground tracking-tight">IA Calorias</span>
-            <span className="px-1.5 py-0.5 rounded-md bg-muted text-[10px] font-medium text-muted-foreground uppercase tracking-wider ml-1">Beta</span>
+            <span style={{ fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-0.3px' }}>IA Calorias</span>
+            <span style={{
+              padding: '2px 6px', borderRadius: '6px',
+              background: 'var(--bg-3)', fontSize: '10px', fontWeight: 700,
+              color: 'var(--text-2)', letterSpacing: '0.5px',
+            }}>
+              BETA
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {renderUsagePill()}
 
-            {/* Analytics button — visible for all users */}
             <button
               onClick={() => setShowAnalytics(true)}
-              title="Ver análises"
-              className="p-2 rounded-full text-muted-foreground hover:bg-background-2 transition-colors"
+              style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
             >
-              <BarChart2 className="w-4 h-4" />
+              <BarChart2 size={16} />
             </button>
 
             {isPremium && (
               <button
                 onClick={() => setShowGoalsPanel(true)}
-                title="Configurar metas"
-                className="p-2 rounded-full text-muted-foreground hover:bg-background-2 transition-colors"
+                style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
               >
-                <Settings className="w-4 h-4" />
+                <Settings size={16} />
               </button>
             )}
 
-            {/* Auth button / user menu */}
             {isAuthenticated ? (
               <div style={{ position: 'relative' }}>
                 <button
                   onClick={() => setShowUserMenu(v => !v)}
-                  title={user?.email}
-                  className="p-2 rounded-full text-muted-foreground hover:bg-background-2 transition-colors"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
                 >
-                  <User className="w-4 h-4" />
+                  <User size={16} />
                 </button>
                 {showUserMenu && (
                   <>
-                    <div
-                      style={{ position: 'fixed', inset: 0, zIndex: 100 }}
-                      onClick={() => setShowUserMenu(false)}
-                    />
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 100 }} onClick={() => setShowUserMenu(false)} />
                     <div style={{
                       position: 'absolute', right: 0, top: '42px',
-                      background: 'var(--bg-surface)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '12px', padding: '8px',
+                      background: 'var(--bg-2)', border: '1px solid var(--border)',
+                      borderRadius: '16px', padding: '8px',
                       minWidth: '200px', zIndex: 101,
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
                     }}>
-                      <div style={{
-                        padding: '8px 12px 10px',
-                        borderBottom: '1px solid var(--border)',
-                        marginBottom: '4px',
-                      }}>
+                      <div style={{ padding: '8px 12px 10px', borderBottom: '1px solid var(--border)', marginBottom: '4px' }}>
                         <div style={{ fontSize: '11px', color: 'var(--text-2)', marginBottom: '2px' }}>Conectado como</div>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-1)', wordBreak: 'break-all' }}>
-                          {user?.email}
-                        </div>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)', wordBreak: 'break-all' }}>{user?.email}</div>
                       </div>
                       <button
                         onClick={handleLogout}
                         style={{
                           width: '100%', padding: '8px 12px',
-                          background: 'none', border: 'none',
-                          color: '#f87171', fontSize: '14px',
-                          cursor: 'pointer', borderRadius: '8px',
-                          display: 'flex', alignItems: 'center', gap: '8px',
-                          textAlign: 'left',
+                          background: 'none', border: 'none', color: '#f87171',
+                          fontSize: '14px', cursor: 'pointer', borderRadius: '10px',
+                          display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left',
                         }}
                       >
-                        <LogOut style={{ width: '14px', height: '14px' }} />
+                        <LogOut size={14} />
                         Sair da conta
                       </button>
                     </div>
@@ -282,67 +421,111 @@ export default function Home() {
             ) : (
               <button
                 onClick={() => setShowAuth(true)}
-                title="Entrar"
-                className="p-2 rounded-full text-muted-foreground hover:bg-background-2 transition-colors"
+                style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
               >
-                <LogIn className="w-4 h-4" />
+                <LogIn size={16} />
               </button>
             )}
 
-            <button onClick={toggleTheme} className="p-2 rounded-full text-muted-foreground hover:bg-background-2 transition-colors">
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            <button
+              onClick={toggleTheme}
+              style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main */}
-      <main className="w-full max-w-[720px] px-4 py-8 flex flex-col min-h-[calc(100vh-60px)]">
+      {/* Main Content */}
+      <main style={{
+        width: '100%', maxWidth: '720px', padding: '16px 16px 96px',
+        display: 'flex', flexDirection: 'column', flex: 1,
+      }}>
 
         <AnimatePresence mode="wait">
           {!currentResult ? (
             <motion.div
               key="hero"
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
-              className="flex flex-col items-center w-full mt-4 md:mt-10"
+              exit={{ opacity: 0, scale: 0.98 }}
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', paddingTop: '8px' }}
             >
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-background-2 text-xs font-medium text-muted-foreground mb-8">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                GPT-4o Vision · Análise instantânea
+              {/* Greeting */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <h1 style={{
+                    fontSize: '22px', fontWeight: 800, color: 'var(--text-1)',
+                    letterSpacing: '-0.4px', lineHeight: 1.2,
+                  }}>
+                    {greeting}{displayName ? `, ${displayName}` : '!'}
+                    {!displayName && ' 👋'}
+                  </h1>
+                  <p style={{ fontSize: '13px', color: 'var(--text-2)', marginTop: '2px' }}>
+                    {isPremium
+                      ? 'Registre sua próxima refeição'
+                      : `${3 - trialUsed} análise${(3 - trialUsed) !== 1 ? 's' : ''} gratuita${(3 - trialUsed) !== 1 ? 's' : ''} disponível`}
+                  </p>
+                </div>
+                {isPremium && subStatus?.tier === 'unlimited' && (
+                  <div style={{
+                    padding: '5px 12px', borderRadius: '99px',
+                    background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)',
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    fontSize: '12px', fontWeight: 700, color: '#8B5CF6',
+                  }}>
+                    <Crown size={12} />
+                    Premium
+                  </div>
+                )}
               </div>
 
-              <div className="text-center mb-10">
-                <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-foreground leading-[1.1]">
-                  Fotografe seu prato.<br />
-                  <span className="text-gradient">Conheça as calorias.</span>
-                </h1>
-                <p className="text-muted-foreground max-w-[480px] mx-auto text-base">
-                  Descubra calorias, macronutrientes e receba um score de saúde para qualquer refeição com o poder da Inteligência Artificial.
-                </p>
+              {/* Anonymous usage bar */}
+              {!isAuthenticated && subStatus?.tier === 'free' && (
+                <UsageBar used={trialUsed} max={3} onClick={() => setShowPaywall(true)} />
+              )}
+
+              {/* Camera card + upload */}
+              <div style={{
+                borderRadius: '24px',
+                background: 'var(--bg-2)', border: '1px solid var(--border)',
+                padding: '20px',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+              }}>
+                <div style={{ marginBottom: '14px' }}>
+                  <h2 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '3px' }}>
+                    Analise sua refeição
+                  </h2>
+                  <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>
+                    Tire uma foto ou escolha da galeria
+                  </p>
+                </div>
+                <UploadZone
+                  onAnalyze={handleAnalyze}
+                  onFileSelected={handleFileSelected}
+                  isAnalyzing={analyzeMutation.isPending}
+                  usageLabel={!isAuthenticated && subStatus?.tier === 'free' ? `(${3 - trialUsed} de 3 grátis)` : undefined}
+                />
               </div>
 
-              {/* CTA for non-authenticated users */}
+              {/* CTA for non-authenticated */}
               {!isAuthenticated && (
                 <div style={{
-                  display: 'flex', alignItems: 'center', gap: '10px',
-                  marginBottom: '16px',
-                  padding: '10px 16px',
-                  background: 'var(--bg-2)',
-                  borderRadius: '12px',
-                  border: '1px solid var(--border)',
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '12px 16px', borderRadius: '14px',
+                  background: 'var(--bg-2)', border: '1px solid var(--border)',
                 }}>
-                  <User style={{ width: '16px', height: '16px', color: 'var(--text-2)', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', color: 'var(--text-2)' }}>
-                    Salve seu progresso criando uma conta grátis
+                  <User size={16} style={{ color: 'var(--text-2)', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', color: 'var(--text-2)', flex: 1 }}>
+                    Salve seu histórico criando uma conta gratuita
                   </span>
                   <button
                     onClick={() => setShowAuth(true)}
                     style={{
-                      padding: '5px 12px', borderRadius: '8px',
-                      background: 'var(--accent)', color: '#fff',
-                      border: 'none', fontSize: '12px', fontWeight: 600,
+                      padding: '6px 14px', borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+                      color: '#fff', border: 'none', fontSize: '12px', fontWeight: 700,
                       cursor: 'pointer', flexShrink: 0,
                     }}
                   >
@@ -351,34 +534,88 @@ export default function Home() {
                 </div>
               )}
 
-              <UploadZone onAnalyze={handleAnalyze} isAnalyzing={analyzeMutation.isPending} />
-
-              {goalsLoaded && (
-                <div className="w-full mt-8">
-                  <DailyProgress
-                    totals={dailySummary?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, meals: 0 }}
-                    goals={savedGoals}
-                    alerts={dailySummary?.alerts ?? []}
-                    aiSummary={dailySummary?.aiSummary ?? null}
-                    analysesCount={dailySummary?.analysesCount ?? 0}
-                    period={period}
-                    onPeriodChange={handlePeriodChange}
-                    onSetGoals={() => isPremium ? setShowGoalsPanel(true) : setShowPaywall(true)}
-                    isPremium={isPremium}
-                  />
-                </div>
+              {/* Upgrade banner for free users */}
+              {!isPremium && (
+                <button
+                  onClick={() => setShowPaywall(true)}
+                  style={{
+                    width: '100%', padding: '14px 18px', borderRadius: '16px',
+                    background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(13,159,110,0.1))',
+                    border: '1px solid rgba(245,158,11,0.25)',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left',
+                  }}
+                >
+                  <div style={{
+                    width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
+                    background: 'linear-gradient(135deg, #F59E0B, #0D9F6E)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Crown size={18} color="#fff" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>
+                      Desbloqueie análises ilimitadas
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                      Metas personalizadas · Histórico completo · Alertas de nutricionista
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '13px', color: '#0D9F6E', fontWeight: 700, flexShrink: 0 }}>Ver planos →</span>
+                </button>
               )}
+
+              {/* Daily progress */}
+              {goalsLoaded && (
+                <DailyProgress
+                  totals={dailySummary?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, meals: 0 }}
+                  goals={savedGoals}
+                  alerts={dailySummary?.alerts ?? []}
+                  aiSummary={dailySummary?.aiSummary ?? null}
+                  analysesCount={dailySummary?.analysesCount ?? 0}
+                  period={period}
+                  onPeriodChange={handlePeriodChange}
+                  onSetGoals={() => isPremium ? setShowGoalsPanel(true) : setShowPaywall(true)}
+                  isPremium={isPremium}
+                />
+              )}
+
+              {/* Como funciona */}
+              <div style={{ paddingTop: '24px', borderTop: '1px solid var(--border)' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-1)', marginBottom: '14px', letterSpacing: '-0.3px' }}>
+                  Como funciona
+                </h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                  {[
+                    { num: '01', title: 'Fotografe', desc: 'Tire uma foto clara da sua refeição ou faça upload de uma imagem.', emoji: '📸' },
+                    { num: '02', title: 'IA analisa', desc: 'GPT-4o Vision identifica alimentos e calcula macronutrientes automaticamente.', emoji: '⚡' },
+                    { num: '03', title: 'Acompanhe', desc: 'Acumule refeições e veja seu progresso diário em tempo real.', emoji: '📊' },
+                  ].map(({ num, title, desc, emoji }) => (
+                    <div key={num} style={{
+                      padding: '16px', borderRadius: '16px',
+                      background: 'var(--bg-2)', border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                        <span style={{ fontSize: '22px' }}>{emoji}</span>
+                        <span style={{ fontSize: '24px', fontWeight: 800, color: 'var(--border-strong)', letterSpacing: '-1px' }}>{num}</span>
+                      </div>
+                      <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '5px' }}>{title}</h3>
+                      <p style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.5 }}>{desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
             </motion.div>
           ) : (
             <motion.div
               key="result"
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              className="w-full"
+              style={{ width: '100%', paddingTop: '8px' }}
             >
-              <ResultCard result={currentResult} onReset={() => setCurrentResult(null)} />
+              <ResultCard result={currentResult} onReset={() => { setCurrentResult(null); setPhotoUrl(undefined); }} photoUrl={photoUrl} />
               {goalsLoaded && isPremium && (
-                <div className="mt-6">
+                <div style={{ marginTop: '20px' }}>
                   <DailyProgress
                     totals={dailySummary?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, meals: 0 }}
                     goals={savedGoals}
@@ -395,59 +632,37 @@ export default function Home() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Como funciona */}
-        <div className="mt-20 mb-12 w-full pt-12 border-t border-border">
-          <h2 className="text-2xl font-bold text-center text-foreground mb-7 tracking-tight">Como funciona</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {[
-              {
-                num: '01', title: 'Fotografe seu prato',
-                desc: 'Tire uma foto clara da sua refeição ou faça upload de uma imagem existente.',
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
-              },
-              {
-                num: '02', title: 'IA analisa em segundos',
-                desc: 'GPT-4o Vision identifica os alimentos, porções e calcula macronutrientes automaticamente.',
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
-              },
-              {
-                num: '03', title: 'Acompanhe suas metas',
-                desc: 'Acumule refeições, veja anéis de progresso e receba resumos personalizados da nutricionista IA.',
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
-              },
-            ].map(({ num, title, desc, icon }) => (
-              <div key={num} className="p-5 rounded-2xl bg-background-2 border border-border">
-                <div className="flex items-start gap-4 mb-3">
-                  <span style={{ fontSize: '28px', fontWeight: 800, lineHeight: 1, color: 'var(--border-strong)', letterSpacing: '-1px', minWidth: '36px' }}>{num}</span>
-                  <div className="w-9 h-9 rounded-xl bg-background border border-border flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">{icon}</div>
-                </div>
-                <h3 className="font-semibold text-foreground mb-1.5">{title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
       </main>
 
-      {/* Analytics Panel */}
-      <AnalyticsPanel
-        isOpen={showAnalytics}
-        onClose={() => setShowAnalytics(false)}
-        sessionId={sessionId}
+      {/* Bottom Nav */}
+      <BottomNav
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
         isPremium={isPremium}
-        onUpgrade={() => { setShowAnalytics(false); setShowPaywall(true); }}
       />
 
-      {/* Modals */}
-      <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} sessionId={sessionId} />
+      {/* Panels / Modals */}
+      <AnalyticsPanel
+        isOpen={showAnalytics}
+        onClose={() => { setShowAnalytics(false); setActiveTab('home'); }}
+        sessionId={sessionId}
+        isPremium={isPremium}
+        onUpgrade={() => { setShowAnalytics(false); setPaywallDisableClose(false); setShowPaywall(true); }}
+      />
+
+      <PaywallModal
+        isOpen={showPaywall}
+        onClose={() => { setShowPaywall(false); setPaywallDisableClose(false); }}
+        sessionId={sessionId}
+        disableClose={paywallDisableClose}
+        onShowAuth={paywallDisableClose ? () => { setShowPaywall(false); setPaywallDisableClose(false); setShowAuth(true); } : undefined}
+      />
 
       <AnimatePresence>
         {showGoalsPanel && (
           <GoalsPanel
             isOpen={showGoalsPanel}
-            onClose={() => { setShowGoalsPanel(false); refreshSummary(); }}
+            onClose={() => { setShowGoalsPanel(false); setActiveTab('home'); refreshSummary(); }}
             sessionId={sessionId}
             onOpenBiometrics={() => setShowOnboarding(true)}
           />
@@ -459,12 +674,24 @@ export default function Home() {
         onComplete={handleGoalsSave}
         onSkip={() => setShowOnboarding(false)}
       />
+
       <AuthModal
         isOpen={showAuth}
-        onClose={() => setShowAuth(false)}
+        onClose={() => { setShowAuth(false); setActiveTab('home'); }}
         onSuccess={handleAuthSuccess}
         sessionId={sessionId}
       />
+
+      <style>{`
+        @keyframes ping {
+          0% { transform: scale(1); opacity: 1; }
+          75%, 100% { transform: scale(2); opacity: 0; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

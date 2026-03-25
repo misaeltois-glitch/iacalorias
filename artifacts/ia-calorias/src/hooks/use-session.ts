@@ -1,18 +1,37 @@
-import { useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-
-const SESSION_KEY = 'ia-calorias-session-id';
-
-function getOrCreateSession(): string {
-  let stored = localStorage.getItem(SESSION_KEY);
-  if (!stored) {
-    stored = uuidv4();
-    localStorage.setItem(SESSION_KEY, stored);
-  }
-  return stored;
-}
+import { useState, useEffect } from 'react';
+import { generateDeviceFingerprint } from '@/lib/fingerprint';
+import {
+  getFromLS, saveToLS,
+  getFromCookie, saveToCookie,
+  getFromIDB, saveToIDB,
+} from '@/lib/usage-tracker';
 
 export function useSession() {
-  const [sessionId] = useState<string>(() => getOrCreateSession());
+  const [sessionId, setSessionId] = useState<string>(() => {
+    return getFromLS() || getFromCookie() || '';
+  });
+
+  useEffect(() => {
+    if (sessionId) {
+      saveToCookie(sessionId);
+      saveToIDB(sessionId);
+      return;
+    }
+
+    getFromIDB().then(async (fromIDB) => {
+      if (fromIDB) {
+        setSessionId(fromIDB);
+        saveToLS(fromIDB);
+        saveToCookie(fromIDB);
+        return;
+      }
+      const fp = await generateDeviceFingerprint();
+      setSessionId(fp);
+      saveToLS(fp);
+      saveToCookie(fp);
+      await saveToIDB(fp);
+    });
+  }, [sessionId]);
+
   return sessionId;
 }
