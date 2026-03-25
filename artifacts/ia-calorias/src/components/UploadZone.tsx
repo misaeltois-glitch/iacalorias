@@ -241,9 +241,9 @@ export function UploadZone({ onAnalyze, isAnalyzing }: UploadZoneProps) {
             Analisando...
           </>
         ) : selectedFile ? (
-          'Analisar agora →'
+          'Analisar foto →'
         ) : (
-          'Selecione ou tire uma foto'
+          'Analisar foto'
         )}
       </button>
 
