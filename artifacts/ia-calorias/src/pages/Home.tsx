@@ -17,6 +17,7 @@ import { LGPDConsentPopup, useLGPDConsent } from '@/components/LGPDConsentPopup'
 import { SplashScreen } from '@/components/SplashScreen';
 import { OnboardingCarousel } from '@/components/OnboardingCarousel';
 import { BottomNav, type BottomNavTab } from '@/components/BottomNav';
+import { WorkoutPanel } from '@/components/WorkoutPanel';
 
 import {
   useAnalyzeFood,
@@ -110,6 +111,7 @@ export default function Home() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showGoalsPanel, setShowGoalsPanel] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showWorkout, setShowWorkout] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -274,9 +276,9 @@ export default function Home() {
   const handleTabChange = (tab: BottomNavTab) => {
     setActiveTab(tab);
     if (tab === 'home') { setCurrentResult(null); }
-    if (tab === 'history') { setShowAnalytics(true); }
+    if (tab === 'workout') { setShowWorkout(true); }
     if (tab === 'analyze') { setCurrentResult(null); }
-    if (tab === 'goals') { isPremium ? setShowGoalsPanel(true) : setShowPaywall(true); }
+    if (tab === 'analytics') { setShowAnalytics(true); }
     if (tab === 'profile') { isAuthenticated ? setShowUserMenu(v => !v) : setShowAuth(true); }
   };
 
@@ -727,6 +729,14 @@ export default function Home() {
         sessionId={sessionId}
         isPremium={isPremium}
         onUpgrade={() => { setShowAnalytics(false); setPaywallDisableClose(false); setShowPaywall(true); }}
+      />
+
+      <WorkoutPanel
+        isOpen={showWorkout}
+        onClose={() => { setShowWorkout(false); setActiveTab('home'); }}
+        sessionId={sessionId}
+        isPremium={isPremium}
+        onUpgrade={() => { setShowWorkout(false); setPaywallDisableClose(false); setShowPaywall(true); }}
       />
 
       <PaywallModal

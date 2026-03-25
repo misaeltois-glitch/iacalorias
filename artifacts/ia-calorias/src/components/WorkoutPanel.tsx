@@ -1,0 +1,773 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, ChevronLeft, ChevronRight, Dumbbell, Clock, Flame, Target, Apple, Play, Check, RotateCcw, Crown, Zap, Heart, Wind, Smile, BarChart2, ChevronDown, AlertCircle } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import { generateWorkoutPlan, calculateNutrition, getGoalLabel, getLevelLabel, formatRest, getTodayKey, type WorkoutProfile, type WorkoutPlan, type WorkoutSession, type SessionExercise, type WorkoutGoal, type ExperienceLevel, type GymType } from '@/lib/workout-engine';
+
+const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
+const BASE = import.meta.env.BASE_URL ?? '/';
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+interface WorkoutPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  sessionId: string;
+  isPremium: boolean;
+  onUpgrade: () => void;
+}
+
+type PanelView = 'loading' | 'questionnaire' | 'plan' | 'player';
+
+const DAYS = [
+  { key: 'mon', label: 'SEG' }, { key: 'tue', label: 'TER' }, { key: 'wed', label: 'QUA' },
+  { key: 'thu', label: 'QUI' }, { key: 'fri', label: 'SEX' }, { key: 'sat', label: 'SÁB' }, { key: 'sun', label: 'DOM' },
+];
+
+const INJURIES_LIST = [
+  { key: 'lumbar_disc', label: 'Hérnia de disco lombar' },
+  { key: 'lumbar_pain', label: 'Lombalgia crônica' },
+  { key: 'knee_condromalacia', label: 'Condromalácia patelar' },
+  { key: 'lca', label: 'Lesão de LCA/LCP' },
+  { key: 'knee_meniscus', label: 'Lesão de menisco' },
+  { key: 'shoulder_impingement', label: 'Impacto do ombro' },
+  { key: 'rotator_cuff', label: 'Lesão do manguito rotador' },
+  { key: 'tennis_elbow', label: 'Epicondilite (cotovelo)' },
+  { key: 'ankle', label: 'Entorse de tornozelo recorrente' },
+];
+
+export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade }: WorkoutPanelProps) {
+  const { user } = useAuth();
+  const [view, setView] = useState<PanelView>('loading');
+  const [step, setStep] = useState(1);
+  const [profile, setProfile] = useState<Partial<WorkoutProfile>>({
+    trainingDays: ['mon', 'wed', 'fri'],
+    sessionDuration: 60,
+    gym: 'full_gym',
+    equipment: [],
+    hasInjuries: false,
+    injuries: [],
+    techniques: [],
+    cardio: 'none',
+    warmup: 'basic',
+    age: 25,
+    weight: 75,
+    height: 170,
+  });
+  const [plan, setPlan] = useState<WorkoutPlan | null>(null);
+  const [selectedDayKey, setSelectedDayKey] = useState(getTodayKey());
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null);
+  const [playerExIdx, setPlayerExIdx] = useState(0);
+  const [playerSetIdx, setPlayerSetIdx] = useState(0);
+  const [restTimer, setRestTimer] = useState(0);
+  const [isResting, setIsResting] = useState(false);
+  const restRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    loadProfile();
+  }, [isOpen, sessionId]);
+
+  const loadProfile = async () => {
+    setView('loading');
+    try {
+      const r = await fetch(`${BASE}api/workout/profile?sessionId=${sessionId}`, { headers: authHeaders() });
+      if (r.ok) {
+        const data = await r.json();
+        const loaded: WorkoutProfile = {
+          goal: data.goal, sex: data.sex, age: data.age, weight: data.weight, height: data.height,
+          bodyFat: data.bodyFat, level: data.level, trainingDays: data.trainingDays ?? [],
+          sessionDuration: data.sessionDuration, preferredTime: data.preferredTime,
+          gym: data.gym, equipment: data.equipment ?? [], hasInjuries: data.hasInjuries,
+          injuries: data.injuries ?? [], medicalNotes: data.medicalNotes,
+          cardio: data.cardio ?? 'none', warmup: data.warmup ?? 'basic', techniques: data.techniques ?? [],
+        };
+        setProfile(loaded);
+        const p = generateWorkoutPlan(loaded);
+        setPlan(p);
+        setView('plan');
+      } else {
+        setView('questionnaire');
+        setStep(1);
+      }
+    } catch {
+      setView('questionnaire');
+      setStep(1);
+    }
+  };
+
+  const saveProfile = async (p: WorkoutProfile) => {
+    await fetch(`${BASE}api/workout/profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ ...p, sessionId }),
+    });
+  };
+
+  const handleFinishQuestionnaire = async () => {
+    if (!profile.goal || !profile.sex || !profile.age || !profile.weight || !profile.height || !profile.level) return;
+    setIsGenerating(true);
+    const fullProfile = profile as WorkoutProfile;
+    const generated = generateWorkoutPlan(fullProfile);
+    setPlan(generated);
+    await saveProfile(fullProfile);
+    setIsGenerating(false);
+    setView('plan');
+  };
+
+  const handleStartPlayer = (session: WorkoutSession) => {
+    if (!isPremium) { onUpgrade(); return; }
+    setActiveSession(session);
+    setPlayerExIdx(0);
+    setPlayerSetIdx(0);
+    setIsResting(false);
+    setRestTimer(0);
+    setView('player');
+  };
+
+  const startRest = (seconds: number) => {
+    setIsResting(true);
+    setRestTimer(seconds);
+    restRef.current = setInterval(() => {
+      setRestTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(restRef.current!);
+          setIsResting(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleCompleteSet = (session: WorkoutSession) => {
+    const ex = session.exercises[playerExIdx];
+    if (playerSetIdx < ex.sets - 1) {
+      setPlayerSetIdx(s => s + 1);
+      startRest(ex.restSeconds);
+    } else if (playerExIdx < session.exercises.length - 1) {
+      setPlayerExIdx(i => i + 1);
+      setPlayerSetIdx(0);
+      startRest(ex.restSeconds);
+    } else {
+      setView('plan');
+      clearInterval(restRef.current!);
+    }
+  };
+
+  const set = (key: keyof WorkoutProfile, val: unknown) => setProfile(p => ({ ...p, [key]: val }));
+
+  const canProceed = () => {
+    if (step === 1) return !!profile.goal;
+    if (step === 2) return !!(profile.sex && profile.age && profile.weight && profile.height);
+    if (step === 3) return !!profile.level;
+    if (step === 4) return (profile.trainingDays?.length ?? 0) >= 2;
+    if (step === 5) return !!profile.gym;
+    return true;
+  };
+
+  const selectedSession = plan?.sessions.find(s => s.dayKey === selectedDayKey);
+
+  if (!isOpen) return null;
+
+  const accent = '#0D9F6E';
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'var(--bg)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+
+      {/* ── LOADING ── */}
+      {view === 'loading' && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: `linear-gradient(135deg, ${accent}, #057A55)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Dumbbell size={24} color="#fff" />
+          </div>
+          <p style={{ color: 'var(--text-2)', fontSize: '14px' }}>Carregando seu plano...</p>
+        </div>
+      )}
+
+      {/* ── QUESTIONNAIRE ── */}
+      {view === 'questionnaire' && (
+        <>
+          {/* Questionnaire Header */}
+          <div style={{ padding: '16px 20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button onClick={onClose} style={{ padding: '8px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)' }}>
+              <X size={20} />
+            </button>
+            <div style={{ display: 'flex', gap: '5px' }}>
+              {[1,2,3,4,5,6,7].map(n => (
+                <div key={n} style={{ width: n === step ? '20px' : '6px', height: '6px', borderRadius: '99px', transition: 'all 0.3s', background: n <= step ? accent : 'var(--bg-3)' }} />
+              ))}
+            </div>
+            <div style={{ width: '36px' }} />
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 20px 120px' }}>
+            <AnimatePresence mode="wait">
+              <motion.div key={step} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.2 }}>
+
+                {/* STEP 1 — OBJETIVO */}
+                {step === 1 && (
+                  <div>
+                    <StepHeader title="Qual é o seu objetivo principal?" subtitle="Isso define toda a estrutura do seu treino" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {([
+                        { id: 'hypertrophy', icon: <Dumbbell size={18} />, label: 'Hipertrofia', sub: 'Ganho de massa muscular · Rep: 8-12 · Descanso: 60-90s' },
+                        { id: 'strength', icon: <Zap size={18} />, label: 'Força', sub: 'Aumento de carga máxima · Rep: 3-6 · Descanso: 3-5min' },
+                        { id: 'fat_loss', icon: <Flame size={18} />, label: 'Emagrecimento', sub: 'Perda de gordura · Circuitos e HIIT · Rep: 12-20' },
+                        { id: 'endurance', icon: <Wind size={18} />, label: 'Condicionamento', sub: 'Resistência geral · Cardio integrado · Rep: 15-25' },
+                        { id: 'wellness', icon: <Heart size={18} />, label: 'Saúde e Bem-Estar', sub: 'Funcional e mobilidade · Rep: 10-15' },
+                      ] as Array<{ id: WorkoutGoal; icon: React.ReactNode; label: string; sub: string }>).map(opt => (
+                        <OptionCard key={opt.id} selected={profile.goal === opt.id} onClick={() => set('goal', opt.id)} icon={opt.icon} label={opt.label} sub={opt.sub} accent={accent} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 2 — DADOS ANTROPOMÉTRICOS */}
+                {step === 2 && (
+                  <div>
+                    <StepHeader title="Seus dados físicos" subtitle="Usamos para calcular seu plano e metas nutricionais ideais" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <div>
+                        <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: '8px' }}>Sexo biológico</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          {[{ id: 'male', label: '♂ Masculino' }, { id: 'female', label: '♀ Feminino' }].map(s => (
+                            <button key={s.id} onClick={() => set('sex', s.id)} style={{ padding: '12px', borderRadius: '12px', border: `2px solid ${profile.sex === s.id ? accent : 'var(--border)'}`, background: profile.sex === s.id ? `rgba(13,159,110,0.08)` : 'var(--bg-2)', color: profile.sex === s.id ? accent : 'var(--text-1)', fontWeight: 600, fontSize: '14px', cursor: 'pointer' }}>
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <NumberInput label="Idade (anos)" value={profile.age} min={14} max={80} onChange={v => set('age', v)} />
+                      <NumberInput label="Peso atual (kg)" value={profile.weight} min={30} max={250} step={0.5} onChange={v => set('weight', v)} />
+                      <NumberInput label="Altura (cm)" value={profile.height} min={130} max={230} onChange={v => set('height', v)} />
+                      <NumberInput label="% Gordura corporal (opcional)" value={profile.bodyFat} min={4} max={60} placeholder="Deixe em branco se não souber" onChange={v => set('bodyFat', v)} />
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 3 — NÍVEL */}
+                {step === 3 && (
+                  <div>
+                    <StepHeader title="Há quanto tempo você treina?" subtitle="Define a complexidade dos exercícios e volume semanal" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {([
+                        { id: 'beginner', dot: '#10B981', label: 'Iniciante', sub: '0-6 meses · Full Body · 10-12 séries/músculo/semana · Foco em técnica' },
+                        { id: 'intermediate', dot: '#F59E0B', label: 'Intermediário', sub: '6 meses a 2 anos · Upper/Lower ou PPL · 14-18 séries/músculo' },
+                        { id: 'advanced', dot: '#EF4444', label: 'Avançado', sub: '2+ anos contínuos · PPL 6x ou mais · 18-25 séries/músculo' },
+                      ] as Array<{ id: ExperienceLevel; dot: string; label: string; sub: string }>).map(opt => (
+                        <button key={opt.id} onClick={() => set('level', opt.id)} style={{ padding: '16px', borderRadius: '16px', border: `2px solid ${profile.level === opt.id ? accent : 'var(--border)'}`, background: profile.level === opt.id ? 'rgba(13,159,110,0.06)' : 'var(--bg-2)', cursor: 'pointer', textAlign: 'left' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: opt.dot, flexShrink: 0 }} />
+                            <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-1)' }}>{opt.label}</span>
+                          </div>
+                          <p style={{ fontSize: '12px', color: 'var(--text-2)', marginLeft: '20px', lineHeight: 1.5 }}>{opt.sub}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 4 — DISPONIBILIDADE */}
+                {step === 4 && (
+                  <div>
+                    <StepHeader title="Disponibilidade de treino" subtitle="Selecione os dias e o tempo disponível por sessão" />
+                    <div style={{ marginBottom: '20px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: '10px' }}>Dias da semana ({profile.trainingDays?.length ?? 0} selecionados)</label>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {DAYS.map(d => {
+                          const active = profile.trainingDays?.includes(d.key);
+                          return (
+                            <button key={d.key} onClick={() => {
+                              const curr = profile.trainingDays ?? [];
+                              set('trainingDays', active ? curr.filter(x => x !== d.key) : [...curr, d.key]);
+                            }} style={{ padding: '8px 12px', borderRadius: '10px', border: `2px solid ${active ? accent : 'var(--border)'}`, background: active ? `rgba(13,159,110,0.1)` : 'var(--bg-2)', color: active ? accent : 'var(--text-2)', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}>
+                              {d.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {(profile.trainingDays?.length ?? 0) < 2 && (
+                        <p style={{ fontSize: '12px', color: '#F59E0B', marginTop: '8px' }}>⚠️ Selecione pelo menos 2 dias</p>
+                      )}
+                    </div>
+                    <div style={{ marginBottom: '20px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: '10px' }}>
+                        Duração da sessão: <span style={{ color: 'var(--text-1)' }}>{profile.sessionDuration} minutos</span>
+                      </label>
+                      <input type="range" min={30} max={120} step={15} value={profile.sessionDuration ?? 60} onChange={e => set('sessionDuration', Number(e.target.value))}
+                        style={{ width: '100%', accentColor: accent }} />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-3)', marginTop: '4px' }}>
+                        <span>30min</span><span>60min</span><span>90min</span><span>2h</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: '10px' }}>Horário preferido (opcional)</label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        {[
+                          { id: 'morning', label: '🌅 Manhã', sub: '5h–9h' },
+                          { id: 'midday', label: '☀️ Meio-dia', sub: '10h–14h' },
+                          { id: 'afternoon', label: '🌤️ Tarde', sub: '15h–18h' },
+                          { id: 'night', label: '🌙 Noite', sub: '19h–23h' },
+                        ].map(t => (
+                          <button key={t.id} onClick={() => set('preferredTime', profile.preferredTime === t.id ? undefined : t.id)} style={{ padding: '10px', borderRadius: '12px', border: `2px solid ${profile.preferredTime === t.id ? accent : 'var(--border)'}`, background: profile.preferredTime === t.id ? 'rgba(13,159,110,0.08)' : 'var(--bg-2)', cursor: 'pointer', textAlign: 'center' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)' }}>{t.label}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-2)' }}>{t.sub}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 5 — EQUIPAMENTOS */}
+                {step === 5 && (
+                  <div>
+                    <StepHeader title="Onde você vai treinar?" subtitle="Adaptamos os exercícios ao que você tem disponível" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {([
+                        { id: 'full_gym', icon: '🏢', label: 'Academia Completa', sub: 'Barras, halteres, máquinas, cabos, smith — acesso total' },
+                        { id: 'home_gym', icon: '🏠', label: 'Home Gym', sub: 'Halteres, barra, banco, elásticos — exercícios adaptados' },
+                        { id: 'bodyweight', icon: '🤸', label: 'Sem Equipamento', sub: 'Apenas o próprio corpo — calistênico e isométrico' },
+                        { id: 'custom', icon: '🔧', label: 'Personalizado', sub: 'Selecione exatamente o que você tem disponível' },
+                      ] as Array<{ id: GymType; icon: string; label: string; sub: string }>).map(opt => (
+                        <button key={opt.id} onClick={() => set('gym', opt.id)} style={{ padding: '14px 16px', borderRadius: '14px', border: `2px solid ${profile.gym === opt.id ? accent : 'var(--border)'}`, background: profile.gym === opt.id ? 'rgba(13,159,110,0.06)' : 'var(--bg-2)', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ fontSize: '24px' }}>{opt.icon}</span>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-1)' }}>{opt.label}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '2px' }}>{opt.sub}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 6 — LESÕES */}
+                {step === 6 && (
+                  <div>
+                    <StepHeader title="Lesões ou restrições?" subtitle="Sua segurança é prioridade — adaptamos o treino para você" />
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        {[{ v: false, label: '✅ Sem restrições' }, { v: true, label: '⚠️ Tenho lesões' }].map(opt => (
+                          <button key={String(opt.v)} onClick={() => set('hasInjuries', opt.v)} style={{ padding: '12px', borderRadius: '12px', border: `2px solid ${profile.hasInjuries === opt.v ? accent : 'var(--border)'}`, background: profile.hasInjuries === opt.v ? 'rgba(13,159,110,0.08)' : 'var(--bg-2)', fontWeight: 700, fontSize: '13px', cursor: 'pointer', color: 'var(--text-1)' }}>
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {profile.hasInjuries && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <p style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '4px' }}>Selecione as lesões que possui:</p>
+                        {INJURIES_LIST.map(inj => {
+                          const checked = profile.injuries?.includes(inj.key);
+                          return (
+                            <button key={inj.key} onClick={() => {
+                              const curr = profile.injuries ?? [];
+                              set('injuries', checked ? curr.filter(x => x !== inj.key) : [...curr, inj.key]);
+                            }} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', border: `1px solid ${checked ? '#F59E0B' : 'var(--border)'}`, background: checked ? 'rgba(245,158,11,0.06)' : 'var(--bg-2)', cursor: 'pointer', textAlign: 'left' }}>
+                              <div style={{ width: '18px', height: '18px', borderRadius: '4px', border: `2px solid ${checked ? '#F59E0B' : 'var(--border)'}`, background: checked ? '#F59E0B' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {checked && <Check size={11} color="#fff" strokeWidth={3} />}
+                              </div>
+                              <span style={{ fontSize: '13px', color: 'var(--text-1)' }}>{inj.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* STEP 7 — PREFERÊNCIAS */}
+                {step === 7 && (
+                  <div>
+                    <StepHeader title="Personalize seu estilo" subtitle="Últimos detalhes para deixar o treino perfeito" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      <div>
+                        <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: '10px' }}>Cardio integrado ao treino</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {[
+                            { id: 'none', label: 'Sem cardio — só musculação' },
+                            { id: 'light', label: '🚶 Cardio leve — 10min caminhada pós-treino' },
+                            { id: 'moderate', label: '🚴 Cardio moderado — 20min esteira/bike' },
+                            { id: 'hiit', label: '⚡ HIIT — intervalado de alta intensidade' },
+                          ].map(c => (
+                            <button key={c.id} onClick={() => set('cardio', c.id)} style={{ padding: '11px 14px', borderRadius: '10px', border: `2px solid ${profile.cardio === c.id ? accent : 'var(--border)'}`, background: profile.cardio === c.id ? 'rgba(13,159,110,0.08)' : 'var(--bg-2)', cursor: 'pointer', textAlign: 'left', fontSize: '13px', color: 'var(--text-1)', fontWeight: profile.cardio === c.id ? 700 : 400 }}>
+                              {c.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: '10px' }}>Aquecimento</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {[
+                            { id: 'full', label: '🔥 Completo — mobilidade + ativação (10-15min)' },
+                            { id: 'basic', label: '⚡ Básico — aquecimento simples (5min)' },
+                            { id: 'none', label: '❌ Não, faço por conta própria' },
+                          ].map(w => (
+                            <button key={w.id} onClick={() => set('warmup', w.id)} style={{ padding: '11px 14px', borderRadius: '10px', border: `2px solid ${profile.warmup === w.id ? accent : 'var(--border)'}`, background: profile.warmup === w.id ? 'rgba(13,159,110,0.08)' : 'var(--bg-2)', cursor: 'pointer', textAlign: 'left', fontSize: '13px', color: 'var(--text-1)', fontWeight: profile.warmup === w.id ? 700 : 400 }}>
+                              {w.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Footer */}
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 20px', background: 'var(--bg)', borderTop: '1px solid var(--border)', display: 'flex', gap: '10px' }}>
+            {step > 1 && (
+              <button onClick={() => setStep(s => s - 1)} style={{ padding: '14px 20px', borderRadius: '14px', background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ChevronLeft size={16} /> Voltar
+              </button>
+            )}
+            {step < 7 ? (
+              <button onClick={() => setStep(s => s + 1)} disabled={!canProceed()} style={{ flex: 1, padding: '14px', borderRadius: '14px', background: canProceed() ? `linear-gradient(135deg, ${accent}, #057A55)` : 'var(--bg-3)', color: '#fff', fontWeight: 700, fontSize: '15px', border: 'none', cursor: canProceed() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                Continuar <ChevronRight size={16} />
+              </button>
+            ) : (
+              <button onClick={handleFinishQuestionnaire} disabled={isGenerating} style={{ flex: 1, padding: '14px', borderRadius: '14px', background: `linear-gradient(135deg, ${accent}, #057A55)`, color: '#fff', fontWeight: 700, fontSize: '15px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                {isGenerating ? 'Gerando plano...' : <><Dumbbell size={16} /> Gerar meu plano de treino</>}
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── PLAN VIEW ── */}
+      {view === 'plan' && plan && (
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+          {/* Plan Header */}
+          <div style={{ background: `linear-gradient(135deg, ${accent} 0%, #057A55 100%)`, padding: '20px 20px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <button onClick={onClose} style={{ padding: '8px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', color: '#fff' }}>
+                <X size={18} />
+              </button>
+              <span style={{ fontWeight: 700, color: '#fff', fontSize: '15px' }}>Meu Plano de Treino</span>
+              <button onClick={() => { setStep(1); setView('questionnaire'); }} style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '20px', cursor: 'pointer', color: '#fff', fontSize: '12px', fontWeight: 600 }}>
+                Editar
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <Badge label={plan.splitName} />
+              <Badge label={getGoalLabel(profile.goal as WorkoutGoal)} />
+              <Badge label={getLevelLabel(profile.level as ExperienceLevel)} />
+              <Badge label={`${profile.trainingDays?.length ?? 0}x/semana`} />
+            </div>
+          </div>
+
+          {/* Week Calendar */}
+          <div style={{ padding: '16px 16px 0', overflowX: 'auto' }}>
+            <div style={{ display: 'flex', gap: '6px', minWidth: 'max-content' }}>
+              {DAYS.map(({ key, label }) => {
+                const s = plan.sessions.find(x => x.dayKey === key);
+                const isToday = key === getTodayKey();
+                const isSelected = key === selectedDayKey;
+                const isRest = s?.isRestDay;
+                return (
+                  <button key={key} onClick={() => setSelectedDayKey(key)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '8px 10px', borderRadius: '14px', border: `2px solid ${isSelected ? accent : 'transparent'}`, background: isSelected ? 'rgba(13,159,110,0.1)' : isToday ? 'var(--bg-2)' : 'transparent', cursor: 'pointer', minWidth: '44px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: isSelected ? accent : 'var(--text-3)' }}>{label}</span>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isRest ? 'var(--bg-3)' : isToday ? '#F59E0B' : accent }} />
+                    <span style={{ fontSize: '9px', color: isSelected ? accent : 'var(--text-3)', fontWeight: 500 }}>{isRest ? 'DSC' : s?.sessionName?.split(' ')[0]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Session Detail */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 100px' }}>
+            {selectedSession && !selectedSession.isRestDay ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* Session title card */}
+                <div style={{ padding: '18px 20px', borderRadius: '20px', background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{selectedSession.sessionName}</h2>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: 'var(--text-2)', fontWeight: 600 }}>
+                      <Clock size={13} /> ~{selectedSession.estimatedMinutes}min
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '13px', color: accent, fontWeight: 600, margin: '0 0 14px' }}>{selectedSession.focusLabel}</p>
+
+                  {/* Start Workout Button */}
+                  {isPremium ? (
+                    <button onClick={() => handleStartPlayer(selectedSession)} style={{ width: '100%', padding: '13px', borderRadius: '12px', background: `linear-gradient(135deg, ${accent}, #057A55)`, color: '#fff', border: 'none', fontWeight: 700, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <Play size={16} fill="#fff" /> Iniciar Treino
+                    </button>
+                  ) : (
+                    <button onClick={onUpgrade} style={{ width: '100%', padding: '13px', borderRadius: '12px', background: 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(139,92,246,0.08))', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', fontWeight: 700, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <Crown size={16} /> Desbloqueie o Player de Treino
+                    </button>
+                  )}
+                </div>
+
+                {/* Warmup */}
+                {selectedSession.warmup.length > 0 && (
+                  <SectionCard title="🔥 Aquecimento" items={selectedSession.warmup.map(w => `${w.name} — ${w.duration}`)} />
+                )}
+
+                {/* Exercises */}
+                <div style={{ borderRadius: '20px', background: 'var(--bg-2)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                  <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>💪 {selectedSession.exercises.length} Exercícios</h3>
+                  </div>
+                  {selectedSession.exercises.map((se, i) => (
+                    <div key={se.exercise.id} style={{ padding: '14px 18px', borderBottom: i < selectedSession.exercises.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                      <div style={{ width: '26px', height: '26px', borderRadius: '8px', background: 'rgba(13,159,110,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontFamily: "'DM Mono', monospace", fontSize: '11px', fontWeight: 700, color: accent }}>
+                        {String(i + 1).padStart(2, '0')}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-1)', marginBottom: '4px' }}>{se.exercise.name}</div>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          <Pill label={`${se.sets} séries`} />
+                          <Pill label={`${se.reps} reps`} />
+                          <Pill label={`${formatRest(se.restSeconds)} desc.`} />
+                          <Pill label={`RPE ${se.rpe}`} />
+                        </div>
+                        {se.notes && <p style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '4px', lineHeight: 1.4 }}>💡 {se.notes}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Cooldown */}
+                {selectedSession.cooldown.length > 0 && (
+                  <SectionCard title="🧊 Volta à Calma" items={selectedSession.cooldown.map(w => `${w.name} — ${w.duration}`)} />
+                )}
+
+                {/* Nutrition Integration Card */}
+                <NutritionCard nutrition={plan.nutritionTargets} goal={profile.goal as WorkoutGoal} />
+              </div>
+            ) : (
+              <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                <div style={{ fontSize: '48px', marginBottom: '12px' }}>😴</div>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '8px' }}>Dia de Descanso</h3>
+                <p style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.6, marginBottom: '20px' }}>Seu corpo está se recuperando e crescendo. Mantenha a hidratação e a proteína alta hoje.</p>
+                <NutritionCard nutrition={plan.nutritionTargets} goal={profile.goal as WorkoutGoal} restDay />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── PLAYER ── */}
+      {view === 'player' && activeSession && (
+        <WorkoutPlayer
+          session={activeSession}
+          exerciseIdx={playerExIdx}
+          setIdx={playerSetIdx}
+          isResting={isResting}
+          restTimer={restTimer}
+          onCompleteSet={() => handleCompleteSet(activeSession)}
+          onSkipRest={() => { clearInterval(restRef.current!); setIsResting(false); }}
+          onPrev={() => { clearInterval(restRef.current!); setIsResting(false); if (playerExIdx > 0) { setPlayerExIdx(i => i - 1); setPlayerSetIdx(0); } else setView('plan'); }}
+          onClose={() => { clearInterval(restRef.current!); setView('plan'); }}
+          goal={profile.goal as WorkoutGoal}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── SUB-COMPONENTS ──
+
+function StepHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div style={{ marginBottom: '24px' }}>
+      <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-0.4px', marginBottom: '6px', lineHeight: 1.3 }}>{title}</h1>
+      <p style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.5 }}>{subtitle}</p>
+    </div>
+  );
+}
+
+function OptionCard({ selected, onClick, icon, label, sub, accent }: { selected: boolean; onClick: () => void; icon: React.ReactNode; label: string; sub: string; accent: string }) {
+  return (
+    <button onClick={onClick} style={{ padding: '16px', borderRadius: '16px', border: `2px solid ${selected ? accent : 'var(--border)'}`, background: selected ? 'rgba(13,159,110,0.06)' : 'var(--bg-2)', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '12px', transition: 'all 0.15s' }}>
+      <div style={{ padding: '8px', borderRadius: '10px', background: selected ? 'rgba(13,159,110,0.12)' : 'var(--bg-3)', color: selected ? accent : 'var(--text-2)', flexShrink: 0 }}>
+        {icon}
+      </div>
+      <div>
+        <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-1)', marginBottom: '2px' }}>{label}</div>
+        <div style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.4 }}>{sub}</div>
+      </div>
+      {selected && <div style={{ marginLeft: 'auto', color: accent, flexShrink: 0 }}><Check size={18} /></div>}
+    </button>
+  );
+}
+
+function NumberInput({ label, value, min, max, step = 1, placeholder, onChange }: { label: string; value?: number; min: number; max: number; step?: number; placeholder?: string; onChange: (v: number | undefined) => void }) {
+  return (
+    <div>
+      <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: '6px' }}>{label}</label>
+      <input type="number" value={value ?? ''} min={min} max={max} step={step} placeholder={placeholder ?? ''}
+        onChange={e => { const v = e.target.value === '' ? undefined : Number(e.target.value); onChange(v); }}
+        style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', background: 'var(--bg-2)', border: '1.5px solid var(--border)', color: 'var(--text-1)', fontSize: '15px', outline: 'none', boxSizing: 'border-box' }} />
+    </div>
+  );
+}
+
+function Badge({ label }: { label: string }) {
+  return (
+    <span style={{ padding: '4px 10px', borderRadius: '99px', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '11px', fontWeight: 700 }}>{label}</span>
+  );
+}
+
+function Pill({ label }: { label: string }) {
+  return (
+    <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'var(--bg-3)', color: 'var(--text-2)', fontSize: '11px', fontWeight: 600 }}>{label}</span>
+  );
+}
+
+function SectionCard({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div style={{ padding: '16px 18px', borderRadius: '18px', background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
+      <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '10px' }}>{title}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {items.map((item, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+            <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--text-3)', marginTop: '8px', flexShrink: 0 }} />
+            <span style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.5 }}>{item}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NutritionCard({ nutrition, goal, restDay = false }: { nutrition: WorkoutPlan['nutritionTargets']; goal: WorkoutGoal; restDay?: boolean }) {
+  const restDayCalories = restDay ? Math.round(nutrition.calories * 0.9) : nutrition.calories;
+  const restDayCarbs = restDay ? Math.round(nutrition.carbs * 0.8) : nutrition.carbs;
+  return (
+    <div style={{ padding: '18px 20px', borderRadius: '20px', background: 'linear-gradient(135deg, rgba(13,159,110,0.07), rgba(59,130,246,0.05))', border: '1px solid rgba(13,159,110,0.2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+        <Apple size={16} style={{ color: '#0D9F6E' }} />
+        <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-1)' }}>
+          {restDay ? 'Nutrição — Dia de Descanso' : 'Nutrição — Dia de Treino'}
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
+        {[
+          { label: 'Calorias', val: `${restDayCalories}`, unit: 'kcal', color: '#0D9F6E' },
+          { label: 'Proteína', val: `${nutrition.protein}g`, unit: 'proteinase', color: '#EF4444' },
+          { label: 'Carboidrato', val: `${restDayCarbs}g`, unit: '', color: '#F59E0B' },
+          { label: 'Gordura', val: `${nutrition.fat}g`, unit: '', color: '#8B5CF6' },
+          { label: 'Fibra', val: `${nutrition.fiber}g`, unit: '', color: '#10B981' },
+          { label: 'TDEE', val: `${nutrition.tdee}`, unit: 'kcal', color: 'var(--text-2)' },
+        ].map(item => (
+          <div key={item.label} style={{ padding: '10px', borderRadius: '12px', background: 'var(--bg-2)', border: '1px solid var(--border)', textAlign: 'center' }}>
+            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '15px', fontWeight: 700, color: item.color }}>{item.val}</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>{item.label}</div>
+          </div>
+        ))}
+      </div>
+      {restDay ? (
+        <p style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.5 }}>💡 Mantenha a proteína alta. Reduza carboidratos em ~20%. Foco em alimentos anti-inflamatórios.</p>
+      ) : (
+        <p style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.5 }}>💡 Concentre <strong>35-40% dos carboidratos</strong> no pré-treino e <strong>30%</strong> no pós-treino para máxima recuperação.</p>
+      )}
+    </div>
+  );
+}
+
+function WorkoutPlayer({ session, exerciseIdx, setIdx, isResting, restTimer, onCompleteSet, onSkipRest, onPrev, onClose, goal }: {
+  session: WorkoutSession; exerciseIdx: number; setIdx: number;
+  isResting: boolean; restTimer: number;
+  onCompleteSet: () => void; onSkipRest: () => void; onPrev: () => void; onClose: () => void;
+  goal: WorkoutGoal;
+}) {
+  const currentExercise = session.exercises[exerciseIdx];
+  const totalSets = currentExercise.sets;
+  const progress = ((exerciseIdx * totalSets + setIdx) / (session.exercises.reduce((a, e) => a + e.sets, 0))) * 100;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+      {/* Player Header */}
+      <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)' }}>
+        <button onClick={onPrev} style={{ padding: '8px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)' }}>
+          <ChevronLeft size={20} />
+        </button>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-3)', fontWeight: 600 }}>{session.sessionName}</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-1)', fontWeight: 700 }}>Exercício {exerciseIdx + 1} de {session.exercises.length}</div>
+        </div>
+        <button onClick={onClose} style={{ padding: '8px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)' }}>
+          <X size={20} />
+        </button>
+      </div>
+
+      {/* Progress Bar */}
+      <div style={{ height: '3px', background: 'var(--bg-3)' }}>
+        <div style={{ height: '100%', background: '#0D9F6E', width: `${progress}%`, transition: 'width 0.4s ease' }} />
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 20px 120px' }}>
+        {/* Exercise Name */}
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '99px', background: 'rgba(13,159,110,0.1)', color: '#0D9F6E', fontSize: '11px', fontWeight: 700, marginBottom: '10px' }}>
+            <Dumbbell size={10} /> {currentExercise.exercise.category === 'compound' ? 'COMPOSTO' : currentExercise.exercise.category === 'bodyweight' ? 'PESO CORPORAL' : 'ISOLAMENTO'}
+          </div>
+          <h2 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-0.4px' }}>{currentExercise.exercise.name}</h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-2)', marginTop: '4px' }}>
+            {currentExercise.sets} séries · {currentExercise.reps} reps · RPE {currentExercise.rpe}
+          </p>
+        </div>
+
+        {/* Sets Tracker */}
+        <div style={{ borderRadius: '20px', background: 'var(--bg-2)', border: '1px solid var(--border)', overflow: 'hidden', marginBottom: '16px' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)' }}>Série {setIdx + 1} de {totalSets}</span>
+          </div>
+          {Array.from({ length: totalSets }).map((_, i) => (
+            <div key={i} style={{ padding: '12px 18px', borderBottom: i < totalSets - 1 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', gap: '12px', opacity: i > setIdx ? 0.4 : 1 }}>
+              <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: i < setIdx ? '#0D9F6E' : i === setIdx ? 'rgba(13,159,110,0.15)' : 'var(--bg-3)', border: `2px solid ${i <= setIdx ? '#0D9F6E' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {i < setIdx && <Check size={12} color="#fff" strokeWidth={3} />}
+              </div>
+              <span style={{ fontSize: '14px', color: 'var(--text-1)', fontWeight: i === setIdx ? 700 : 400 }}>
+                Série {i + 1} — {currentExercise.reps} reps
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Tip */}
+        {currentExercise.notes && (
+          <div style={{ padding: '14px 16px', borderRadius: '14px', background: 'rgba(13,159,110,0.05)', border: '1px solid rgba(13,159,110,0.15)' }}>
+            <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.5 }}>💡 {currentExercise.notes}</p>
+          </div>
+        )}
+
+        {/* Rest Timer */}
+        <AnimatePresence>
+          {isResting && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={{ marginTop: '20px', padding: '20px', borderRadius: '20px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', textAlign: 'center' }}>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '40px', fontWeight: 700, color: '#3B82F6' }}>
+                {Math.floor(restTimer / 60)}:{String(restTimer % 60).padStart(2, '0')}
+              </div>
+              <p style={{ fontSize: '13px', color: 'var(--text-2)', margin: '4px 0 14px' }}>Descanso entre séries</p>
+              <button onClick={onSkipRest} style={{ padding: '8px 20px', borderRadius: '10px', background: 'none', border: '1px solid var(--border)', color: 'var(--text-2)', fontSize: '13px', cursor: 'pointer' }}>
+                Pular descanso →
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Player Footer */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 20px', background: 'var(--bg)', borderTop: '1px solid var(--border)' }}>
+        <button onClick={onCompleteSet} disabled={isResting} style={{ width: '100%', padding: '15px', borderRadius: '14px', background: isResting ? 'var(--bg-3)' : 'linear-gradient(135deg, #0D9F6E, #057A55)', color: isResting ? 'var(--text-3)' : '#fff', fontWeight: 700, fontSize: '15px', border: 'none', cursor: isResting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          {isResting ? <><Clock size={16} /> Descansando...</> : <><Check size={16} /> Série Concluída</>}
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -1,7 +1,7 @@
 import React from 'react';
-import { Home, BarChart2, Camera, Target, User } from 'lucide-react';
+import { Home, Dumbbell, Camera, BarChart2, User } from 'lucide-react';
 
-export type BottomNavTab = 'home' | 'history' | 'analyze' | 'goals' | 'profile';
+export type BottomNavTab = 'home' | 'workout' | 'analyze' | 'analytics' | 'profile';
 
 interface BottomNavProps {
   activeTab: BottomNavTab;
@@ -12,9 +12,9 @@ interface BottomNavProps {
 export function BottomNav({ activeTab, onTabChange, isPremium }: BottomNavProps) {
   const tabs = [
     { id: 'home' as const, label: 'Início', Icon: Home },
-    { id: 'history' as const, label: 'Histórico', Icon: BarChart2, premiumOnly: true },
+    { id: 'workout' as const, label: 'Treino', Icon: Dumbbell },
     { id: 'analyze' as const, label: 'Analisar', Icon: Camera, isCenter: true },
-    { id: 'goals' as const, label: 'Metas', Icon: Target, premiumOnly: true },
+    { id: 'analytics' as const, label: 'Progresso', Icon: BarChart2 },
     { id: 'profile' as const, label: 'Perfil', Icon: User },
   ];
 
@@ -37,9 +37,8 @@ export function BottomNav({ activeTab, onTabChange, isPremium }: BottomNavProps)
         padding: '0 8px',
         height: '62px',
       }}>
-        {tabs.map(({ id, label, Icon, isCenter, premiumOnly }) => {
+        {tabs.map(({ id, label, Icon, isCenter }) => {
           const isActive = activeTab === id;
-          const isLocked = premiumOnly && !isPremium;
 
           if (isCenter) {
             return (
@@ -86,14 +85,6 @@ export function BottomNav({ activeTab, onTabChange, isPremium }: BottomNavProps)
               }}>
                 {label}
               </span>
-              {isLocked && (
-                <span style={{
-                  position: 'absolute', top: '4px', right: '12px',
-                  fontSize: '9px', color: '#F59E0B',
-                }}>
-                  ✦
-                </span>
-              )}
             </button>
           );
         })}
