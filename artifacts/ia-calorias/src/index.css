@@ -45,6 +45,7 @@
   --bg: #ffffff;
   --bg-2: #f5f5f7;
   --bg-3: #e8e8ed;
+  --bg-surface: #ffffff;
   
   --text-1: #1d1d1f;
   --text-2: #6e6e73;
@@ -62,6 +63,7 @@
   --bg: #0a0a0a;
   --bg-2: #111111;
   --bg-3: #1a1a1a;
+  --bg-surface: #161616;
   
   --text-1: #f5f5f7;
   --text-2: #86868b;

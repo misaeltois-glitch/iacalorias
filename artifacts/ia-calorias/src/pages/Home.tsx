@@ -198,37 +198,56 @@ export default function Home() {
 
         {/* Como funciona Section */}
         <div className="mt-20 mb-12 w-full pt-12 border-t border-border">
-          <h2 className="text-xl font-semibold mb-6 text-foreground">Como funciona</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-5 rounded-2xl bg-background-2 border border-border">
-              <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center mb-4">
-                <Camera className="w-5 h-5 text-muted-foreground" />
+          <h2 className="text-2xl font-bold text-center text-foreground mb-7 tracking-tight">Como funciona</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              {
+                num: '01',
+                title: 'Fotografe seu prato',
+                desc: 'Tire uma foto clara da sua refeição ou faça upload de uma imagem existente.',
+                icon: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                  </svg>
+                ),
+              },
+              {
+                num: '02',
+                title: 'IA analisa em segundos',
+                desc: 'Nossa IA com GPT-4o Vision identifica os alimentos e porções automaticamente.',
+                icon: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                  </svg>
+                ),
+              },
+              {
+                num: '03',
+                title: 'Resultados completos',
+                desc: 'Calorias, macronutrientes, score de saúde e dicas nutricionais personalizadas.',
+                icon: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                  </svg>
+                ),
+              },
+            ].map(({ num, title, desc, icon }) => (
+              <div key={num} className="p-5 rounded-2xl bg-background-2 border border-border">
+                <div className="flex items-start gap-4 mb-3">
+                  <span style={{
+                    fontSize: '28px', fontWeight: 800, lineHeight: 1,
+                    color: 'var(--border-strong)', letterSpacing: '-1px', fontVariantNumeric: 'tabular-nums',
+                    minWidth: '36px',
+                  }}>{num}</span>
+                  <div className="w-9 h-9 rounded-xl bg-background border border-border flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
+                    {icon}
+                  </div>
+                </div>
+                <h3 className="font-semibold text-foreground mb-1.5">{title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
               </div>
-              <h3 className="font-semibold text-foreground mb-2">01. Fotografe seu prato</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Tire uma foto clara da sua refeição ou faça upload da galeria do seu celular.
-              </p>
-            </div>
-            
-            <div className="p-5 rounded-2xl bg-background-2 border border-border">
-              <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center mb-4">
-                <Zap className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <h3 className="font-semibold text-foreground mb-2">02. IA analisa em segundos</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Nossa IA com GPT-4o Vision identifica os alimentos e porções com alta precisão.
-              </p>
-            </div>
-            
-            <div className="p-5 rounded-2xl bg-background-2 border border-border">
-              <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center mb-4">
-                <Info className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <h3 className="font-semibold text-foreground mb-2">03. Resultados detalhados</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Receba as calorias exatas, macros e um score de saúde para melhorar sua dieta.
-              </p>
-            </div>
+            ))}
           </div>
         </div>
 

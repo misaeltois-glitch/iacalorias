@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { ShieldCheck, Loader2 } from 'lucide-react';
 import { useCreateCheckoutSession } from '@workspace/api-client-react';
-import { useToast } from '@/hooks/use-toast';
 
 interface PaywallModalProps {
   isOpen: boolean;
@@ -11,120 +8,157 @@ interface PaywallModalProps {
 }
 
 export function PaywallModal({ isOpen, onClose, sessionId }: PaywallModalProps) {
-  const [selectedPlan, setSelectedPlan] = useState<'limited' | 'unlimited'>('unlimited');
+  const [loadingPlan, setLoadingPlan] = useState<'limited' | 'unlimited' | null>(null);
   const checkoutMutation = useCreateCheckoutSession();
-  const { toast } = useToast();
 
-  const handleCheckout = () => {
-    if (!sessionId) return;
-    
-    checkoutMutation.mutate({
-      data: {
-        sessionId,
-        plan: selectedPlan
-      }
-    }, {
-      onSuccess: (res) => {
-        window.location.href = res.url;
-      },
-      onError: () => {
-        toast({
-          title: "Erro ao processar",
-          description: "Ocorreu um erro ao iniciar o pagamento. Tente novamente.",
-          variant: "destructive"
-        });
-      }
+  const handleCheckout = (plan: 'limited' | 'unlimited') => {
+    if (!sessionId || loadingPlan) return;
+    setLoadingPlan(plan);
+    checkoutMutation.mutate({ data: { sessionId, plan } }, {
+      onSuccess: (res) => { window.location.href = res.url; },
+      onError: () => { setLoadingPlan(null); },
     });
   };
 
+  if (!isOpen) return null;
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[720px] p-0 overflow-hidden bg-background border-border sm:rounded-[2rem] gap-0">
-        <DialogTitle className="sr-only">Escolha um plano</DialogTitle>
-        <div className="p-6 md:p-10 flex flex-col items-center">
-          
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-semibold mb-6">
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.75)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        padding: '0',
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{
+        width: '100%', maxWidth: '560px',
+        background: 'var(--bg-surface)',
+        borderRadius: '28px 28px 0 0',
+        padding: '32px 24px 40px',
+        boxShadow: 'var(--shadow-lg)',
+        transform: 'translateY(0)',
+        transition: 'transform 0.3s ease',
+      }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            padding: '5px 12px', borderRadius: '99px',
+            background: 'rgba(239,68,68,0.1)', color: '#f87171',
+            fontSize: '12px', fontWeight: 600, marginBottom: '16px',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
             Suas análises gratuitas acabaram
           </div>
-          
-          <h2 className="text-3xl md:text-4xl font-bold text-center text-foreground mb-10 tracking-tight">
-            Continue monitorando<br />sua nutrição
+          <h2 style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--text-1)', marginBottom: '8px' }}>
+            Continue monitorando sua nutrição
           </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-8">
-            {/* Limited Plan */}
-            <div 
-              onClick={() => setSelectedPlan('limited')}
-              className={`
-                relative p-6 rounded-3xl border-2 cursor-pointer transition-all duration-200 text-left
-                ${selectedPlan === 'limited' 
-                  ? 'border-primary bg-primary/5' 
-                  : 'border-border bg-background-2 hover:border-border-strong'}
-              `}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-lg text-foreground">Limitado</span>
-                <div className={`w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center ${selectedPlan === 'limited' ? 'border-primary' : 'border-muted-foreground'}`}>
-                  {selectedPlan === 'limited' && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
-                </div>
-              </div>
-              <div className="flex items-baseline gap-1 mb-2">
-                <span className="text-2xl font-bold text-foreground">R$ 29,90</span>
-                <span className="text-sm text-muted-foreground font-medium">/mês</span>
-              </div>
-              <p className="text-sm text-muted-foreground font-medium">
-                20 análises por mês
-              </p>
-            </div>
-
-            {/* Unlimited Plan */}
-            <div 
-              onClick={() => setSelectedPlan('unlimited')}
-              className={`
-                relative p-6 rounded-3xl border-2 cursor-pointer transition-all duration-200 text-left
-                ${selectedPlan === 'unlimited' 
-                  ? 'border-primary bg-primary/5' 
-                  : 'border-border bg-background-2 hover:border-border-strong'}
-              `}
-            >
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-primary text-white text-[11px] font-bold uppercase tracking-wider rounded-full whitespace-nowrap">
-                Mais popular
-              </div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-lg text-foreground">Ilimitado</span>
-                <div className={`w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center ${selectedPlan === 'unlimited' ? 'border-primary' : 'border-muted-foreground'}`}>
-                  {selectedPlan === 'unlimited' && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
-                </div>
-              </div>
-              <div className="flex items-baseline gap-1 mb-2">
-                <span className="text-2xl font-bold text-foreground">R$ 49,90</span>
-                <span className="text-sm text-muted-foreground font-medium">/mês</span>
-              </div>
-              <p className="text-sm text-muted-foreground font-medium">
-                Análises ilimitadas
-              </p>
-            </div>
-          </div>
-
-          <button 
-            className="w-full h-14 rounded-2xl bg-foreground text-background font-semibold text-lg hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed mb-4"
-            onClick={handleCheckout}
-            disabled={checkoutMutation.isPending}
-          >
-            {checkoutMutation.isPending ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              'Continuar'
-            )}
-          </button>
-
-          <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground font-medium">
-            <ShieldCheck className="w-4 h-4" />
-            Pagamento seguro via Stripe · Cancele quando quiser
-          </div>
-          
+          <p style={{ fontSize: '14px', color: 'var(--text-2)' }}>
+            Escolha o plano ideal para continuar usando o IA Calorias.
+          </p>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* Plans */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+          {/* Limitado */}
+          <div style={{
+            border: '1.5px solid var(--border-strong)', borderRadius: '16px',
+            padding: '20px', background: 'var(--bg-2)',
+          }}>
+            <div style={{ marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px' }}>Limitado</h3>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '1px' }}>
+                <span style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-1)' }}>R$ 29</span>
+                <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-1)' }}>,90</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-2)', marginLeft: '3px' }}>/mês</span>
+              </div>
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {['20 análises por mês', 'Macronutrientes completos', 'Score de saúde', 'Dicas nutricionais'].map(f => (
+                <li key={f} style={{ fontSize: '13px', color: 'var(--text-2)', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--accent)', fontWeight: 700 }}>✓</span> {f}
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={() => handleCheckout('limited')}
+              disabled={!!loadingPlan}
+              style={{
+                width: '100%', padding: '11px', borderRadius: '10px',
+                background: 'var(--bg-3)', color: 'var(--text-1)',
+                border: '1.5px solid var(--border-strong)',
+                fontSize: '14px', fontWeight: 600, cursor: loadingPlan ? 'not-allowed' : 'pointer',
+                opacity: loadingPlan ? 0.6 : 1, transition: 'all 0.2s',
+              }}
+            >
+              {loadingPlan === 'limited' ? 'Aguarde...' : 'Começar agora'}
+            </button>
+          </div>
+
+          {/* Ilimitado */}
+          <div style={{
+            border: '2px solid var(--accent)', borderRadius: '16px',
+            padding: '20px', background: 'var(--accent-glow)',
+            position: 'relative',
+          }}>
+            <div style={{
+              position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)',
+              background: 'var(--accent)', color: '#fff',
+              fontSize: '11px', fontWeight: 700, letterSpacing: '0.3px',
+              padding: '3px 12px', borderRadius: '99px', whiteSpace: 'nowrap',
+            }}>
+              Mais popular
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px' }}>Ilimitado</h3>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '1px' }}>
+                <span style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-1)' }}>R$ 49</span>
+                <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-1)' }}>,90</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-2)', marginLeft: '3px' }}>/mês</span>
+              </div>
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {['Análises ilimitadas', 'Macronutrientes completos', 'Score de saúde', 'Dicas nutricionais', 'Processamento prioritário'].map(f => (
+                <li key={f} style={{ fontSize: '13px', color: 'var(--text-2)', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--accent)', fontWeight: 700 }}>✓</span>
+                  {f === 'Análises ilimitadas' ? <><strong style={{ color: 'var(--text-1)' }}>ilimitadas</strong></> : f}
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={() => handleCheckout('unlimited')}
+              disabled={!!loadingPlan}
+              style={{
+                width: '100%', padding: '11px', borderRadius: '10px',
+                background: 'linear-gradient(135deg, var(--accent), #059669)',
+                color: '#fff', border: 'none',
+                fontSize: '14px', fontWeight: 600, cursor: loadingPlan ? 'not-allowed' : 'pointer',
+                opacity: loadingPlan ? 0.6 : 1, transition: 'all 0.2s',
+                boxShadow: '0 4px 14px var(--accent-glow)',
+              }}
+            >
+              {loadingPlan === 'unlimited' ? 'Aguarde...' : 'Assinar ilimitado'}
+            </button>
+          </div>
+        </div>
+
+        {/* Security */}
+        <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          Pagamento seguro via Stripe · Cancele quando quiser
+        </p>
+      </div>
+    </div>
   );
 }
