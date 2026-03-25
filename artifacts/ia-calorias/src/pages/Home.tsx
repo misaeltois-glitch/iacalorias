@@ -53,8 +53,8 @@ export default function Home() {
   const [goalsLoaded, setGoalsLoaded] = useState(false);
 
   const { data: subStatus, refetch: refetchStatus } = useGetSubscriptionStatus(
-    { sessionId: sessionId! },
-    { query: { enabled: !!sessionId } }
+    { sessionId },
+    { query: { enabled: true } }
   );
 
   const analyzeMutation = useAnalyzeFood();

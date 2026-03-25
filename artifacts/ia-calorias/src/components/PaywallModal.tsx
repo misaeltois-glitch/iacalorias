@@ -4,7 +4,7 @@ import { useCreateCheckoutSession } from '@workspace/api-client-react';
 interface PaywallModalProps {
   isOpen: boolean;
   onClose: () => void;
-  sessionId: string | null;
+  sessionId: string;
 }
 
 export function PaywallModal({ isOpen, onClose, sessionId }: PaywallModalProps) {
@@ -12,7 +12,7 @@ export function PaywallModal({ isOpen, onClose, sessionId }: PaywallModalProps) 
   const checkoutMutation = useCreateCheckoutSession();
 
   const handleCheckout = (plan: 'limited' | 'unlimited') => {
-    if (!sessionId || loadingPlan) return;
+    if (loadingPlan) return;
     setLoadingPlan(plan);
     checkoutMutation.mutate({ data: { sessionId, plan } }, {
       onSuccess: (res) => { window.location.href = res.url; },
