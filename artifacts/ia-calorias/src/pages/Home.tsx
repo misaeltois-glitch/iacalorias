@@ -61,6 +61,50 @@ export default function Home() {
     setTheme(newTheme);
   };
 
+  const getErrorMessage = (error: any): { title: string; description: string } => {
+    const status = error?.response?.status ?? error?.status;
+    const body = error?.response?.data ?? error?.data ?? {};
+    const code = body?.error;
+
+    if (status === 402 || body?.requiresUpgrade) return { title: '', description: '' }; // handled separately
+
+    const messages: Record<string, { title: string; description: string }> = {
+      not_food: {
+        title: "Nenhum alimento detectado",
+        description: body?.message || "Envie uma foto de um prato ou refeição.",
+      },
+      file_too_large: {
+        title: "Imagem muito grande",
+        description: "O arquivo deve ter no máximo 4 MB. Reduza o tamanho e tente novamente.",
+      },
+      invalid_file_type: {
+        title: "Formato inválido",
+        description: "Envie uma imagem JPG, PNG ou WEBP.",
+      },
+      invalid_image: {
+        title: "Imagem inválida",
+        description: "O arquivo pode estar corrompido. Tente com outra foto.",
+      },
+      incomplete_analysis: {
+        title: "Foto pouco nítida",
+        description: body?.message || "Tire uma foto mais clara, bem iluminada e com o prato em destaque.",
+      },
+      parse_error: {
+        title: "Erro de processamento",
+        description: body?.message || "Tente novamente com uma foto mais clara.",
+      },
+      rate_limited: {
+        title: "Muitas requisições",
+        description: "Aguarde alguns segundos e tente novamente.",
+      },
+    };
+
+    return messages[code] ?? {
+      title: "Erro na análise",
+      description: body?.message || "Ocorreu um erro inesperado. Tente novamente.",
+    };
+  };
+
   const handleAnalyze = async (file: File) => {
     if (!sessionId) return;
 
@@ -77,15 +121,16 @@ export default function Home() {
         refetchStatus();
       },
       onError: (error: any) => {
-        if (error?.response?.status === 402 || error?.status === 402 || error?.response?.data?.requiresUpgrade) {
+        const status = error?.response?.status ?? error?.status;
+        const body = error?.response?.data ?? error?.data ?? {};
+
+        if (status === 402 || body?.requiresUpgrade) {
           setShowPaywall(true);
-        } else {
-          toast({
-            title: "Erro na análise",
-            description: "Não foi possível analisar sua foto. Tente novamente com uma imagem mais clara.",
-            variant: "destructive"
-          });
+          return;
         }
+
+        const { title, description } = getErrorMessage(error);
+        toast({ title, description, variant: "destructive" });
       }
     });
   };

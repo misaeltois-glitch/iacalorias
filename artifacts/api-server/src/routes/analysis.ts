@@ -36,13 +36,32 @@ router.post("/", upload.single("image"), async (req: Request, res: Response) => 
     return;
   }
 
+  // Validate file size (4 MB for users, we allow 10 MB in multer for safety)
+  if (req.file.size > 4 * 1024 * 1024) {
+    res.status(400).json({
+      error: "file_too_large",
+      message: "A imagem deve ter no máximo 4 MB. Reduza o tamanho e tente novamente.",
+    });
+    return;
+  }
+
+  // Validate mime type
+  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+  if (!allowedTypes.includes(req.file.mimetype)) {
+    res.status(400).json({
+      error: "invalid_file_type",
+      message: "Formato não suportado. Envie uma imagem JPG, PNG ou WEBP.",
+    });
+    return;
+  }
+
   const sub = await getOrCreateSub(sessionId);
   const tier = sub.tier as "free" | "limited" | "unlimited";
 
   if (tier === "free" && sub.analysisCount >= FREE_TRIAL_LIMIT) {
     res.status(402).json({
       error: "payment_required",
-      message: "Free trial limit reached",
+      message: "Suas análises gratuitas acabaram.",
       requiresUpgrade: true,
       trialUsed: sub.analysisCount,
       trialLimit: FREE_TRIAL_LIMIT,
@@ -53,7 +72,7 @@ router.post("/", upload.single("image"), async (req: Request, res: Response) => 
   if (tier === "limited" && sub.analysisCount >= LIMITED_PLAN_LIMIT) {
     res.status(402).json({
       error: "payment_required",
-      message: "Monthly analysis limit reached",
+      message: "Você atingiu o limite mensal de análises do plano Limitado.",
       requiresUpgrade: true,
       trialUsed: sub.analysisCount,
       trialLimit: LIMITED_PLAN_LIMIT,
@@ -70,9 +89,14 @@ router.post("/", upload.single("image"), async (req: Request, res: Response) => 
       messages: [
         {
           role: "system",
-          content: `Você é um nutricionista especialista. Analise imagens de comida e retorne APENAS JSON válido, SEM markdown, SEM blocos de código, SEM texto extra.
-Retorne exatamente esta estrutura:
+          content: `Você é um nutricionista especialista em análise de imagens de comida. Analise a imagem e retorne APENAS JSON válido, SEM markdown, SEM blocos de código, SEM texto extra.
+
+IMPORTANTE: Se a imagem NÃO contiver alimentos/comida visível, retorne:
+{"isFood": false, "reason": "Descreva brevemente o que foi detectado na imagem (ex: 'Texto/documento', 'Paisagem', 'Pessoa', 'Objeto', etc.)"}
+
+Se a imagem contiver comida, retorne exatamente esta estrutura:
 {
+  "isFood": true,
   "dishName": "string (nome do prato em português)",
   "servingSize": "string (ex: '1 porção (~350g)')",
   "calories": number (kcal totais como inteiro),
@@ -81,7 +105,7 @@ Retorne exatamente esta estrutura:
   "fat": number (gramas, uma casa decimal),
   "fiber": number (gramas, uma casa decimal),
   "healthScore": number (pontuação de saúde de 1 a 10, sendo 10 o mais saudável),
-  "nutritionTip": "string (uma dica nutricional curta e personalizada em português sobre este prato, máximo 80 caracteres)",
+  "nutritionTip": "string (uma dica nutricional curta e personalizada em português sobre este prato, máximo 100 caracteres)",
   "confidence": "string (nível de confiança: 'Alta confiança', 'Média confiança', ou 'Baixa confiança')"
 }`,
         },
@@ -92,17 +116,18 @@ Retorne exatamente esta estrutura:
               type: "image_url",
               image_url: { url: `data:${mimeType};base64,${base64Image}` },
             },
-            { type: "text", text: "Analise esta imagem de comida e retorne as informações nutricionais como JSON." },
+            { type: "text", text: "Analise esta imagem e retorne as informações nutricionais como JSON." },
           ],
         },
       ],
-      max_tokens: 400,
+      max_tokens: 500,
     });
 
     const raw = response.choices[0]?.message?.content?.trim() ?? "";
     let parsed: {
-      dishName: string; servingSize?: string; calories: number;
-      protein: number; carbs: number; fat: number; fiber?: number;
+      isFood: boolean; reason?: string;
+      dishName?: string; servingSize?: string; calories?: number;
+      protein?: number; carbs?: number; fat?: number; fiber?: number;
       healthScore?: number; nutritionTip?: string; confidence?: string;
     };
 
@@ -111,10 +136,36 @@ Retorne exatamente esta estrutura:
       parsed = JSON.parse(cleaned);
     } catch {
       req.log.error({ raw }, "Failed to parse OpenAI response as JSON");
-      res.status(500).json({ error: "parse_error", message: "Failed to parse AI response" });
+      // Do NOT increment count — parse error is not the user's fault
+      res.status(422).json({
+        error: "parse_error",
+        message: "A IA não conseguiu processar a resposta. Tente com uma foto mais clara e bem iluminada.",
+      });
       return;
     }
 
+    // If not food — do NOT increment count and return helpful message
+    if (!parsed.isFood) {
+      const detected = parsed.reason || "Conteúdo não identificado";
+      res.status(422).json({
+        error: "not_food",
+        message: `Nenhum alimento foi detectado na imagem. Detectado: ${detected}. Tire uma foto de um prato ou refeição.`,
+        detected,
+      });
+      return;
+    }
+
+    // Validate required food fields
+    if (!parsed.dishName || parsed.calories == null || parsed.protein == null || parsed.carbs == null || parsed.fat == null) {
+      req.log.error({ parsed }, "Missing required fields in AI response");
+      res.status(422).json({
+        error: "incomplete_analysis",
+        message: "Não foi possível obter todos os dados nutricionais. A foto pode estar muito escura, borrada ou com alimentos pouco visíveis.",
+      });
+      return;
+    }
+
+    // All good — now save and increment count
     const analysisId = randomUUID();
     await db.insert(analysesTable).values({
       id: analysisId,
@@ -152,9 +203,29 @@ Retorne exatamente esta estrutura:
     });
 
     res.json(result);
-  } catch (err) {
+  } catch (err: any) {
     req.log.error({ err }, "Error analyzing image");
-    res.status(500).json({ error: "internal_error", message: "Analysis failed" });
+
+    // Handle OpenAI specific errors
+    if (err?.status === 429) {
+      res.status(503).json({
+        error: "rate_limited",
+        message: "Muitas requisições simultâneas. Aguarde alguns segundos e tente novamente.",
+      });
+      return;
+    }
+    if (err?.status === 400 && err?.message?.includes("image")) {
+      res.status(422).json({
+        error: "invalid_image",
+        message: "A imagem não pôde ser processada. Verifique se o arquivo não está corrompido e tente novamente.",
+      });
+      return;
+    }
+
+    res.status(500).json({
+      error: "internal_error",
+      message: "Ocorreu um erro inesperado. Tente novamente em instantes.",
+    });
   }
 });
 
