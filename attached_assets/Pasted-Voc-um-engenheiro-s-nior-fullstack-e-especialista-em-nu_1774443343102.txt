@@ -1,0 +1,81 @@
+Você é um engenheiro sênior fullstack e especialista em nutrição clínica. Estou desenvolvendo um aplicativo mobile de rastreamento nutricional onde o usuário fotografa um prato e recebe a estimativa de proteína, carboidrato, fibra e gordura via visão computacional + LLM.
+Preciso que você projete e implemente as seguintes funcionalidades novas, com arquitetura sólida, UX inteligente e lógica nutricional clinicamente embasada:
+
+1. Sistema de metas diárias de macronutrientes (somente plano premium)
+
+O usuário pode configurar metas diárias de proteína (g), carboidrato (g), fibra (g) e gordura total (g).
+Defina limites clínicos mínimos e máximos de validação por macro (ex: fibra mínima de 20g/dia para adultos segundo a OMS; proteína máxima razoável sem prescrição médica de 3g/kg/dia).
+O sistema deve acumular os macros de todas as refeições do dia e comparar com as metas em tempo real.
+Mostre um painel de progresso diário estilo "anel de meta" (semelhante ao Apple Fitness), separado por macro.
+Ao final do dia (ou após cada refeição), gere um resumo clínico automatizado com linguagem de nutricionista: tom empático, sem julgamento, com sugestões práticas para a próxima refeição.
+
+
+2. Motor de alertas contextuais com tom de nutricionista
+Crie um sistema de alertas inteligente que dispara notificações push e mensagens in-app baseadas em:
+
+Timing nutricional: ex: proteína pós-treino insuficiente (< 20g nas 2h seguintes ao registro de treino); carboidrato simples excessivo à noite (após 20h).
+Tendências semanais: fibra acumulada abaixo de 25g em dias consecutivos; gordura saturada ultrapassando 10% das calorias totais na semana.
+Lacunas de micro-refeições: ex: gap de mais de 5h sem registro → alerta de possível catabolismo proteico.
+Desvios críticos de meta: macro ultrapassado em mais de 30% do limite diário.
+
+Os alertas devem usar linguagem naturalista de nutricionista — nunca tom alarmista. Exemplos:
+
+✅ "Você ainda tem espaço para ~30g de proteína hoje. Que tal um iogurte grego ou ovos no jantar?"
+✅ "Sua ingestão de fibras está abaixo esta semana. Adicionar uma porção de leguminosas ajudaria bastante."
+❌ Nunca: "Você está comendo errado!" ou termos médicos sem contexto.
+
+
+3. Calibração nutricional via questionário de onboarding (para usuários sem meta pré-definida)
+Para usuários que não sabem quais metas definir, crie um fluxo de onboarding guiado por IA que colete:
+Dados biométricos:
+
+Peso atual (kg), altura (cm), idade, sexo biológico.
+
+Objetivo principal (single-select):
+
+Perda de gordura · Ganho de massa muscular · Manutenção · Saúde geral
+
+Nível de atividade física (escala de 1 a 5, com exemplos práticos por nível):
+
+1 = Sedentário (trabalho de mesa, sem exercício) → 5 = Atleta (treino 2x/dia)
+
+Restrições alimentares (multi-select):
+
+Vegetariano · Vegano · Sem glúten · Sem lactose · Nenhuma
+
+Contexto clínico opcional:
+
+Diabetes tipo 2 · Hipertensão · Colesterol alto · Nenhum (com aviso de que metas médicas requerem acompanhamento profissional)
+
+Com base nessas respostas, calcule as metas usando as fórmulas validadas clinicamente:
+
+TMB via Mifflin-St Jeor
+GET (Gasto Energético Total) com fator de atividade de Harris-Benedict adaptado
+Proteína: 1.6–2.2g/kg para hipertrofia; 1.2–1.6g/kg para manutenção; 1.0–1.2g/kg para perda de peso com preservação muscular
+Carboidrato: GET - (proteína kcal + gordura kcal), priorizado por objetivo
+Gordura: 20–35% do GET (AHA guidelines)
+Fibra: 14g por 1000kcal consumidas (DRI)
+
+Apresente as metas calculadas com explicação simples e permita ajuste manual antes de confirmar.
+
+Requisitos técnicos (fullstack):
+Backend:
+
+Endpoint /api/goals (CRUD de metas por usuário + plano de assinatura)
+Endpoint /api/meals/daily-summary (agregação de macros do dia com diff vs. meta)
+Job diário (cron ou queue) para geração do resumo clínico via LLM
+Regras de negócio de paywall: metas e alertas somente para plan === 'premium'
+
+Frontend:
+
+Painel de progresso diário com anéis de macro (React Native / Flutter)
+Tela de onboarding com stepper de 6 etapas, validação em tempo real
+Componente de alerta in-app com ícone, mensagem e ação sugerida
+Estado vazio inteligente para usuários free: preview das features premium com CTA de upgrade
+
+LLM / IA:
+
+Prompt de sistema para geração de resumos e alertas com persona de nutricionista (tom empático, baseado em evidências, sem diagnóstico)
+Guardrails: nunca recomendar suplementação específica, nunca tratar condições clínicas
+
+Estruture a resposta em: arquitetura de dados (schemas), fluxos de tela (wireframe textual), lógica de negócio e exemplos de prompts para o LLM interno.
