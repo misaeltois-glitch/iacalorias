@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, subscriptionsTable, analysesTable, goalsTable } from "@workspace/db";
-import { eq, gte, and } from "drizzle-orm";
+import { eq, gte, and, lt } from "drizzle-orm";
 import OpenAI from "openai";
 
 const router: IRouter = Router();
@@ -23,13 +23,30 @@ async function resolveSubTier(userId?: string, sessionId?: string): Promise<"fre
 
 async function findGoals(userId?: string, sessionId?: string) {
   if (userId) {
-    const goals = await db.query.goalsTable.findFirst({ where: eq(goalsTable.userId, userId) });
+    const goals = await db.query.goalsTable.findFirst({
+      where: eq(goalsTable.userId, userId),
+      orderBy: (t, { desc }) => [desc(t.updatedAt)],
+    });
     if (goals) return goals;
   }
   if (sessionId) {
     return db.query.goalsTable.findFirst({ where: eq(goalsTable.sessionId, sessionId) });
   }
   return null;
+}
+
+function withPerMeal(goals: typeof goalsTable.$inferSelect | null) {
+  if (!goals) return null;
+  const mpd = goals.mealsPerDay ?? 3;
+  return {
+    ...goals,
+    mealsPerDay: mpd,
+    caloriesPerMeal: goals.calories ? Math.round(goals.calories / mpd) : null,
+    proteinPerMeal: goals.protein ? Math.round((goals.protein / mpd) * 10) / 10 : null,
+    carbsPerMeal: goals.carbs ? Math.round((goals.carbs / mpd) * 10) / 10 : null,
+    fatPerMeal: goals.fat ? Math.round((goals.fat / mpd) * 10) / 10 : null,
+    fiberPerMeal: goals.fiber ? Math.round((goals.fiber / mpd) * 10) / 10 : null,
+  };
 }
 
 // ── GET /api/goals ─────────────────────────────────────────────────────────────
@@ -46,12 +63,12 @@ router.get("/", async (req: Request, res: Response) => {
   }
 
   const goals = await findGoals(userId, sessionId);
-  res.json(goals ?? null);
+  res.json(withPerMeal(goals));
 });
 
 // ── POST /api/goals ────────────────────────────────────────────────────────────
 router.post("/", async (req: Request, res: Response) => {
-  const { sessionId, calories, protein, carbs, fat, fiber, weight, height, age, sex, objective, activityLevel, restrictions } = req.body;
+  const { sessionId, calories, protein, carbs, fat, fiber, mealsPerDay, weight, height, age, sex, objective, activityLevel, restrictions } = req.body;
   const userId = req.user?.userId;
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
@@ -68,14 +85,15 @@ router.post("/", async (req: Request, res: Response) => {
 
   if (existing) {
     await db.update(goalsTable)
-      .set({ calories, protein, carbs, fat, fiber, weight, height, age, sex, objective, activityLevel, restrictions: restrictionsStr, userId: userId ?? existing.userId, updatedAt: new Date() })
+      .set({ calories, protein, carbs, fat, fiber, mealsPerDay: mealsPerDay ?? existing.mealsPerDay ?? 3, weight, height, age, sex, objective, activityLevel, restrictions: restrictionsStr, userId: userId ?? existing.userId, updatedAt: new Date() })
       .where(eq(goalsTable.sessionId, existing.sessionId));
   } else {
     const effectiveSessionId = sessionId ?? `user-${userId}`;
     await db.insert(goalsTable).values({
       sessionId: effectiveSessionId,
       userId: userId ?? null,
-      calories, protein, carbs, fat, fiber, weight, height, age, sex, objective, activityLevel,
+      calories, protein, carbs, fat, fiber, mealsPerDay: mealsPerDay ?? 3,
+      weight, height, age, sex, objective, activityLevel,
       restrictions: restrictionsStr,
       updatedAt: new Date(),
     });
@@ -84,10 +102,57 @@ router.post("/", async (req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
+// ── PATCH /api/goals ───────────────────────────────────────────────────────────
+router.patch("/", async (req: Request, res: Response) => {
+  const { sessionId, ...fields } = req.body;
+  const userId = req.user?.userId;
+
+  if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
+
+  const tier = await resolveSubTier(userId, sessionId);
+  if (tier === "free") {
+    res.status(403).json({ error: "plan_required", message: "Metas disponíveis apenas em planos pagos.", requiresUpgrade: true });
+    return;
+  }
+
+  const allowed = ["calories", "protein", "carbs", "fat", "fiber", "mealsPerDay"] as const;
+  const patch: Record<string, number> = {};
+  for (const key of allowed) {
+    if (fields[key] !== undefined && fields[key] !== null) {
+      patch[key] = Number(fields[key]);
+    }
+  }
+  if (Object.keys(patch).length === 0) {
+    res.status(400).json({ error: "bad_request", message: "No valid fields to update" });
+    return;
+  }
+
+  const existing = await findGoals(userId, sessionId);
+
+  if (existing) {
+    await db.update(goalsTable)
+      .set({ ...patch, userId: userId ?? existing.userId, updatedAt: new Date() })
+      .where(eq(goalsTable.sessionId, existing.sessionId));
+  } else {
+    const effectiveSessionId = sessionId ?? `user-${userId}`;
+    await db.insert(goalsTable).values({
+      sessionId: effectiveSessionId,
+      userId: userId ?? null,
+      mealsPerDay: 3,
+      ...patch,
+      updatedAt: new Date(),
+    });
+  }
+
+  const updated = await findGoals(userId, sessionId ?? `user-${userId}`);
+  res.json(withPerMeal(updated));
+});
+
 // ── GET /api/goals/daily-summary ───────────────────────────────────────────────
 router.get("/daily-summary", async (req: Request, res: Response) => {
   const sessionId = req.query.sessionId as string;
   const userId = req.user?.userId;
+  const period = (req.query.period as string) ?? "day";
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
@@ -100,23 +165,46 @@ router.get("/daily-summary", async (req: Request, res: Response) => {
   const goals = await findGoals(userId, sessionId);
 
   const now = new Date();
-  const startOfDay = new Date(now);
-  startOfDay.setHours(0, 0, 0, 0);
+  let periodStart: Date;
+  let periodEnd: Date = new Date(now);
 
-  let todayAnalyses;
+  if (period === "week") {
+    const dow = now.getDay();
+    periodStart = new Date(now);
+    periodStart.setDate(now.getDate() - dow);
+    periodStart.setHours(0, 0, 0, 0);
+    periodEnd.setHours(23, 59, 59, 999);
+  } else if (period === "month") {
+    periodStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    periodEnd.setHours(23, 59, 59, 999);
+  } else {
+    periodStart = new Date(now);
+    periodStart.setHours(0, 0, 0, 0);
+    periodEnd.setHours(23, 59, 59, 999);
+  }
+
+  let periodAnalyses;
   if (userId) {
-    todayAnalyses = await db.query.analysesTable.findMany({
-      where: and(eq(analysesTable.userId, userId), gte(analysesTable.createdAt, startOfDay)),
+    periodAnalyses = await db.query.analysesTable.findMany({
+      where: and(
+        eq(analysesTable.userId, userId),
+        gte(analysesTable.createdAt, periodStart),
+        lt(analysesTable.createdAt, periodEnd),
+      ),
       orderBy: (t, { asc }) => [asc(t.createdAt)],
     });
   } else {
-    todayAnalyses = await db.query.analysesTable.findMany({
-      where: and(eq(analysesTable.sessionId, sessionId!), gte(analysesTable.createdAt, startOfDay)),
+    periodAnalyses = await db.query.analysesTable.findMany({
+      where: and(
+        eq(analysesTable.sessionId, sessionId!),
+        gte(analysesTable.createdAt, periodStart),
+        lt(analysesTable.createdAt, periodEnd),
+      ),
       orderBy: (t, { asc }) => [asc(t.createdAt)],
     });
   }
 
-  const totals = todayAnalyses.reduce((acc, a) => ({
+  const totals = periodAnalyses.reduce((acc, a) => ({
     calories: acc.calories + a.calories,
     protein: acc.protein + a.protein,
     carbs: acc.carbs + a.carbs,
@@ -125,8 +213,20 @@ router.get("/daily-summary", async (req: Request, res: Response) => {
     meals: acc.meals + 1,
   }), { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, meals: 0 });
 
+  // Scale goals for multi-day periods
+  const daysInPeriod = period === "week" ? 7 : period === "month" ? new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() : 1;
+  const scaledGoals = goals ? {
+    calories: goals.calories ? goals.calories * daysInPeriod : null,
+    protein: goals.protein ? goals.protein * daysInPeriod : null,
+    carbs: goals.carbs ? goals.carbs * daysInPeriod : null,
+    fat: goals.fat ? goals.fat * daysInPeriod : null,
+    fiber: goals.fiber ? goals.fiber * daysInPeriod : null,
+    objective: goals.objective,
+    mealsPerDay: goals.mealsPerDay ?? 3,
+  } : null;
+
   const alerts: { type: "tip" | "warning" | "ok"; macro: string; message: string }[] = [];
-  if (goals) {
+  if (goals && period === "day") {
     const hour = now.getHours();
     if (goals.protein && totals.meals > 0) {
       const remaining = goals.protein - totals.protein;
@@ -149,13 +249,13 @@ router.get("/daily-summary", async (req: Request, res: Response) => {
   }
 
   let aiSummary: string | null = null;
-  if (goals && todayAnalyses.length >= 1) {
+  if (goals && period === "day" && periodAnalyses.length >= 1) {
     try {
       const prompt = `Você é uma nutricionista clínica empática. Analise o dia e gere um resumo em até 3 frases com tom acolhedor, sem julgamentos, com sugestões práticas.
 
-METAS: Cal ${goals.calories ?? "?"} kcal | Prot ${goals.protein ?? "?"}g | Carbs ${goals.carbs ?? "?"}g | Gorд ${goals.fat ?? "?"}g | Fibras ${goals.fiber ?? "?"}g
+METAS: Cal ${goals.calories ?? "?"} kcal | Prot ${goals.protein ?? "?"}g | Carbs ${goals.carbs ?? "?"}g | Gord ${goals.fat ?? "?"}g | Fibras ${goals.fiber ?? "?"}g
 CONSUMIDO (${totals.meals} refeição${totals.meals !== 1 ? "ões" : ""}): Cal ${Math.round(totals.calories)} kcal | Prot ${totals.protein.toFixed(1)}g | Carbs ${totals.carbs.toFixed(1)}g | Gord ${totals.fat.toFixed(1)}g | Fibras ${totals.fiber.toFixed(1)}g
-Refeições: ${todayAnalyses.map((a) => a.dishName).join(", ")}
+Refeições: ${periodAnalyses.map((a) => a.dishName).join(", ")}
 
 Retorne APENAS o texto do resumo, sem títulos, sem bullets, sem markdown.`;
 
@@ -173,11 +273,14 @@ Retorne APENAS o texto do resumo, sem títulos, sem bullets, sem markdown.`;
 
   res.json({
     totals,
-    goals: goals ? { calories: goals.calories, protein: goals.protein, carbs: goals.carbs, fat: goals.fat, fiber: goals.fiber, objective: goals.objective } : null,
+    goals: scaledGoals,
+    rawGoals: goals ? { calories: goals.calories, protein: goals.protein, carbs: goals.carbs, fat: goals.fat, fiber: goals.fiber, objective: goals.objective, mealsPerDay: goals.mealsPerDay ?? 3 } : null,
     alerts,
     aiSummary,
-    analysesCount: todayAnalyses.length,
-    lastMealAt: todayAnalyses.length > 0 ? todayAnalyses[todayAnalyses.length - 1].createdAt : null,
+    analysesCount: periodAnalyses.length,
+    period,
+    daysInPeriod,
+    lastMealAt: periodAnalyses.length > 0 ? periodAnalyses[periodAnalyses.length - 1].createdAt : null,
   });
 });
 

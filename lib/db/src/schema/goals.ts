@@ -11,6 +11,8 @@ export const goalsTable = pgTable("goals", {
   carbs: real("carbs"),
   fat: real("fat"),
   fiber: real("fiber"),
+  // Meals per day (used to compute per-meal equivalents)
+  mealsPerDay: integer("meals_per_day").default(3),
   // Onboarding biometrics
   weight: real("weight"),
   height: real("height"),

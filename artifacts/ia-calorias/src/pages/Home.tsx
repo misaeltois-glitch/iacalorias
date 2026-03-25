@@ -9,6 +9,7 @@ import { UploadZone } from '@/components/UploadZone';
 import { ResultCard } from '@/components/ResultCard';
 import { PaywallModal } from '@/components/PaywallModal';
 import { OnboardingModal, type CalculatedGoals } from '@/components/OnboardingModal';
+import { GoalsPanel } from '@/components/GoalsPanel';
 import { DailyProgress } from '@/components/DailyProgress';
 import { AuthModal } from '@/components/AuthModal';
 import { LGPDConsentPopup, useLGPDConsent } from '@/components/LGPDConsentPopup';
@@ -20,6 +21,8 @@ import {
 
 import type { AnalysisResult } from '@workspace/api-client-react/src/generated/api.schemas';
 
+type Period = 'day' | 'week' | 'month';
+
 const BASE = import.meta.env.BASE_URL ?? '/';
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 
@@ -28,11 +31,6 @@ function authHeaders(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function fetchGoals(sessionId: string) {
-  const r = await fetch(`${BASE}api/goals?sessionId=${sessionId}`, { headers: authHeaders() });
-  if (!r.ok) return null;
-  return r.json();
-}
 async function saveGoals(sessionId: string, goals: CalculatedGoals) {
   await fetch(`${BASE}api/goals`, {
     method: 'POST',
@@ -40,8 +38,9 @@ async function saveGoals(sessionId: string, goals: CalculatedGoals) {
     body: JSON.stringify({ sessionId, ...goals, restrictions: goals.restrictions }),
   });
 }
-async function fetchDailySummary(sessionId: string) {
-  const r = await fetch(`${BASE}api/goals/daily-summary?sessionId=${sessionId}`, { headers: authHeaders() });
+
+async function fetchDailySummary(sessionId: string, period: Period = 'day') {
+  const r = await fetch(`${BASE}api/goals/daily-summary?sessionId=${sessionId}&period=${period}`, { headers: authHeaders() });
   if (!r.ok) return null;
   return r.json();
 }
@@ -56,12 +55,14 @@ export default function Home() {
   const [currentResult, setCurrentResult] = useState<AnalysisResult | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showGoalsPanel, setShowGoalsPanel] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const [savedGoals, setSavedGoals] = useState<any>(null);
   const [dailySummary, setDailySummary] = useState<any>(null);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
+  const [period, setPeriod] = useState<Period>('day');
 
   const { data: subStatus, refetch: refetchStatus } = useGetSubscriptionStatus(
     { sessionId },
@@ -71,15 +72,16 @@ export default function Home() {
   const analyzeMutation = useAnalyzeFood();
   const isPremium = subStatus?.tier === 'limited' || subStatus?.tier === 'unlimited';
 
-  const refreshSummary = useCallback(async () => {
+  const refreshSummary = useCallback(async (p?: Period) => {
     if (!sessionId || !isPremium) return;
-    const summary = await fetchDailySummary(sessionId);
+    const activePeriod = p ?? period;
+    const summary = await fetchDailySummary(sessionId, activePeriod);
     if (summary) {
       setDailySummary(summary);
-      setSavedGoals(summary.goals);
+      setSavedGoals(summary.rawGoals ?? summary.goals);
     }
     setGoalsLoaded(true);
-  }, [sessionId, isPremium]);
+  }, [sessionId, isPremium, period]);
 
   useEffect(() => {
     if (sessionId && isPremium) refreshSummary();
@@ -102,6 +104,11 @@ export default function Home() {
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('theme', next);
     setTheme(next);
+  };
+
+  const handlePeriodChange = (p: Period) => {
+    setPeriod(p);
+    refreshSummary(p);
   };
 
   const getErrorMessage = (error: any): { title: string; description: string } => {
@@ -199,7 +206,7 @@ export default function Home() {
             {renderUsagePill()}
             {isPremium && (
               <button
-                onClick={() => setShowOnboarding(true)}
+                onClick={() => setShowGoalsPanel(true)}
                 title="Configurar metas"
                 className="p-2 rounded-full text-muted-foreground hover:bg-background-2 transition-colors"
               >
@@ -342,7 +349,9 @@ export default function Home() {
                     alerts={dailySummary?.alerts ?? []}
                     aiSummary={dailySummary?.aiSummary ?? null}
                     analysesCount={dailySummary?.analysesCount ?? 0}
-                    onSetGoals={() => isPremium ? setShowOnboarding(true) : setShowPaywall(true)}
+                    period={period}
+                    onPeriodChange={handlePeriodChange}
+                    onSetGoals={() => isPremium ? setShowGoalsPanel(true) : setShowPaywall(true)}
                     isPremium={isPremium}
                   />
                 </div>
@@ -364,7 +373,9 @@ export default function Home() {
                     alerts={dailySummary?.alerts ?? []}
                     aiSummary={dailySummary?.aiSummary ?? null}
                     analysesCount={dailySummary?.analysesCount ?? 0}
-                    onSetGoals={() => setShowOnboarding(true)}
+                    period={period}
+                    onPeriodChange={handlePeriodChange}
+                    onSetGoals={() => setShowGoalsPanel(true)}
                     isPremium={isPremium}
                   />
                 </div>
@@ -410,6 +421,18 @@ export default function Home() {
 
       {/* Modals */}
       <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} sessionId={sessionId} />
+
+      <AnimatePresence>
+        {showGoalsPanel && (
+          <GoalsPanel
+            isOpen={showGoalsPanel}
+            onClose={() => { setShowGoalsPanel(false); refreshSummary(); }}
+            sessionId={sessionId}
+            onOpenBiometrics={() => setShowOnboarding(true)}
+          />
+        )}
+      </AnimatePresence>
+
       <OnboardingModal
         isOpen={showOnboarding}
         onComplete={handleGoalsSave}

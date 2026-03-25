@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Target, Sparkles, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Info } from 'lucide-react';
 
+type Period = 'day' | 'week' | 'month';
+
 interface MacroRing {
   label: string;
   emoji: string;
@@ -24,6 +26,8 @@ interface DailyProgressProps {
   alerts: Alert[];
   aiSummary: string | null;
   analysesCount: number;
+  period: Period;
+  onPeriodChange: (p: Period) => void;
   onSetGoals: () => void;
   isPremium: boolean;
 }
@@ -70,7 +74,9 @@ function MacroRingComponent({ label, emoji, current, goal, unit, color, trackCol
   );
 }
 
-export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount, onSetGoals, isPremium }: DailyProgressProps) {
+const PERIOD_LABELS: Record<Period, string> = { day: 'Hoje', week: 'Semana', month: 'Mês' };
+
+export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount, period, onPeriodChange, onSetGoals, isPremium }: DailyProgressProps) {
   const [showSummary, setShowSummary] = useState(false);
 
   const macros: MacroRing[] = [
@@ -122,7 +128,7 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Target style={{ width: '18px', height: '18px', color: 'var(--accent)' }} />
-          <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-1)' }}>Progresso de hoje</span>
+          <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-1)' }}>Progresso</span>
           <span style={{
             fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px',
             background: 'var(--accent-glow)', color: 'var(--accent)',
@@ -130,14 +136,35 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
             {analysesCount} {analysesCount === 1 ? 'refeição' : 'refeições'}
           </span>
         </div>
-        {!goals && (
-          <button onClick={onSetGoals} style={{
-            fontSize: '12px', fontWeight: 600, color: 'var(--accent)',
-            background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px',
-          }}>
-            + Definir metas
-          </button>
-        )}
+
+        {/* Period filter */}
+        <div style={{
+          display: 'flex',
+          background: 'var(--bg-3)',
+          borderRadius: '8px',
+          padding: '2px',
+          gap: '2px',
+        }}>
+          {(['day', 'week', 'month'] as Period[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => onPeriodChange(p)}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                background: period === p ? 'var(--accent)' : 'transparent',
+                color: period === p ? '#fff' : 'var(--text-2)',
+              }}
+            >
+              {PERIOD_LABELS[p]}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Macro rings */}
@@ -152,7 +179,7 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
         ) : (
           <div style={{ textAlign: 'center', padding: '12px 0' }}>
             <p style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '12px' }}>
-              Você registrou <strong style={{ color: 'var(--text-1)' }}>{analysesCount} refeição{analysesCount !== 1 ? 'ões' : ''}</strong> hoje. Configure metas para ver o progresso.
+              Você registrou <strong style={{ color: 'var(--text-1)' }}>{analysesCount} refeição{analysesCount !== 1 ? 'ões' : ''}</strong>. Configure metas para ver o progresso.
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap' }}>
               {[
@@ -171,8 +198,8 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
         )}
       </div>
 
-      {/* Alerts */}
-      {alerts.length > 0 && (
+      {/* Alerts (day only) */}
+      {alerts.length > 0 && period === 'day' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {alerts.map((alert, i) => {
             const Icon = alertIcons[alert.type];
@@ -197,8 +224,8 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
         </div>
       )}
 
-      {/* AI Summary */}
-      {aiSummary && (
+      {/* AI Summary (day only) */}
+      {aiSummary && period === 'day' && (
         <div style={{ borderRadius: '16px', border: '1.5px solid var(--border)', overflow: 'hidden' }}>
           <button
             onClick={() => setShowSummary(s => !s)}
