@@ -439,7 +439,7 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                     <StatCard
                       icon={<Trophy style={{ width: '14px', height: '14px' }} />}
                       label={data.goals?.calories && period !== 'day' ? 'Dias dentro da meta' : 'Total de refeições'}
-                      value={data.goals?.calories && period !== 'day' ? `${data.daysOnTarget} de ${data.daysWithData}` : String(data.totals.meals)}
+                      value={data.goals?.calories && period !== 'day' ? `${data.daysOnTarget} de ${data.daysInPeriod}` : String(data.totals.meals)}
                       color="#f59e0b"
                     />
                     {data.streak > 0 && period === 'day' && (
