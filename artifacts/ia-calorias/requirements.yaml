@@ -1,0 +1,17 @@
+packages:
+  "framer-motion": "For premium smooth layout transitions, entry animations, and result card reveals"
+  "react-dropzone": "For the drag and drop image upload area with drag state support"
+  "uuid": "To generate persistent local session IDs for anonymous tracking"
+  "@types/uuid": "TypeScript definitions for uuid"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility to merge Tailwind classes without style conflicts"
+
+images:
+  - path: "artifacts/ia-calorias/public/images/hero-bg.png"
+    description: "Ultra minimal abstract dark background with very subtle, soft gradient meshes in deep grays and a hint of dark teal. Apple aesthetic, very dark, smooth curves."
+    aspect_ratio: "16:9"
+
+notes:
+  - We assume @workspace/api-client-react is available for TanStack hooks.
+  - The UI relies on the pre-existing Shadcn components in src/components/ui.
+  - We use a local UUID for sessionId to track free tier usage before sign up.
