@@ -10,6 +10,11 @@ export const analysesTable = pgTable("analyses", {
   protein: real("protein").notNull(),
   carbs: real("carbs").notNull(),
   fat: real("fat").notNull(),
+  fiber: real("fiber"),
+  healthScore: integer("health_score"),
+  nutritionTip: text("nutrition_tip"),
+  servingSize: text("serving_size"),
+  confidence: text("confidence"),
   imageUrl: text("image_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

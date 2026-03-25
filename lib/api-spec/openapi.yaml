@@ -240,6 +240,21 @@ components:
           type: integer
         macros:
           $ref: "#/components/schemas/MacroNutrients"
+        fiber:
+          type: number
+          nullable: true
+        healthScore:
+          type: integer
+          nullable: true
+        nutritionTip:
+          type: string
+          nullable: true
+        servingSize:
+          type: string
+          nullable: true
+        confidence:
+          type: string
+          nullable: true
         imageUrl:
           type: string
           nullable: true

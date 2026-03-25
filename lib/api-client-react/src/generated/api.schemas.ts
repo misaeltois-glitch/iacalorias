@@ -42,6 +42,11 @@ export interface AnalysisResult {
   dishName: string;
   calories: number;
   macros: MacroNutrients;
+  fiber?: number | null;
+  healthScore?: number | null;
+  nutritionTip?: string | null;
+  servingSize?: string | null;
+  confidence?: string | null;
   imageUrl?: string | null;
   createdAt: string;
 }

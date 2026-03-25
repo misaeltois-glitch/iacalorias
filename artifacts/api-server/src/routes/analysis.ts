@@ -70,14 +70,19 @@ router.post("/", upload.single("image"), async (req: Request, res: Response) => 
       messages: [
         {
           role: "system",
-          content: `You are a nutrition expert. Analyze food images and return ONLY valid JSON with NO markdown, NO code blocks, NO extra text.
-Return exactly this structure:
+          content: `Você é um nutricionista especialista. Analise imagens de comida e retorne APENAS JSON válido, SEM markdown, SEM blocos de código, SEM texto extra.
+Retorne exatamente esta estrutura:
 {
-  "dishName": "string (name of the dish in Portuguese)",
-  "calories": number (total kcal as integer),
-  "protein": number (grams, one decimal),
-  "carbs": number (grams, one decimal),
-  "fat": number (grams, one decimal)
+  "dishName": "string (nome do prato em português)",
+  "servingSize": "string (ex: '1 porção (~350g)')",
+  "calories": number (kcal totais como inteiro),
+  "protein": number (gramas, uma casa decimal),
+  "carbs": number (gramas, uma casa decimal),
+  "fat": number (gramas, uma casa decimal),
+  "fiber": number (gramas, uma casa decimal),
+  "healthScore": number (pontuação de saúde de 1 a 10, sendo 10 o mais saudável),
+  "nutritionTip": "string (uma dica nutricional curta e personalizada em português sobre este prato, máximo 80 caracteres)",
+  "confidence": "string (nível de confiança: 'Alta confiança', 'Média confiança', ou 'Baixa confiança')"
 }`,
         },
         {
@@ -87,15 +92,19 @@ Return exactly this structure:
               type: "image_url",
               image_url: { url: `data:${mimeType};base64,${base64Image}` },
             },
-            { type: "text", text: "Analyze this food image and return the nutritional information as JSON." },
+            { type: "text", text: "Analise esta imagem de comida e retorne as informações nutricionais como JSON." },
           ],
         },
       ],
-      max_tokens: 300,
+      max_tokens: 400,
     });
 
     const raw = response.choices[0]?.message?.content?.trim() ?? "";
-    let parsed: { dishName: string; calories: number; protein: number; carbs: number; fat: number };
+    let parsed: {
+      dishName: string; servingSize?: string; calories: number;
+      protein: number; carbs: number; fat: number; fiber?: number;
+      healthScore?: number; nutritionTip?: string; confidence?: string;
+    };
 
     try {
       const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
@@ -115,6 +124,11 @@ Return exactly this structure:
       protein: parsed.protein,
       carbs: parsed.carbs,
       fat: parsed.fat,
+      fiber: parsed.fiber ?? null,
+      healthScore: parsed.healthScore ? Math.round(parsed.healthScore) : null,
+      nutritionTip: parsed.nutritionTip ?? null,
+      servingSize: parsed.servingSize ?? null,
+      confidence: parsed.confidence ?? null,
     });
 
     await db
@@ -128,6 +142,11 @@ Return exactly this structure:
       dishName: parsed.dishName,
       calories: Math.round(parsed.calories),
       macros: { protein: parsed.protein, carbs: parsed.carbs, fat: parsed.fat },
+      fiber: parsed.fiber ?? null,
+      healthScore: parsed.healthScore ? Math.round(parsed.healthScore) : null,
+      nutritionTip: parsed.nutritionTip ?? null,
+      servingSize: parsed.servingSize ?? null,
+      confidence: parsed.confidence ?? null,
       imageUrl: null,
       createdAt: new Date().toISOString(),
     });
@@ -159,7 +178,12 @@ router.get("/history", async (req: Request, res: Response) => {
       dishName: a.dishName,
       calories: a.calories,
       macros: { protein: a.protein, carbs: a.carbs, fat: a.fat },
-      imageUrl: a.imageUrl,
+      fiber: a.fiber ?? null,
+      healthScore: a.healthScore ?? null,
+      nutritionTip: a.nutritionTip ?? null,
+      servingSize: a.servingSize ?? null,
+      confidence: a.confidence ?? null,
+      imageUrl: a.imageUrl ?? null,
       createdAt: a.createdAt.toISOString(),
     }))
   );

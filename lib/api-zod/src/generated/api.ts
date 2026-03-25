@@ -43,6 +43,11 @@ export const AnalyzeFoodResponse = zod.object({
     carbs: zod.number(),
     fat: zod.number(),
   }),
+  fiber: zod.number().nullish(),
+  healthScore: zod.number().nullish(),
+  nutritionTip: zod.string().nullish(),
+  servingSize: zod.string().nullish(),
+  confidence: zod.string().nullish(),
   imageUrl: zod.string().nullish(),
   createdAt: zod.date(),
 });
@@ -64,6 +69,11 @@ export const GetAnalysisHistoryResponseItem = zod.object({
     carbs: zod.number(),
     fat: zod.number(),
   }),
+  fiber: zod.number().nullish(),
+  healthScore: zod.number().nullish(),
+  nutritionTip: zod.string().nullish(),
+  servingSize: zod.string().nullish(),
+  confidence: zod.string().nullish(),
   imageUrl: zod.string().nullish(),
   createdAt: zod.date(),
 });

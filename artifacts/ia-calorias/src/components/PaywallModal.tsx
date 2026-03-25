@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { CheckCircle2, Sparkles, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { ShieldCheck, Loader2 } from 'lucide-react';
 import { useCreateCheckoutSession } from '@workspace/api-client-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -40,104 +39,90 @@ export function PaywallModal({ isOpen, onClose, sessionId }: PaywallModalProps) 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden bg-background/95 backdrop-blur-3xl border-border/50">
-        <div className="grid md:grid-cols-2">
-          {/* Left Side: Context */}
-          <div className="p-8 md:p-12 bg-muted/30 flex flex-col justify-center">
-            <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-6">
-              <Sparkles className="w-6 h-6" />
-            </div>
-            <DialogHeader className="text-left mb-6">
-              <DialogTitle className="text-3xl md:text-4xl font-display mb-2">Eleve sua nutrição</DialogTitle>
-              <DialogDescription className="text-base md:text-lg text-muted-foreground">
-                Você atingiu o limite gratuito de 3 análises. Assine um de nossos planos para continuar descobrindo a verdade nutricional de seus pratos com a precisão da Inteligência Artificial.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <ul className="space-y-4">
-              {[
-                'Análise fotográfica instantânea',
-                'Macronutrientes detalhados',
-                'Histórico completo de refeições',
-                'Suporte prioritário'
-              ].map((feature, i) => (
-                <li key={i} className="flex items-center gap-3 text-sm font-medium">
-                  <CheckCircle2 className="w-5 h-5 text-primary" />
-                  {feature}
-                </li>
-              ))}
-            </ul>
+      <DialogContent className="max-w-[720px] p-0 overflow-hidden bg-background border-border sm:rounded-[2rem] gap-0">
+        <DialogTitle className="sr-only">Escolha um plano</DialogTitle>
+        <div className="p-6 md:p-10 flex flex-col items-center">
+          
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-semibold mb-6">
+            Suas análises gratuitas acabaram
           </div>
+          
+          <h2 className="text-3xl md:text-4xl font-bold text-center text-foreground mb-10 tracking-tight">
+            Continue monitorando<br />sua nutrição
+          </h2>
 
-          {/* Right Side: Pricing */}
-          <div className="p-8 md:p-12 space-y-6">
-            <div className="space-y-4">
-              {/* Limited Plan */}
-              <div 
-                onClick={() => setSelectedPlan('limited')}
-                className={`relative p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${
-                  selectedPlan === 'limited' 
-                    ? 'border-primary bg-primary/5 shadow-xl shadow-primary/5' 
-                    : 'border-border/50 bg-card hover:border-border'
-                }`}
-              >
-                <div className="flex justify-between items-center mb-2">
-                  <h4 className="font-semibold text-lg">Plano Limitado</h4>
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    selectedPlan === 'limited' ? 'border-primary' : 'border-muted-foreground/30'
-                  }`}>
-                    {selectedPlan === 'limited' && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
-                  </div>
-                </div>
-                <div className="mb-2">
-                  <span className="text-3xl font-display font-bold">R$ 29,90</span>
-                  <span className="text-muted-foreground text-sm">/mês</span>
-                </div>
-                <p className="text-sm text-muted-foreground">20 análises precisas por mês.</p>
-              </div>
-
-              {/* Unlimited Plan */}
-              <div 
-                onClick={() => setSelectedPlan('unlimited')}
-                className={`relative p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${
-                  selectedPlan === 'unlimited' 
-                    ? 'border-primary bg-primary/5 shadow-xl shadow-primary/5' 
-                    : 'border-border/50 bg-card hover:border-border'
-                }`}
-              >
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider rounded-full">
-                  Recomendado
-                </div>
-                <div className="flex justify-between items-center mb-2">
-                  <h4 className="font-semibold text-lg">Plano Ilimitado</h4>
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    selectedPlan === 'unlimited' ? 'border-primary' : 'border-muted-foreground/30'
-                  }`}>
-                    {selectedPlan === 'unlimited' && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
-                  </div>
-                </div>
-                <div className="mb-2">
-                  <span className="text-3xl font-display font-bold">R$ 49,90</span>
-                  <span className="text-muted-foreground text-sm">/mês</span>
-                </div>
-                <p className="text-sm text-muted-foreground">Análises ilimitadas, sem restrições.</p>
-              </div>
-            </div>
-
-            <Button 
-              className="w-full h-14 text-lg rounded-xl font-semibold shadow-xl"
-              onClick={handleCheckout}
-              disabled={checkoutMutation.isPending}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-8">
+            {/* Limited Plan */}
+            <div 
+              onClick={() => setSelectedPlan('limited')}
+              className={`
+                relative p-6 rounded-3xl border-2 cursor-pointer transition-all duration-200 text-left
+                ${selectedPlan === 'limited' 
+                  ? 'border-primary bg-primary/5' 
+                  : 'border-border bg-background-2 hover:border-border-strong'}
+              `}
             >
-              {checkoutMutation.isPending ? (
-                <Loader2 className="w-5 h-5 animate-spin mr-2" />
-              ) : null}
-              {checkoutMutation.isPending ? 'Redirecionando...' : 'Assinar Agora'}
-            </Button>
-            <p className="text-xs text-center text-muted-foreground">
-              Cancelamento fácil a qualquer momento. Pagamento seguro via Stripe.
-            </p>
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-semibold text-lg text-foreground">Limitado</span>
+                <div className={`w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center ${selectedPlan === 'limited' ? 'border-primary' : 'border-muted-foreground'}`}>
+                  {selectedPlan === 'limited' && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
+                </div>
+              </div>
+              <div className="flex items-baseline gap-1 mb-2">
+                <span className="text-2xl font-bold text-foreground">R$ 29,90</span>
+                <span className="text-sm text-muted-foreground font-medium">/mês</span>
+              </div>
+              <p className="text-sm text-muted-foreground font-medium">
+                20 análises por mês
+              </p>
+            </div>
+
+            {/* Unlimited Plan */}
+            <div 
+              onClick={() => setSelectedPlan('unlimited')}
+              className={`
+                relative p-6 rounded-3xl border-2 cursor-pointer transition-all duration-200 text-left
+                ${selectedPlan === 'unlimited' 
+                  ? 'border-primary bg-primary/5' 
+                  : 'border-border bg-background-2 hover:border-border-strong'}
+              `}
+            >
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-primary text-white text-[11px] font-bold uppercase tracking-wider rounded-full whitespace-nowrap">
+                Mais popular
+              </div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-semibold text-lg text-foreground">Ilimitado</span>
+                <div className={`w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center ${selectedPlan === 'unlimited' ? 'border-primary' : 'border-muted-foreground'}`}>
+                  {selectedPlan === 'unlimited' && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
+                </div>
+              </div>
+              <div className="flex items-baseline gap-1 mb-2">
+                <span className="text-2xl font-bold text-foreground">R$ 49,90</span>
+                <span className="text-sm text-muted-foreground font-medium">/mês</span>
+              </div>
+              <p className="text-sm text-muted-foreground font-medium">
+                Análises ilimitadas
+              </p>
+            </div>
           </div>
+
+          <button 
+            className="w-full h-14 rounded-2xl bg-foreground text-background font-semibold text-lg hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+            onClick={handleCheckout}
+            disabled={checkoutMutation.isPending}
+          >
+            {checkoutMutation.isPending ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              'Continuar'
+            )}
+          </button>
+
+          <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground font-medium">
+            <ShieldCheck className="w-4 h-4" />
+            Pagamento seguro via Stripe · Cancele quando quiser
+          </div>
+          
         </div>
       </DialogContent>
     </Dialog>
