@@ -478,6 +478,21 @@ export default function Home() {
                         Tour do aplicativo
                       </button>
                       <button
+                        onClick={() => { toggleTheme(); }}
+                        style={{
+                          width: '100%', padding: '8px 12px',
+                          background: 'none', border: 'none', color: 'var(--text-2)',
+                          fontSize: '13px', cursor: 'pointer', borderRadius: '10px',
+                          display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left',
+                          marginBottom: '2px',
+                        }}
+                      >
+                        {theme === 'dark'
+                          ? <Sun size={14} />
+                          : <Moon size={14} />}
+                        {theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+                      </button>
+                      <button
                         onClick={handleLogout}
                         style={{
                           width: '100%', padding: '8px 12px',
@@ -494,20 +509,21 @@ export default function Home() {
                 )}
               </div>
             ) : (
-              <button
-                onClick={() => setShowAuth(true)}
-                style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
-              >
-                <LogIn size={16} />
-              </button>
+              <>
+                <button
+                  onClick={toggleTheme}
+                  style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
+                >
+                  {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                </button>
+                <button
+                  onClick={() => setShowAuth(true)}
+                  style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
+                >
+                  <LogIn size={16} />
+                </button>
+              </>
             )}
-
-            <button
-              onClick={toggleTheme}
-              style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
-            >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
           </div>
         </div>
       </header>
