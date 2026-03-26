@@ -18,7 +18,8 @@ import { SplashScreen } from '@/components/SplashScreen';
 import { OnboardingCarousel } from '@/components/OnboardingCarousel';
 import { BottomNav, type BottomNavTab } from '@/components/BottomNav';
 import { WorkoutPanel } from '@/components/WorkoutPanel';
-import { AppTour, useTour } from '@/components/AppTour';
+import { AppTour } from '@/components/AppTour';
+import { useTour } from '@/hooks/use-tour';
 
 import {
   useAnalyzeFood,
