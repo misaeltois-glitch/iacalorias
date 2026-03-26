@@ -17,6 +17,8 @@ const PRICE_UNLIMITED = "price_1TEVyY5gtu657TZjVELJthbH";
 const FREE_TRIAL_LIMIT = 3;
 const LIMITED_PLAN_LIMIT = 20;
 
+const DEV_EMAILS = new Set(["dev@iacalorias.com.br"]);
+
 async function resolveSub(userId?: string, sessionId?: string) {
   if (userId) {
     const sub = await db.query.subscriptionsTable.findFirst({
@@ -47,6 +49,21 @@ router.get("/status", async (req: Request, res: Response) => {
 
   if (!sessionId && !userId) {
     res.status(400).json({ error: "bad_request", message: "sessionId is required" });
+    return;
+  }
+
+  // Dev/QA bypass — conta de desenvolvedor sempre retorna unlimited
+  if (req.user?.email && DEV_EMAILS.has(req.user.email)) {
+    res.json(GetSubscriptionStatusResponse.parse({
+      sessionId: sessionId ?? `dev-${req.user.userId}`,
+      tier: "unlimited",
+      analysisCount: 0,
+      analysisLimit: null,
+      trialRemaining: 0,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      currentPeriodEnd: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000),
+    }));
     return;
   }
 

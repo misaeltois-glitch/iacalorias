@@ -11,6 +11,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 const FREE_TRIAL_LIMIT = 3;
 const LIMITED_PLAN_LIMIT = 20;
+const DEV_EMAILS = new Set(["dev@iacalorias.com.br"]);
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -68,13 +69,14 @@ router.post("/", upload.single("image"), async (req: Request, res: Response) => 
     return;
   }
 
-  const tier = sub.tier as "free" | "limited" | "unlimited";
+  const isDevAccount = !!(req.user?.email && DEV_EMAILS.has(req.user.email));
+  const tier = isDevAccount ? "unlimited" : (sub.tier as "free" | "limited" | "unlimited");
 
-  if (tier === "free" && sub.analysisCount >= FREE_TRIAL_LIMIT) {
+  if (!isDevAccount && tier === "free" && sub.analysisCount >= FREE_TRIAL_LIMIT) {
     res.status(402).json({ error: "payment_required", message: "Suas análises gratuitas acabaram.", requiresUpgrade: true, trialUsed: sub.analysisCount, trialLimit: FREE_TRIAL_LIMIT });
     return;
   }
-  if (tier === "limited" && sub.analysisCount >= LIMITED_PLAN_LIMIT) {
+  if (!isDevAccount && tier === "limited" && sub.analysisCount >= LIMITED_PLAN_LIMIT) {
     res.status(402).json({ error: "payment_required", message: "Você atingiu o limite mensal.", requiresUpgrade: true, trialUsed: sub.analysisCount, trialLimit: LIMITED_PLAN_LIMIT });
     return;
   }
@@ -166,9 +168,11 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
       confidence: parsed.confidence ?? null,
     });
 
-    await db.update(subscriptionsTable)
-      .set({ analysisCount: sub.analysisCount + 1, updatedAt: new Date() })
-      .where(eq(subscriptionsTable.sessionId, sub.sessionId));
+    if (!isDevAccount) {
+      await db.update(subscriptionsTable)
+        .set({ analysisCount: sub.analysisCount + 1, updatedAt: new Date() })
+        .where(eq(subscriptionsTable.sessionId, sub.sessionId));
+    }
 
     const result = AnalyzeFoodResponse.parse({
       id: analysisId,
