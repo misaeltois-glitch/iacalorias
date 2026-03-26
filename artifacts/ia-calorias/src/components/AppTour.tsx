@@ -162,15 +162,19 @@ export function AppTour({ onDone }: AppTourProps) {
         scrollTimerRef.current = setTimeout(measureStep, 100);
       }
     } else {
-      // element not found → fall back to centered tooltip
-      scrollTimerRef.current = setTimeout(() => setReady(true), 100);
+      // element not found → skip this step automatically
+      if (stepIdx < STEPS.length - 1) {
+        setStepIdx(i => i + 1);
+      } else {
+        onDone();
+      }
     }
 
     return () => {
       if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
       if (readyTimerRef.current) clearTimeout(readyTimerRef.current);
     };
-  }, [stepIdx, measureStep, step.selector]);
+  }, [stepIdx, measureStep, step.selector, onDone]);
 
   useEffect(() => {
     const handler = () => {
