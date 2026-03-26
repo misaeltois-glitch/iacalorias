@@ -624,6 +624,7 @@ export default function Home() {
               {/* Upgrade banner for free users */}
               {!isPremium && (
                 <button
+                  data-tour="upgrade-banner"
                   onClick={() => setShowPaywall(true)}
                   style={{
                     width: '100%', padding: '14px 18px', borderRadius: '16px',
@@ -653,17 +654,19 @@ export default function Home() {
 
               {/* Daily progress */}
               {goalsLoaded && (
-                <DailyProgress
-                  totals={dailySummary?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, meals: 0 }}
-                  goals={savedGoals}
-                  alerts={dailySummary?.alerts ?? []}
-                  aiSummary={dailySummary?.aiSummary ?? null}
-                  analysesCount={dailySummary?.analysesCount ?? 0}
-                  period={period}
-                  onPeriodChange={handlePeriodChange}
-                  onSetGoals={() => isPremium ? setShowGoalsPanel(true) : setShowPaywall(true)}
-                  isPremium={isPremium}
-                />
+                <div data-tour="daily-progress">
+                  <DailyProgress
+                    totals={dailySummary?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, meals: 0 }}
+                    goals={savedGoals}
+                    alerts={dailySummary?.alerts ?? []}
+                    aiSummary={dailySummary?.aiSummary ?? null}
+                    analysesCount={dailySummary?.analysesCount ?? 0}
+                    period={period}
+                    onPeriodChange={handlePeriodChange}
+                    onSetGoals={() => isPremium ? setShowGoalsPanel(true) : setShowPaywall(true)}
+                    isPremium={isPremium}
+                  />
+                </div>
               )}
 
               {/* Como funciona */}

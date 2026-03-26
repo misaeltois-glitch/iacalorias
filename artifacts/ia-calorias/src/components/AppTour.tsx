@@ -1,64 +1,83 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 
-
 interface TourStep {
   selector: string;
   title: string;
   description: string;
-  tooltipSide: 'above' | 'below';
+  tooltipSide: 'above' | 'below' | 'center';
   padding?: number;
 }
 
 const STEPS: TourStep[] = [
   {
-    selector: '[data-tour="camera"]',
+    selector: '',
+    title: '👋 Bem-vindo ao IA Calorias!',
+    description: 'Vamos fazer um tour rápido para você conhecer tudo o que o app oferece. Leva menos de 1 minuto!',
+    tooltipSide: 'center',
+  },
+  {
+    selector: '[data-tour="upload-zone"]',
     title: '📸 Analisar refeição',
-    description: 'Toque aqui para fotografar qualquer refeição. A IA identifica os alimentos e calcula calorias e macros em segundos.',
+    description: 'O coração do app. Fotografe qualquer refeição ou envie da galeria — a IA identifica os alimentos e calcula calorias e macros em segundos.',
+    tooltipSide: 'above',
+    padding: 12,
+  },
+  {
+    selector: '[data-tour="camera"]',
+    title: '📷 Câmera rápida',
+    description: 'Acesso direto à câmera do celular. Toque aqui para fotografar sua refeição na hora sem precisar abrir a galeria.',
+    tooltipSide: 'above',
+    padding: 8,
+  },
+  {
+    selector: '[data-tour="usage-pill"]',
+    title: '✨ Seu plano atual',
+    description: 'Acompanhe quantas análises restam no plano gratuito. Faça upgrade para ter análises ilimitadas e recursos exclusivos.',
+    tooltipSide: 'below',
+    padding: 8,
+  },
+  {
+    selector: '[data-tour="daily-progress"]',
+    title: '🎯 Progresso do dia',
+    description: 'Acompanhe seu consumo diário de calorias e macronutrientes em tempo real. Complete o questionário de metas para personalizar seus alvos.',
     tooltipSide: 'above',
     padding: 10,
   },
   {
+    selector: '[data-tour="upgrade-banner"]',
+    title: '👑 Planos Premium',
+    description: 'Desbloqueie análises ilimitadas, histórico completo, metas nutricionais personalizadas e alertas inteligentes. A partir de R$29,90/mês.',
+    tooltipSide: 'above',
+    padding: 8,
+  },
+  {
     selector: '[data-tour="nav-home"]',
-    title: '🏠 Início',
-    description: 'Seu painel principal. Veja o resumo do dia, análises recentes e o progresso de metas nutricionais.',
+    title: '🏠 Aba Início',
+    description: 'Seu painel principal. Veja o resumo do dia, análises recentes e acesse rapidamente a câmera para registrar refeições.',
     tooltipSide: 'above',
     padding: 6,
   },
   {
     selector: '[data-tour="nav-workout"]',
-    title: '💪 Treino',
-    description: 'Monte seu plano de treino personalizado. Responda um questionário e receba uma semana completa baseada no seu perfil.',
+    title: '💪 Aba Treino',
+    description: 'Monte um plano de treino personalizado para a semana. Responda um questionário rápido e receba exercícios adaptados ao seu perfil e objetivo.',
     tooltipSide: 'above',
     padding: 6,
   },
   {
     selector: '[data-tour="nav-analytics"]',
-    title: '📊 Progresso',
-    description: 'Acompanhe gráficos de calorias, histórico de refeições e tendências nutricionais ao longo do tempo.',
+    title: '📊 Aba Progresso',
+    description: 'Gráficos de calorias, histórico de refeições e tendências de macros ao longo do tempo. Veja sua evolução semanal e mensal.',
     tooltipSide: 'above',
     padding: 6,
   },
   {
     selector: '[data-tour="nav-profile"]',
-    title: '👤 Perfil',
-    description: 'Acesse sua conta, gerencie sua assinatura e configure suas preferências pessoais.',
+    title: '👤 Aba Perfil',
+    description: 'Gerencie sua conta, veja e altere seu plano de assinatura, configure preferências pessoais e acesse o suporte quando precisar.',
     tooltipSide: 'above',
     padding: 6,
-  },
-  {
-    selector: '[data-tour="usage-pill"]',
-    title: '✨ Seu plano',
-    description: 'Veja quantas análises restam. Faça upgrade para análises ilimitadas, histórico completo e metas personalizadas.',
-    tooltipSide: 'below',
-    padding: 8,
-  },
-  {
-    selector: '[data-tour="upload-zone"]',
-    title: '🖼️ Enviar foto',
-    description: 'Arraste uma imagem, escolha da galeria ou use a câmera. Suporta JPG, PNG e WEBP até 4 MB.',
-    tooltipSide: 'below',
-    padding: 8,
   },
 ];
 
@@ -72,6 +91,7 @@ interface Rect {
 }
 
 function measureElement(selector: string, padding = 8): Rect | null {
+  if (!selector) return null;
   const el = document.querySelector(selector);
   if (!el) return null;
   const r = el.getBoundingClientRect();
@@ -140,17 +160,18 @@ export function AppTour({ onDone }: AppTourProps) {
   const GAP = 16;
 
   let tooltipStyle: React.CSSProperties = {};
-  let arrowStyle: React.CSSProperties = {};
-  let arrowDir: 'up' | 'down' = 'up';
+  let arrowDir: 'up' | 'down' | null = null;
+  let arrowLeft = 0;
 
-  if (rect) {
+  const isCentered = step.tooltipSide === 'center' || !rect;
+
+  if (!isCentered && rect) {
     const centerX = rect.left + rect.width / 2;
     let tooltipLeft = centerX - TOOLTIP_W / 2;
     if (tooltipLeft < 12) tooltipLeft = 12;
     if (tooltipLeft + TOOLTIP_W > vw - 12) tooltipLeft = vw - TOOLTIP_W - 12;
 
-    const arrowCenter = centerX - tooltipLeft;
-    const clampedArrow = Math.min(Math.max(arrowCenter, 20), TOOLTIP_W - 20);
+    arrowLeft = Math.min(Math.max(centerX - tooltipLeft, 20), TOOLTIP_W - 20);
 
     if (step.tooltipSide === 'above') {
       tooltipStyle = {
@@ -159,7 +180,6 @@ export function AppTour({ onDone }: AppTourProps) {
         width: TOOLTIP_W,
       };
       arrowDir = 'down';
-      arrowStyle = { left: clampedArrow - 8 };
     } else {
       tooltipStyle = {
         top: rect.bottom + GAP,
@@ -167,12 +187,12 @@ export function AppTour({ onDone }: AppTourProps) {
         width: TOOLTIP_W,
       };
       arrowDir = 'up';
-      arrowStyle = { left: clampedArrow - 8 };
     }
   } else {
     tooltipStyle = {
-      top: vh / 2 - 110,
-      left: (vw - TOOLTIP_W) / 2,
+      top: '50%',
+      left: '50%',
+      transform: `translate(-50%, -50%) scale(${ready ? 1 : 0.95})`,
       width: TOOLTIP_W,
     };
   }
@@ -180,8 +200,8 @@ export function AppTour({ onDone }: AppTourProps) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, pointerEvents: 'all' }}>
 
-      {/* Dark overlay (no-op when rect exists — box-shadow on spotlight handles it) */}
-      {!rect && (
+      {/* Dark overlay for centered steps */}
+      {isCentered && (
         <div style={{
           position: 'absolute', inset: 0,
           background: 'rgba(0,0,0,0.78)',
@@ -189,7 +209,7 @@ export function AppTour({ onDone }: AppTourProps) {
       )}
 
       {/* Spotlight — transparent cutout with huge box-shadow overlay */}
-      {rect && (
+      {rect && !isCentered && (
         <div
           style={{
             position: 'absolute',
@@ -220,65 +240,59 @@ export function AppTour({ onDone }: AppTourProps) {
           boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
           zIndex: 10000,
           opacity: ready ? 1 : 0,
-          transform: ready ? 'scale(1)' : 'scale(0.95)',
+          ...(isCentered ? {} : {
+            transform: ready ? 'scale(1)' : 'scale(0.95)',
+          }),
           transition: 'opacity 0.2s ease, transform 0.2s ease',
           overflow: 'visible',
         }}
       >
         {/* Arrow pointing to element */}
-        {rect && arrowDir === 'down' && (
-          <div style={{
-            position: 'absolute',
-            bottom: -9,
-            ...arrowStyle,
-            width: 0, height: 0,
-            borderLeft: '9px solid transparent',
-            borderRight: '9px solid transparent',
-            borderTop: '9px solid rgba(255,255,255,0.12)',
-          }} />
+        {arrowDir === 'down' && rect && (
+          <>
+            <div style={{
+              position: 'absolute', bottom: -9, left: arrowLeft - 9,
+              width: 0, height: 0,
+              borderLeft: '9px solid transparent',
+              borderRight: '9px solid transparent',
+              borderTop: '9px solid rgba(255,255,255,0.12)',
+            }} />
+            <div style={{
+              position: 'absolute', bottom: -7, left: arrowLeft - 8,
+              width: 0, height: 0,
+              borderLeft: '8px solid transparent',
+              borderRight: '8px solid transparent',
+              borderTop: '8px solid var(--bg, #141414)',
+            }} />
+          </>
         )}
-        {rect && arrowDir === 'down' && (
-          <div style={{
-            position: 'absolute',
-            bottom: -7,
-            left: (arrowStyle.left as number) + 1,
-            width: 0, height: 0,
-            borderLeft: '8px solid transparent',
-            borderRight: '8px solid transparent',
-            borderTop: '8px solid var(--bg, #141414)',
-          }} />
-        )}
-        {rect && arrowDir === 'up' && (
-          <div style={{
-            position: 'absolute',
-            top: -9,
-            ...arrowStyle,
-            width: 0, height: 0,
-            borderLeft: '9px solid transparent',
-            borderRight: '9px solid transparent',
-            borderBottom: '9px solid rgba(255,255,255,0.12)',
-          }} />
-        )}
-        {rect && arrowDir === 'up' && (
-          <div style={{
-            position: 'absolute',
-            top: -7,
-            left: (arrowStyle.left as number) + 1,
-            width: 0, height: 0,
-            borderLeft: '8px solid transparent',
-            borderRight: '8px solid transparent',
-            borderBottom: '8px solid var(--bg, #141414)',
-          }} />
+        {arrowDir === 'up' && rect && (
+          <>
+            <div style={{
+              position: 'absolute', top: -9, left: arrowLeft - 9,
+              width: 0, height: 0,
+              borderLeft: '9px solid transparent',
+              borderRight: '9px solid transparent',
+              borderBottom: '9px solid rgba(255,255,255,0.12)',
+            }} />
+            <div style={{
+              position: 'absolute', top: -7, left: arrowLeft - 8,
+              width: 0, height: 0,
+              borderLeft: '8px solid transparent',
+              borderRight: '8px solid transparent',
+              borderBottom: '8px solid var(--bg, #141414)',
+            }} />
+          </>
         )}
 
         <div style={{ padding: '16px 16px 14px' }}>
-          {/* Step + close */}
+          {/* Step counter + close */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: '#0D9F6E', letterSpacing: '0.4px' }}>
               PASSO {stepIdx + 1} DE {STEPS.length}
             </span>
             <button onClick={finish} style={{
-              padding: '3px 3px', borderRadius: 8,
+              padding: '3px', borderRadius: 8,
               background: 'rgba(255,255,255,0.07)', border: 'none',
               cursor: 'pointer', color: 'var(--text-3, #555)',
               display: 'flex', alignItems: 'center',
@@ -295,7 +309,7 @@ export function AppTour({ onDone }: AppTourProps) {
             {step.description}
           </p>
 
-          {/* Progress bar */}
+          {/* Progress dots */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
             {STEPS.map((_, i) => (
               <div key={i} style={{
@@ -307,7 +321,7 @@ export function AppTour({ onDone }: AppTourProps) {
             ))}
           </div>
 
-          {/* Actions */}
+          {/* Navigation buttons */}
           <div style={{ display: 'flex', gap: 6 }}>
             {stepIdx > 0 && (
               <button onClick={prev} style={{
@@ -320,16 +334,19 @@ export function AppTour({ onDone }: AppTourProps) {
                 <ChevronLeft size={15} />
               </button>
             )}
-            <button onClick={stepIdx < STEPS.length - 1 ? next : finish} style={{
-              flex: 1, padding: '9px 14px', borderRadius: 11,
-              background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
-              border: 'none', color: '#fff', fontSize: 13, fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-            }}>
+            <button
+              onClick={stepIdx < STEPS.length - 1 ? next : finish}
+              style={{
+                flex: 1, padding: '9px 14px', borderRadius: 11,
+                background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+                border: 'none', color: '#fff', fontSize: 13, fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              }}
+            >
               {stepIdx < STEPS.length - 1
                 ? <><span>Próximo</span><ChevronRight size={14} /></>
-                : <span>Começar 🚀</span>}
+                : <span>Começar agora 🚀</span>}
             </button>
           </div>
 
@@ -355,4 +372,3 @@ export function AppTour({ onDone }: AppTourProps) {
     </div>
   );
 }
-
