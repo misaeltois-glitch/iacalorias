@@ -87,22 +87,23 @@ interface Rect {
   width: number;
   height: number;
   bottom: number;
-  right: number;
 }
 
-function measureElement(selector: string, padding = 8): Rect | null {
+function getElementRect(selector: string, padding = 8): Rect | null {
   if (!selector) return null;
   const el = document.querySelector(selector);
   if (!el) return null;
   const r = el.getBoundingClientRect();
   if (r.width === 0 && r.height === 0) return null;
+  const vh = window.innerHeight;
+  // element is not in viewport at all
+  if (r.bottom < 0 || r.top > vh) return null;
   return {
     top: r.top - padding,
     left: r.left - padding,
     width: r.width + padding * 2,
     height: r.height + padding * 2,
     bottom: r.bottom + padding,
-    right: r.right + padding,
   };
 }
 
@@ -114,35 +115,75 @@ export function AppTour({ onDone }: AppTourProps) {
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const [ready, setReady] = useState(false);
-  const tooltipRef = useRef<HTMLDivElement>(null);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const step = STEPS[stepIdx];
+  const isCenter = step.tooltipSide === 'center';
 
-  const updateRect = useCallback(() => {
-    if (!step) return;
-    const r = measureElement(step.selector, step.padding ?? 8);
+  // Lock body scroll while tour is active
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  const measureStep = useCallback(() => {
+    const r = getElementRect(step.selector, step.padding ?? 8);
     setRect(r);
+    readyTimerRef.current = setTimeout(() => setReady(true), 80);
   }, [step]);
 
   useEffect(() => {
     setReady(false);
     setRect(null);
-    const t = setTimeout(() => {
-      updateRect();
-      setTimeout(() => setReady(true), 80);
-    }, 100);
-    return () => clearTimeout(t);
-  }, [stepIdx, updateRect]);
+
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    if (readyTimerRef.current) clearTimeout(readyTimerRef.current);
+
+    if (!step.selector) {
+      // center step: no element, just show after small delay
+      scrollTimerRef.current = setTimeout(() => setReady(true), 120);
+      return;
+    }
+
+    const el = document.querySelector(step.selector) as HTMLElement | null;
+
+    if (el) {
+      const r = el.getBoundingClientRect();
+      const vh = window.innerHeight;
+      const outOfView = r.bottom < 0 || r.top > vh;
+
+      if (outOfView) {
+        // scroll instantly then measure
+        el.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'center' });
+        scrollTimerRef.current = setTimeout(measureStep, 150);
+      } else {
+        scrollTimerRef.current = setTimeout(measureStep, 100);
+      }
+    } else {
+      // element not found → fall back to centered tooltip
+      scrollTimerRef.current = setTimeout(() => setReady(true), 100);
+    }
+
+    return () => {
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+      if (readyTimerRef.current) clearTimeout(readyTimerRef.current);
+    };
+  }, [stepIdx, measureStep, step.selector]);
 
   useEffect(() => {
-    const handler = () => updateRect();
+    const handler = () => {
+      if (step.selector) {
+        const r = getElementRect(step.selector, step.padding ?? 8);
+        setRect(r);
+      }
+    };
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
-  }, [updateRect]);
+  }, [step]);
 
-  const finish = () => {
-    onDone();
-  };
+  const finish = useCallback(() => onDone(), [onDone]);
 
   const next = () => {
     if (stepIdx < STEPS.length - 1) setStepIdx(i => i + 1);
@@ -153,180 +194,145 @@ export function AppTour({ onDone }: AppTourProps) {
     if (stepIdx > 0) setStepIdx(i => i - 1);
   };
 
-  const vw = typeof window !== 'undefined' ? window.innerWidth : 390;
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 844;
-
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
   const TOOLTIP_W = Math.min(300, vw - 32);
-  const GAP = 16;
+  const GAP = 14;
 
+  // Compute tooltip position
   let tooltipStyle: React.CSSProperties = {};
   let arrowDir: 'up' | 'down' | null = null;
   let arrowLeft = 0;
 
-  const isCentered = step.tooltipSide === 'center' || !rect;
+  const hasRect = !!rect && !isCenter;
 
-  if (!isCentered && rect) {
+  if (hasRect && rect) {
     const centerX = rect.left + rect.width / 2;
-    let tooltipLeft = centerX - TOOLTIP_W / 2;
-    if (tooltipLeft < 12) tooltipLeft = 12;
-    if (tooltipLeft + TOOLTIP_W > vw - 12) tooltipLeft = vw - TOOLTIP_W - 12;
-
-    arrowLeft = Math.min(Math.max(centerX - tooltipLeft, 20), TOOLTIP_W - 20);
+    let tLeft = centerX - TOOLTIP_W / 2;
+    tLeft = Math.max(12, Math.min(tLeft, vw - TOOLTIP_W - 12));
+    arrowLeft = Math.min(Math.max(centerX - tLeft, 20), TOOLTIP_W - 20);
 
     if (step.tooltipSide === 'above') {
-      tooltipStyle = {
-        bottom: vh - rect.top + GAP,
-        left: tooltipLeft,
-        width: TOOLTIP_W,
-      };
+      // anchor tooltip bottom just above the spotlight
+      tooltipStyle = { bottom: vh - rect.top + GAP, left: tLeft, width: TOOLTIP_W };
       arrowDir = 'down';
     } else {
-      tooltipStyle = {
-        top: rect.bottom + GAP,
-        left: tooltipLeft,
-        width: TOOLTIP_W,
-      };
+      // anchor tooltip top just below the spotlight
+      tooltipStyle = { top: rect.bottom + GAP, left: tLeft, width: TOOLTIP_W };
       arrowDir = 'up';
     }
   } else {
+    // centered
     tooltipStyle = {
-      top: '50%',
-      left: '50%',
-      transform: `translate(-50%, -50%) scale(${ready ? 1 : 0.95})`,
+      top: '50%', left: '50%',
       width: TOOLTIP_W,
+      transform: `translate(-50%, -50%) scale(${ready ? 1 : 0.95})`,
     };
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, pointerEvents: 'all' }}>
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, pointerEvents: 'all' }}
+      onWheel={e => e.preventDefault()}
+      onTouchMove={e => e.preventDefault()}
+    >
+      {/* Full-screen dark overlay */}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.75)' }} />
 
-      {/* Dark overlay for centered steps */}
-      {isCentered && (
+      {/* Spotlight cutout — position: fixed so it aligns with getBoundingClientRect */}
+      {hasRect && rect && (
         <div style={{
-          position: 'absolute', inset: 0,
-          background: 'rgba(0,0,0,0.78)',
+          position: 'fixed',
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+          borderRadius: 14,
+          background: 'transparent',
+          boxShadow: '0 0 0 9999px rgba(0,0,0,0.75)',
+          border: '2.5px solid #0D9F6E',
+          outline: '4px solid rgba(13,159,110,0.22)',
+          zIndex: 10001,
+          pointerEvents: 'none',
+          animation: 'tour-glow 2s ease-in-out infinite',
         }} />
       )}
 
-      {/* Spotlight — transparent cutout with huge box-shadow overlay */}
-      {rect && !isCentered && (
-        <div
-          style={{
-            position: 'absolute',
-            top: rect.top,
-            left: rect.left,
-            width: rect.width,
-            height: rect.height,
-            borderRadius: 14,
-            boxShadow: '0 0 0 9999px rgba(0,0,0,0.78)',
-            border: '2.5px solid #0D9F6E',
-            outline: '4px solid rgba(13,159,110,0.2)',
-            zIndex: 9998,
-            pointerEvents: 'none',
-            animation: 'tour-glow 2s ease-in-out infinite',
-          }}
-        />
-      )}
-
-      {/* Tooltip card */}
-      <div
-        ref={tooltipRef}
-        style={{
-          position: 'fixed',
-          ...tooltipStyle,
-          background: 'var(--bg, #141414)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 18,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
-          zIndex: 10000,
-          opacity: ready ? 1 : 0,
-          ...(isCentered ? {} : {
-            transform: ready ? 'scale(1)' : 'scale(0.95)',
-          }),
-          transition: 'opacity 0.2s ease, transform 0.2s ease',
-          overflow: 'visible',
-        }}
-      >
-        {/* Arrow pointing to element */}
-        {arrowDir === 'down' && rect && (
-          <>
-            <div style={{
-              position: 'absolute', bottom: -9, left: arrowLeft - 9,
-              width: 0, height: 0,
-              borderLeft: '9px solid transparent',
-              borderRight: '9px solid transparent',
-              borderTop: '9px solid rgba(255,255,255,0.12)',
-            }} />
-            <div style={{
-              position: 'absolute', bottom: -7, left: arrowLeft - 8,
-              width: 0, height: 0,
-              borderLeft: '8px solid transparent',
-              borderRight: '8px solid transparent',
-              borderTop: '8px solid var(--bg, #141414)',
-            }} />
-          </>
-        )}
-        {arrowDir === 'up' && rect && (
-          <>
-            <div style={{
-              position: 'absolute', top: -9, left: arrowLeft - 9,
-              width: 0, height: 0,
-              borderLeft: '9px solid transparent',
-              borderRight: '9px solid transparent',
-              borderBottom: '9px solid rgba(255,255,255,0.12)',
-            }} />
-            <div style={{
-              position: 'absolute', top: -7, left: arrowLeft - 8,
-              width: 0, height: 0,
-              borderLeft: '8px solid transparent',
-              borderRight: '8px solid transparent',
-              borderBottom: '8px solid var(--bg, #141414)',
-            }} />
-          </>
-        )}
+      {/* Tooltip */}
+      <div style={{
+        position: 'fixed',
+        ...tooltipStyle,
+        background: 'var(--bg, #0f0f0f)',
+        border: '1px solid rgba(255,255,255,0.13)',
+        borderRadius: 18,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.75)',
+        zIndex: 10002,
+        opacity: ready ? 1 : 0,
+        ...(hasRect ? { transform: ready ? 'scale(1)' : 'scale(0.96)' } : {}),
+        transition: 'opacity 0.22s ease, transform 0.22s ease',
+        overflow: 'visible',
+        maxWidth: '92vw',
+      }}>
+        {/* Arrow — down (tooltip above element) */}
+        {arrowDir === 'down' && rect && (<>
+          <div style={{ position: 'absolute', bottom: -9, left: arrowLeft - 9, width: 0, height: 0,
+            borderLeft: '9px solid transparent', borderRight: '9px solid transparent',
+            borderTop: '9px solid rgba(255,255,255,0.13)' }} />
+          <div style={{ position: 'absolute', bottom: -7, left: arrowLeft - 8, width: 0, height: 0,
+            borderLeft: '8px solid transparent', borderRight: '8px solid transparent',
+            borderTop: '8px solid var(--bg, #0f0f0f)' }} />
+        </>)}
+        {/* Arrow — up (tooltip below element) */}
+        {arrowDir === 'up' && rect && (<>
+          <div style={{ position: 'absolute', top: -9, left: arrowLeft - 9, width: 0, height: 0,
+            borderLeft: '9px solid transparent', borderRight: '9px solid transparent',
+            borderBottom: '9px solid rgba(255,255,255,0.13)' }} />
+          <div style={{ position: 'absolute', top: -7, left: arrowLeft - 8, width: 0, height: 0,
+            borderLeft: '8px solid transparent', borderRight: '8px solid transparent',
+            borderBottom: '8px solid var(--bg, #0f0f0f)' }} />
+        </>)}
 
         <div style={{ padding: '16px 16px 14px' }}>
-          {/* Step counter + close */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#0D9F6E', letterSpacing: '0.4px' }}>
+          {/* Header row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#0D9F6E', letterSpacing: '0.5px' }}>
               PASSO {stepIdx + 1} DE {STEPS.length}
             </span>
             <button onClick={finish} style={{
-              padding: '3px', borderRadius: 8,
-              background: 'rgba(255,255,255,0.07)', border: 'none',
-              cursor: 'pointer', color: 'var(--text-3, #555)',
+              padding: 4, borderRadius: 8,
+              background: 'rgba(255,255,255,0.08)', border: 'none',
+              cursor: 'pointer', color: 'var(--text-2, #888)',
               display: 'flex', alignItems: 'center',
             }}>
-              <X size={14} />
+              <X size={13} />
             </button>
           </div>
 
-          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1, #fff)', marginBottom: 6, letterSpacing: '-0.2px' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1, #fff)', marginBottom: 5, letterSpacing: '-0.2px' }}>
             {step.title}
           </div>
 
-          <p style={{ fontSize: 12, color: 'var(--text-2, #aaa)', lineHeight: 1.6, margin: '0 0 12px' }}>
+          <p style={{ fontSize: 12.5, color: 'var(--text-2, #aaa)', lineHeight: 1.65, margin: '0 0 12px' }}>
             {step.description}
           </p>
 
-          {/* Progress dots */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+          {/* Progress bar */}
+          <div style={{ display: 'flex', gap: 3, marginBottom: 12 }}>
             {STEPS.map((_, i) => (
               <div key={i} style={{
-                height: 3, borderRadius: 99,
+                height: 3, borderRadius: 99, flex: 1,
                 background: i <= stepIdx ? '#0D9F6E' : 'rgba(255,255,255,0.12)',
-                flex: 1,
                 transition: 'background 0.25s',
               }} />
             ))}
           </div>
 
-          {/* Navigation buttons */}
+          {/* Navigation */}
           <div style={{ display: 'flex', gap: 6 }}>
             {stepIdx > 0 && (
               <button onClick={prev} style={{
                 padding: '9px 12px', borderRadius: 11,
-                background: 'rgba(255,255,255,0.07)',
+                background: 'rgba(255,255,255,0.08)',
                 border: '1px solid rgba(255,255,255,0.1)',
                 color: 'var(--text-2, #aaa)', cursor: 'pointer',
                 display: 'flex', alignItems: 'center',
@@ -365,8 +371,8 @@ export function AppTour({ onDone }: AppTourProps) {
 
       <style>{`
         @keyframes tour-glow {
-          0%, 100% { outline-color: rgba(13,159,110,0.2); }
-          50% { outline-color: rgba(13,159,110,0.45); }
+          0%, 100% { outline-color: rgba(13,159,110,0.22); }
+          50% { outline-color: rgba(13,159,110,0.5); }
         }
       `}</style>
     </div>
