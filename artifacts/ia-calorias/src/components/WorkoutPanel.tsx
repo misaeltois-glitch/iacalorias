@@ -18,6 +18,7 @@ interface WorkoutPanelProps {
   sessionId: string;
   isPremium: boolean;
   onUpgrade: () => void;
+  onNutritionTargets?: (targets: { calories: number; protein: number; carbs: number; fat: number; fiber: number; weight: number; height: number; age: number; sex: string; activityFactor: number }) => void;
 }
 
 type PanelView = 'loading' | 'questionnaire' | 'plan' | 'player';
@@ -39,7 +40,7 @@ const INJURIES_LIST = [
   { key: 'ankle', label: 'Entorse de tornozelo recorrente' },
 ];
 
-export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade }: WorkoutPanelProps) {
+export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade, onNutritionTargets }: WorkoutPanelProps) {
   const { user } = useAuth();
   const [view, setView] = useState<PanelView>('loading');
   const [step, setStep] = useState(1);
@@ -89,6 +90,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade 
         setProfile(loaded);
         const p = generateWorkoutPlan(loaded);
         setPlan(p);
+        onNutritionTargets?.({ ...p.nutritionTargets, weight: loaded.weight, height: loaded.height, age: loaded.age, sex: loaded.sex, activityFactor: p.nutritionTargets.activityFactor });
         setView('plan');
       } else {
         setView('questionnaire');
@@ -114,6 +116,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade 
     const fullProfile = profile as WorkoutProfile;
     const generated = generateWorkoutPlan(fullProfile);
     setPlan(generated);
+    onNutritionTargets?.({ ...generated.nutritionTargets, weight: fullProfile.weight, height: fullProfile.height, age: fullProfile.age, sex: fullProfile.sex, activityFactor: generated.nutritionTargets.activityFactor });
     await saveProfile(fullProfile);
     setIsGenerating(false);
     setView('plan');

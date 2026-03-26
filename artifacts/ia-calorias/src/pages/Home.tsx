@@ -260,7 +260,34 @@ export default function Home() {
   const handleLogout = async () => {
     setShowUserMenu(false);
     await logout();
+    refetchStatus();
     toast({ title: "Até logo!", description: "Você saiu da sua conta." });
+  };
+
+  const handleWorkoutNutrition = useCallback(async (targets: { calories: number; protein: number; carbs: number; fat: number; fiber: number; weight: number; height: number; age: number; sex: string; activityFactor: number }) => {
+    if (!sessionId || !isPremium) return;
+    const goals = {
+      calories: targets.calories,
+      protein: targets.protein,
+      carbs: targets.carbs,
+      fat: targets.fat,
+      fiber: targets.fiber,
+      weight: targets.weight,
+      height: targets.height,
+      age: targets.age,
+      sex: targets.sex,
+      objective: 'treino',
+      activityLevel: targets.activityFactor,
+      restrictions: [],
+    };
+    await saveGoals(sessionId, goals as any);
+    await refreshSummary();
+  }, [sessionId, isPremium, refreshSummary]);
+
+  const handleCameraCapture = (file: File) => {
+    setActiveTab('analyze');
+    setCurrentResult(null);
+    handleAnalyze(file);
   };
 
   const handleSplashDone = () => {
@@ -720,6 +747,7 @@ export default function Home() {
         activeTab={activeTab}
         onTabChange={handleTabChange}
         isPremium={isPremium}
+        onCameraCapture={handleCameraCapture}
       />
 
       {/* Panels / Modals */}
@@ -737,6 +765,7 @@ export default function Home() {
         sessionId={sessionId}
         isPremium={isPremium}
         onUpgrade={() => { setShowWorkout(false); setPaywallDisableClose(false); setShowPaywall(true); }}
+        onNutritionTargets={handleWorkoutNutrition}
       />
 
       <PaywallModal

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Home, Dumbbell, Camera, BarChart2, User } from 'lucide-react';
 
 export type BottomNavTab = 'home' | 'workout' | 'analyze' | 'analytics' | 'profile';
@@ -7,9 +7,12 @@ interface BottomNavProps {
   activeTab: BottomNavTab;
   onTabChange: (tab: BottomNavTab) => void;
   isPremium: boolean;
+  onCameraCapture?: (file: File) => void;
 }
 
-export function BottomNav({ activeTab, onTabChange, isPremium }: BottomNavProps) {
+export function BottomNav({ activeTab, onTabChange, isPremium, onCameraCapture }: BottomNavProps) {
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
   const tabs = [
     { id: 'home' as const, label: 'Início', Icon: Home },
     { id: 'workout' as const, label: 'Treino', Icon: Dumbbell },
@@ -42,15 +45,27 @@ export function BottomNav({ activeTab, onTabChange, isPremium }: BottomNavProps)
 
           if (isCenter) {
             return (
-              <button
+              <label
                 key={id}
-                onClick={() => onTabChange(id)}
                 style={{
                   flex: 1,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  background: 'none', border: 'none', cursor: 'pointer',
+                  cursor: 'pointer',
                 }}
+                onClick={() => onTabChange(id)}
               >
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && onCameraCapture) onCameraCapture(file);
+                    e.currentTarget.value = '';
+                  }}
+                />
                 <div style={{
                   width: '52px', height: '52px', borderRadius: '50%',
                   background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
@@ -60,7 +75,7 @@ export function BottomNav({ activeTab, onTabChange, isPremium }: BottomNavProps)
                 }}>
                   <Icon size={22} color="#fff" strokeWidth={2} />
                 </div>
-              </button>
+              </label>
             );
           }
 
