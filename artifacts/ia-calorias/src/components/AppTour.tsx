@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 
-const TOUR_DONE_KEY = 'ia-calorias-tour-done';
 
 interface TourStep {
   selector: string;
@@ -122,7 +121,6 @@ export function AppTour({ onDone }: AppTourProps) {
   }, [updateRect]);
 
   const finish = () => {
-    localStorage.setItem(TOUR_DONE_KEY, 'true');
     onDone();
   };
 
