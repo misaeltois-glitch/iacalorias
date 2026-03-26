@@ -75,7 +75,7 @@ const STEPS: TourStep[] = [
   {
     selector: '[data-tour="nav-profile"]',
     title: '👤 Aba Perfil',
-    description: 'Gerencie sua conta, veja e altere seu plano de assinatura, configure preferências pessoais e acesse o suporte quando precisar.',
+    description: 'Gerencie sua conta e assinatura. Lembre-se: configurar suas metas de calorias (calorias consumidas × desejadas) e o comparativo de treino são recursos exclusivos do plano Pro 👑',
     tooltipSide: 'above',
     padding: 6,
   },
