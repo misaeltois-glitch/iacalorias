@@ -47,6 +47,7 @@ export function BottomNav({ activeTab, onTabChange, isPremium, onCameraCapture }
             return (
               <label
                 key={id}
+                data-tour="camera"
                 style={{
                   flex: 1,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -82,6 +83,7 @@ export function BottomNav({ activeTab, onTabChange, isPremium, onCameraCapture }
           return (
             <button
               key={id}
+              data-tour={`nav-${id}`}
               onClick={() => onTabChange(id)}
               style={{
                 flex: 1,

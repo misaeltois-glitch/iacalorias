@@ -18,6 +18,7 @@ import { SplashScreen } from '@/components/SplashScreen';
 import { OnboardingCarousel } from '@/components/OnboardingCarousel';
 import { BottomNav, type BottomNavTab } from '@/components/BottomNav';
 import { WorkoutPanel } from '@/components/WorkoutPanel';
+import { AppTour, useTour } from '@/components/AppTour';
 
 import {
   useAnalyzeFood,
@@ -102,6 +103,7 @@ export default function Home() {
   const sessionId = useSession();
   const { user, isAuthenticated, logout } = useAuth();
   const { accepted: lgpdAccepted, accept: acceptLGPD } = useLGPDConsent();
+  const { showTour, maybeStartTour, endTour, resetTour } = useTour();
 
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [currentResult, setCurrentResult] = useState<AnalysisResult | null>(null);
@@ -166,6 +168,8 @@ export default function Home() {
     const alreadyOnboarded = localStorage.getItem(ONBOARDED_KEY);
     if (!alreadyOnboarded) {
       setShowSplash(true);
+    } else {
+      maybeStartTour(1200);
     }
   }, []);
 
@@ -298,6 +302,7 @@ export default function Home() {
   const handleCarouselDone = () => {
     setShowCarousel(false);
     localStorage.setItem(ONBOARDED_KEY, 'true');
+    maybeStartTour(800);
   };
 
   const handleTabChange = (tab: BottomNavTab) => {
@@ -395,7 +400,7 @@ export default function Home() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {renderUsagePill()}
+            <div data-tour="usage-pill" style={{ display: 'flex' }}>{renderUsagePill()}</div>
 
             <button
               onClick={() => setShowAnalytics(true)}
@@ -458,6 +463,19 @@ export default function Home() {
                           Upgrade para Ilimitado
                         </button>
                       )}
+                      <button
+                        onClick={() => { setShowUserMenu(false); resetTour(); }}
+                        style={{
+                          width: '100%', padding: '8px 12px',
+                          background: 'none', border: 'none', color: 'var(--text-2)',
+                          fontSize: '13px', cursor: 'pointer', borderRadius: '10px',
+                          display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left',
+                          marginBottom: '2px',
+                        }}
+                      >
+                        <span style={{ fontSize: '14px' }}>🗺️</span>
+                        Tour do aplicativo
+                      </button>
                       <button
                         onClick={handleLogout}
                         style={{
@@ -567,12 +585,14 @@ export default function Home() {
                     Tire uma foto ou escolha da galeria
                   </p>
                 </div>
-                <UploadZone
-                  onAnalyze={handleAnalyze}
-                  onFileSelected={handleFileSelected}
-                  isAnalyzing={analyzeMutation.isPending}
-                  usageLabel={!isAuthenticated && subStatus?.tier === 'free' ? `(${3 - trialUsed} de 3 grátis)` : undefined}
-                />
+                <div data-tour="upload-zone">
+                  <UploadZone
+                    onAnalyze={handleAnalyze}
+                    onFileSelected={handleFileSelected}
+                    isAnalyzing={analyzeMutation.isPending}
+                    usageLabel={!isAuthenticated && subStatus?.tier === 'free' ? `(${3 - trialUsed} de 3 grátis)` : undefined}
+                  />
+                </div>
               </div>
 
               {/* CTA for non-authenticated */}
@@ -799,6 +819,8 @@ export default function Home() {
         onSuccess={handleAuthSuccess}
         sessionId={sessionId}
       />
+
+      {showTour && <AppTour onDone={endTour} />}
 
       <style>{`
         @keyframes ping {
