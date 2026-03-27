@@ -123,6 +123,7 @@ export default function Home() {
   const [showCarousel, setShowCarousel] = useState(false);
   const [celebration, setCelebration] = useState<{ show: boolean; type: 'calories' | 'meals' }>({ show: false, type: 'calories' });
   const celebrationQueue = useRef<Array<'calories' | 'meals'>>([]);
+  const celebrationInflight = useRef<Set<'calories' | 'meals'>>(new Set());
   const [dismissedOverrun, setDismissedOverrun] = useState(false);
 
   const [savedGoals, setSavedGoals] = useState<any>(null);
@@ -181,6 +182,7 @@ export default function Home() {
   const showNextCelebration = useCallback((delay = 0) => {
     const next = celebrationQueue.current.shift();
     if (next) {
+      celebrationInflight.current.delete(next);
       markCelebratedToday(next);
       if (delay > 0) {
         setTimeout(() => setCelebration({ show: true, type: next }), delay);
@@ -202,17 +204,23 @@ export default function Home() {
     const { rawGoals, totals } = dailySummary;
 
     const toQueue: Array<'calories' | 'meals'> = [];
-    if (rawGoals.calories && totals.calories >= rawGoals.calories && !hasCelebratedToday('calories')) {
-      toQueue.push('calories');
-    }
-    if (rawGoals.mealsPerDay && totals.meals >= rawGoals.mealsPerDay && !hasCelebratedToday('meals')) {
-      toQueue.push('meals');
+    const types: Array<'calories' | 'meals'> = ['calories', 'meals'];
+    for (const type of types) {
+      const eligible = type === 'calories'
+        ? rawGoals.calories && totals.calories >= rawGoals.calories
+        : rawGoals.mealsPerDay && totals.meals >= rawGoals.mealsPerDay;
+      if (eligible && !hasCelebratedToday(type) && !celebrationInflight.current.has(type)) {
+        celebrationInflight.current.add(type);
+        toQueue.push(type);
+      }
     }
     if (toQueue.length > 0) {
       celebrationQueue.current.push(...toQueue);
-      showNextCelebration(600);
+      if (celebration.show === false) {
+        showNextCelebration(600);
+      }
     }
-  }, [dailySummary, isPremium, showNextCelebration]);
+  }, [dailySummary, isPremium, showNextCelebration, celebration.show]);
 
   useEffect(() => {
     setDismissedOverrun(false);
