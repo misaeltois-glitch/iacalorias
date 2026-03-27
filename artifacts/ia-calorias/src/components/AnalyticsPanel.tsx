@@ -352,9 +352,14 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
   useEffect(() => {
     if (isOpen) {
       fetchData(period, 1);
+    }
+  }, [isOpen, period, fetchData]);
+
+  useEffect(() => {
+    if (isOpen) {
       fetchWorkoutLogs();
     }
-  }, [isOpen, period, fetchData, fetchWorkoutLogs]);
+  }, [isOpen, fetchWorkoutLogs]);
 
   const handlePeriod = (p: Period) => {
     setPeriod(p);
