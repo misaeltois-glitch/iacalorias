@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Dumbbell, Clock, Flame, Target, Apple, Play, Check, RotateCcw, Crown, Zap, Heart, Wind, Smile, BarChart2, ChevronDown, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { generateWorkoutPlan, calculateNutrition, getGoalLabel, getLevelLabel, formatRest, getTodayKey, type WorkoutProfile, type WorkoutPlan, type WorkoutSession, type SessionExercise, type WorkoutGoal, type ExperienceLevel, type GymType } from '@/lib/workout-engine';
-import { getExercisesByMuscle, filterByEquipment, filterByInjuries, type Exercise, type MuscleGroup } from '@/lib/exercise-database';
+import { getExercisesByMuscle, filterByEquipment, filterByInjuries, type Exercise, type MuscleGroup, type InjuryKey } from '@/lib/exercise-database';
 
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 const BASE = import.meta.env.BASE_URL ?? '/';
@@ -717,15 +717,14 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
                   <SectionCard title="🧊 Volta à Calma" items={selectedSession.cooldown.map(w => `${w.name} — ${w.duration}`)} />
                 )}
 
-                {/* Calorie Balance Card */}
-                {todayCalories !== null && (
-                  <CalorieBurnCard
-                    consumedKcal={todayCalories.consumed}
-                    sessionMinutes={selectedSession!.estimatedMinutes}
-                    weight={profile.weight ?? 75}
-                    goal={(profile.goal ?? 'hypertrophy') as WorkoutGoal}
-                  />
-                )}
+                {/* Calorie Balance Card — always rendered; falls back to 0 if no data loaded yet */}
+                <CalorieBurnCard
+                  consumedKcal={todayCalories?.consumed ?? 0}
+                  sessionMinutes={selectedSession!.estimatedMinutes}
+                  weight={profile.weight ?? 75}
+                  goal={(profile.goal ?? 'hypertrophy') as WorkoutGoal}
+                  hasData={todayCalories !== null}
+                />
 
                 {/* Nutrition Integration Card */}
                 <NutritionCard nutrition={plan.nutritionTargets} goal={profile.goal as WorkoutGoal} />
@@ -909,12 +908,17 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
             const goal = (profile.goal ?? 'hypertrophy') as WorkoutGoal;
             const level = (profile.level ?? 'intermediate') as ExperienceLevel;
             const allExs = getExercisesByMuscle(mbMuscle.muscle);
-            const injuryKeys = (profile.injuries ?? []) as any[];
+            const injuryKeys = (profile.injuries ?? []) as InjuryKey[];
             const filtered = filterByInjuries(allExs, injuryKeys);
             const compounds = filtered.filter(e => e.category !== 'isolation');
             const isolation = filtered.filter(e => e.category === 'isolation');
+            // Recommend by both level AND goal: compounds prioritized for strength/hypertrophy,
+            // isolation prioritized for fat_loss/endurance. Advanced gets more of each.
+            const isStrengthFocus = goal === 'strength' || goal === 'hypertrophy';
+            const maxCompRec = isStrengthFocus ? (level === 'advanced' ? 2 : 1) : (level === 'advanced' ? 1 : 1);
+            const maxIsoRec = !isStrengthFocus ? (level !== 'beginner' ? (level === 'advanced' ? 2 : 1) : 1) : (level === 'beginner' ? 0 : (level === 'advanced' ? 2 : 1));
             const recommended = new Set(
-              [...compounds.slice(0, level === 'advanced' ? 2 : 1), ...isolation.slice(0, level === 'advanced' ? 2 : 1)].map(e => e.id)
+              [...compounds.slice(0, maxCompRec), ...isolation.slice(0, maxIsoRec)].map(e => e.id)
             );
             return (
               <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 120px' }}>
@@ -1184,11 +1188,12 @@ function NutritionCard({ nutrition, goal, restDay = false }: { nutrition: Workou
   );
 }
 
-function CalorieBurnCard({ consumedKcal, sessionMinutes, weight, goal }: {
+function CalorieBurnCard({ consumedKcal, sessionMinutes, weight, goal, hasData }: {
   consumedKcal: number;
   sessionMinutes: number;
   weight: number;
   goal: WorkoutGoal;
+  hasData: boolean;
 }) {
   const MET_MAP: Record<WorkoutGoal, number> = {
     hypertrophy: 5.0,
@@ -1200,7 +1205,7 @@ function CalorieBurnCard({ consumedKcal, sessionMinutes, weight, goal }: {
   const met = MET_MAP[goal] ?? 5.0;
   const estimatedBurn = Math.round(met * weight * (sessionMinutes / 60));
   const net = consumedKcal - estimatedBurn;
-  const pct = Math.min(100, Math.round((estimatedBurn / Math.max(1, consumedKcal)) * 100));
+  const pct = consumedKcal > 0 ? Math.min(100, Math.round((estimatedBurn / consumedKcal) * 100)) : 0;
 
   return (
     <div style={{ padding: '16px 18px', borderRadius: '18px', background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
@@ -1209,35 +1214,45 @@ function CalorieBurnCard({ consumedKcal, sessionMinutes, weight, goal }: {
         <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-1)' }}>Balanço Calórico do Dia</span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
-        <div style={{ padding: '10px', borderRadius: '12px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', textAlign: 'center' }}>
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '16px', fontWeight: 700, color: '#EF4444' }}>{consumedKcal.toLocaleString('pt-BR')}</div>
-          <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>Consumidas</div>
+      {!hasData ? (
+        <div style={{ padding: '14px', borderRadius: '12px', background: 'var(--bg-3)', textAlign: 'center' }}>
+          <p style={{ fontSize: '13px', color: 'var(--text-2)', margin: 0 }}>
+            📸 Registre sua primeira refeição hoje para ver o balanço calórico aqui.
+          </p>
         </div>
-        <div style={{ padding: '10px', borderRadius: '12px', background: 'rgba(13,159,110,0.06)', border: '1px solid rgba(13,159,110,0.15)', textAlign: 'center' }}>
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '16px', fontWeight: 700, color: '#0D9F6E' }}>{estimatedBurn.toLocaleString('pt-BR')}</div>
-          <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>Queima est.</div>
-        </div>
-        <div style={{ padding: '10px', borderRadius: '12px', background: net <= 0 ? 'rgba(13,159,110,0.06)' : 'rgba(245,158,11,0.06)', border: `1px solid ${net <= 0 ? 'rgba(13,159,110,0.15)' : 'rgba(245,158,11,0.15)'}`, textAlign: 'center' }}>
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '16px', fontWeight: 700, color: net <= 0 ? '#0D9F6E' : '#F59E0B' }}>
-            {net > 0 ? '+' : ''}{net.toLocaleString('pt-BR')}
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
+            <div style={{ padding: '10px', borderRadius: '12px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', textAlign: 'center' }}>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '16px', fontWeight: 700, color: '#EF4444' }}>{consumedKcal.toLocaleString('pt-BR')}</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>Consumidas</div>
+            </div>
+            <div style={{ padding: '10px', borderRadius: '12px', background: 'rgba(13,159,110,0.06)', border: '1px solid rgba(13,159,110,0.15)', textAlign: 'center' }}>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '16px', fontWeight: 700, color: '#0D9F6E' }}>{estimatedBurn.toLocaleString('pt-BR')}</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>Queima est.</div>
+            </div>
+            <div style={{ padding: '10px', borderRadius: '12px', background: net <= 0 ? 'rgba(13,159,110,0.06)' : 'rgba(245,158,11,0.06)', border: `1px solid ${net <= 0 ? 'rgba(13,159,110,0.15)' : 'rgba(245,158,11,0.15)'}`, textAlign: 'center' }}>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '16px', fontWeight: 700, color: net <= 0 ? '#0D9F6E' : '#F59E0B' }}>
+                {net > 0 ? '+' : ''}{net.toLocaleString('pt-BR')}
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>Saldo líq.</div>
+            </div>
           </div>
-          <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>Saldo líq.</div>
-        </div>
-      </div>
 
-      {/* Progress bar */}
-      <div style={{ marginBottom: '8px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-3)', marginBottom: '4px' }}>
-          <span>Queima vs Consumo</span>
-          <span>{pct}%</span>
-        </div>
-        <div style={{ height: '6px', borderRadius: '99px', background: 'var(--bg-3)', overflow: 'hidden' }}>
-          <div style={{ height: '100%', borderRadius: '99px', width: `${pct}%`, background: pct >= 80 ? 'linear-gradient(90deg, #0D9F6E, #10B981)' : 'linear-gradient(90deg, #F59E0B, #EF4444)', transition: 'width 0.6s ease' }} />
-        </div>
-      </div>
-      <p style={{ fontSize: '11px', color: 'var(--text-3)', margin: 0, lineHeight: 1.4 }}>
-        💡 Estimativa baseada em {sessionMinutes} min de treino a MET {met.toFixed(1)} para {weight}kg.
+          {/* Progress bar */}
+          <div style={{ marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-3)', marginBottom: '4px' }}>
+              <span>Queima vs Consumo</span>
+              <span>{pct}%</span>
+            </div>
+            <div style={{ height: '6px', borderRadius: '99px', background: 'var(--bg-3)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: '99px', width: `${pct}%`, background: pct >= 80 ? 'linear-gradient(90deg, #0D9F6E, #10B981)' : 'linear-gradient(90deg, #F59E0B, #EF4444)', transition: 'width 0.6s ease' }} />
+            </div>
+          </div>
+        </>
+      )}
+      <p style={{ fontSize: '11px', color: 'var(--text-3)', margin: hasData ? 0 : '8px 0 0', lineHeight: 1.4 }}>
+        💡 Queima estimada: {estimatedBurn} kcal em {sessionMinutes} min (MET {met.toFixed(1)}, {weight}kg).
       </p>
     </div>
   );
