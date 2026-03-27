@@ -126,7 +126,9 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
     fetch(`${BASE}api/goals/daily-summary?sessionId=${sessionId}`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data?.consumed) setTodayCalories({ consumed: Math.round(data.consumed.calories ?? 0) });
+        if (data?.totals) {
+          setTodayCalories({ consumed: Math.round(data.totals.calories ?? 0) });
+        }
       })
       .catch(() => null);
   }, [isOpen, view, sessionId]);
