@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Dumbbell, Clock, Flame, Target, Apple, Play, Check, RotateCcw, Crown, Zap, Heart, Wind, Smile, BarChart2, ChevronDown, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { generateWorkoutPlan, calculateNutrition, getGoalLabel, getLevelLabel, formatRest, getTodayKey, type WorkoutProfile, type WorkoutPlan, type WorkoutSession, type SessionExercise, type WorkoutGoal, type ExperienceLevel, type GymType } from '@/lib/workout-engine';
+import { getExercisesByMuscle, filterByEquipment, filterByInjuries, type Exercise, type MuscleGroup } from '@/lib/exercise-database';
 
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 const BASE = import.meta.env.BASE_URL ?? '/';
@@ -21,7 +22,43 @@ interface WorkoutPanelProps {
   onNutritionTargets?: (targets: { calories: number; protein: number; carbs: number; fat: number; fiber: number; weight: number; height: number; age: number; sex: string; activityFactor: number }) => void;
 }
 
-type PanelView = 'loading' | 'questionnaire' | 'plan' | 'player' | 'quick-picker';
+type PanelView = 'loading' | 'questionnaire' | 'plan' | 'player' | 'quick-picker' | 'muscle-builder';
+
+const MB_MUSCLES: { label: string; muscle: MuscleGroup; emoji: string; desc: string }[] = [
+  { label: 'Peito', muscle: 'chest', emoji: '🏋️', desc: 'Peitoral maior e menor' },
+  { label: 'Costas', muscle: 'back', emoji: '🦅', desc: 'Dorsal, trapézio, romboides' },
+  { label: 'Ombros', muscle: 'shoulders', emoji: '💪', desc: 'Deltóide ant., med. e post.' },
+  { label: 'Bíceps', muscle: 'biceps', emoji: '💪', desc: 'Bíceps braquial e braquial' },
+  { label: 'Tríceps', muscle: 'triceps', emoji: '🦾', desc: 'Tríceps todas as cabeças' },
+  { label: 'Quadríceps', muscle: 'quads', emoji: '🦵', desc: 'Quadríceps e coxa dianteira' },
+  { label: 'Posteriores', muscle: 'hamstrings', emoji: '🦵', desc: 'Isquiotibiais e posteriores' },
+  { label: 'Glúteos', muscle: 'glutes', emoji: '🍑', desc: 'Glúteo máximo e médio' },
+  { label: 'Panturrilha', muscle: 'calves', emoji: '🦶', desc: 'Gastrocnêmio e sóleo' },
+  { label: 'Abdômen', muscle: 'abs', emoji: '⚡', desc: 'Core, oblíquos e transverso' },
+];
+
+function calcPrescriptionLocal(goal: WorkoutGoal, level: ExperienceLevel, isCompound: boolean) {
+  const baseSets = level === 'beginner' ? 3 : level === 'intermediate' ? 4 : 5;
+  const sets = isCompound ? baseSets : Math.max(2, baseSets - 1);
+  const repMap: Record<WorkoutGoal, { comp: string; iso: string }> = {
+    hypertrophy: { comp: '8-12', iso: '10-15' },
+    strength: { comp: '3-6', iso: '6-10' },
+    fat_loss: { comp: '12-15', iso: '15-20' },
+    endurance: { comp: '15-20', iso: '20-25' },
+    wellness: { comp: '10-15', iso: '12-15' },
+  };
+  const reps = isCompound ? repMap[goal].comp : repMap[goal].iso;
+  const restMap: Record<WorkoutGoal, { comp: number; iso: number }> = {
+    hypertrophy: { comp: 90, iso: 60 },
+    strength: { comp: 240, iso: 120 },
+    fat_loss: { comp: 45, iso: 30 },
+    endurance: { comp: 30, iso: 30 },
+    wellness: { comp: 60, iso: 45 },
+  };
+  const restSeconds = isCompound ? restMap[goal].comp : restMap[goal].iso;
+  const rpe = isCompound ? (goal === 'strength' ? 8 : 7) : 8;
+  return { sets, reps, restSeconds, rpe };
+}
 
 const DAYS = [
   { key: 'mon', label: 'SEG' }, { key: 'tue', label: 'TER' }, { key: 'wed', label: 'QUA' },
@@ -71,10 +108,28 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
   const [isResting, setIsResting] = useState(false);
   const restRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // muscle-builder state
+  const [mbPhase, setMbPhase] = useState<'groups' | 'exercises'>('groups');
+  const [mbMuscle, setMbMuscle] = useState<{ label: string; muscle: MuscleGroup; emoji: string } | null>(null);
+  const [mbSelectedIds, setMbSelectedIds] = useState<Set<string>>(new Set());
+
+  // calorie dashboard state
+  const [todayCalories, setTodayCalories] = useState<{ consumed: number } | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
     loadProfile();
   }, [isOpen, sessionId]);
+
+  useEffect(() => {
+    if (!isOpen || view !== 'plan') return;
+    fetch(`${BASE}api/goals/daily-summary?sessionId=${sessionId}`, { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.consumed) setTodayCalories({ consumed: Math.round(data.consumed.calories ?? 0) });
+      })
+      .catch(() => null);
+  }, [isOpen, view, sessionId]);
 
   const loadProfile = async () => {
     setView('loading');
@@ -161,6 +216,38 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
     } finally {
       setIsQuickLoading(false);
     }
+  };
+
+  const handleStartMuscleBuilder = () => {
+    if (!mbMuscle || mbSelectedIds.size === 0) return;
+    const goal = (profile.goal ?? 'hypertrophy') as WorkoutGoal;
+    const level = (profile.level ?? 'intermediate') as ExperienceLevel;
+    const allExs = getExercisesByMuscle(mbMuscle.muscle);
+    const selectedExs = allExs.filter(e => mbSelectedIds.has(e.id));
+
+    const sessionExercises: SessionExercise[] = selectedExs.map((ex, idx) => {
+      const isCompound = ex.category !== 'isolation';
+      const presc = calcPrescriptionLocal(goal, level, isCompound);
+      return { exercise: ex, order: idx + 1, ...presc, notes: ex.tip };
+    });
+
+    const totalSecs = sessionExercises.reduce((a, e) => a + e.sets * (35 + e.restSeconds), 0);
+    const estimatedMinutes = Math.round(totalSecs / 60) + 5;
+
+    const session: WorkoutSession = {
+      dayKey: 'custom',
+      dayLabel: 'Personalizado',
+      sessionName: `Treino de ${mbMuscle.label}`,
+      focusLabel: mbMuscle.label,
+      primaryMuscles: [mbMuscle.muscle],
+      secondaryMuscles: [],
+      warmup: [{ name: 'Aquecimento articular e mobilidade', duration: '5 min' }],
+      exercises: sessionExercises,
+      cooldown: [{ name: `Alongamento de ${mbMuscle.label} — mantido`, duration: '3 min' }],
+      estimatedMinutes,
+      isRestDay: false,
+    };
+    handleStartPlayer(session);
   };
 
   const startRest = (seconds: number) => {
@@ -500,8 +587,9 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
             </div>
           </div>
 
-          {/* Treino do Dia IA banner */}
-          <div style={{ padding: '12px 16px 0' }}>
+          {/* Action banners */}
+          <div style={{ padding: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* Treino do Dia IA banner */}
             <button
               onClick={() => { setQuickMuscle(''); setQuickError(null); setView('quick-picker'); }}
               style={{
@@ -520,6 +608,30 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
                   Escolha o músculo de hoje e a IA monta na hora
+                </div>
+              </div>
+              <ChevronRight size={16} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+            </button>
+
+            {/* Montar Treino Personalizado banner */}
+            <button
+              onClick={() => { setMbPhase('groups'); setMbMuscle(null); setMbSelectedIds(new Set()); setView('muscle-builder'); }}
+              style={{
+                width: '100%', padding: '13px 16px', borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(13,159,110,0.09), rgba(59,130,246,0.06))',
+                border: '1px solid rgba(13,159,110,0.2)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left',
+              }}
+            >
+              <div style={{ width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0, background: 'linear-gradient(135deg, #0D9F6E, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Dumbbell size={18} color="#fff" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>
+                  Montar Meu Treino 🎯
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                  Escolha exercício por músculo, do seu jeito
                 </div>
               </div>
               <ChevronRight size={16} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
@@ -603,6 +715,16 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
                 {/* Cooldown */}
                 {selectedSession.cooldown.length > 0 && (
                   <SectionCard title="🧊 Volta à Calma" items={selectedSession.cooldown.map(w => `${w.name} — ${w.duration}`)} />
+                )}
+
+                {/* Calorie Balance Card */}
+                {todayCalories !== null && (
+                  <CalorieBurnCard
+                    consumedKcal={todayCalories.consumed}
+                    sessionMinutes={selectedSession!.estimatedMinutes}
+                    weight={profile.weight ?? 75}
+                    goal={(profile.goal ?? 'hypertrophy') as WorkoutGoal}
+                  />
                 )}
 
                 {/* Nutrition Integration Card */}
@@ -728,6 +850,221 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
         </div>
       )}
 
+      {/* ── MUSCLE BUILDER ── */}
+      {view === 'muscle-builder' && (
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+          {/* Header */}
+          <div style={{ background: 'linear-gradient(135deg, #0D9F6E 0%, #059669 100%)', padding: '20px 20px 28px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <button
+                onClick={() => mbPhase === 'exercises' ? setMbPhase('groups') : setView(plan ? 'plan' : 'questionnaire')}
+                style={{ padding: '8px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', color: '#fff' }}
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <span style={{ fontWeight: 700, color: '#fff', fontSize: '15px' }}>
+                {mbPhase === 'groups' ? 'Montar Meu Treino' : `${mbMuscle?.emoji} ${mbMuscle?.label}`}
+              </span>
+              <button onClick={onClose} style={{ padding: '8px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', color: '#fff' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
+              {mbPhase === 'groups'
+                ? 'Escolha o grupo muscular e monte um treino com os exercícios que quiser.'
+                : `Selecione os exercícios de ${mbMuscle?.label}. Os recomendados para seu nível estão destacados.`}
+            </p>
+          </div>
+
+          {/* ── Muscle Groups Grid ── */}
+          {mbPhase === 'groups' && (
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 40px' }}>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '14px', letterSpacing: '0.3px' }}>
+                QUAL MÚSCULO VOCÊ QUER TRABALHAR?
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                {MB_MUSCLES.map(m => (
+                  <button
+                    key={m.muscle}
+                    onClick={() => { setMbMuscle(m); setMbSelectedIds(new Set()); setMbPhase('exercises'); }}
+                    style={{
+                      padding: '14px 12px', borderRadius: '16px',
+                      border: '1.5px solid var(--border)',
+                      background: 'var(--bg-2)',
+                      cursor: 'pointer', textAlign: 'left',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{ fontSize: '22px', marginBottom: '6px' }}>{m.emoji}</div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>{m.label}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-3)', lineHeight: 1.3 }}>{m.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Exercise Selection ── */}
+          {mbPhase === 'exercises' && mbMuscle && (() => {
+            const goal = (profile.goal ?? 'hypertrophy') as WorkoutGoal;
+            const level = (profile.level ?? 'intermediate') as ExperienceLevel;
+            const allExs = getExercisesByMuscle(mbMuscle.muscle);
+            const injuryKeys = (profile.injuries ?? []) as any[];
+            const filtered = filterByInjuries(allExs, injuryKeys);
+            const compounds = filtered.filter(e => e.category !== 'isolation');
+            const isolation = filtered.filter(e => e.category === 'isolation');
+            const recommended = new Set(
+              [...compounds.slice(0, level === 'advanced' ? 2 : 1), ...isolation.slice(0, level === 'advanced' ? 2 : 1)].map(e => e.id)
+            );
+            return (
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 120px' }}>
+                <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '12px' }}>
+                  {mbSelectedIds.size} selecionado{mbSelectedIds.size !== 1 ? 's' : ''} · máx. 8 exercícios
+                </p>
+
+                {/* Compostos */}
+                {compounds.length > 0 && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 700, color: '#0D9F6E', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                      Exercícios Compostos
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {compounds.map(ex => {
+                        const isSelected = mbSelectedIds.has(ex.id);
+                        const isRecommended = recommended.has(ex.id);
+                        const canSelect = isSelected || mbSelectedIds.size < 8;
+                        return (
+                          <button
+                            key={ex.id}
+                            onClick={() => {
+                              if (!canSelect && !isSelected) return;
+                              setMbSelectedIds(prev => {
+                                const next = new Set(prev);
+                                isSelected ? next.delete(ex.id) : next.add(ex.id);
+                                return next;
+                              });
+                            }}
+                            style={{
+                              padding: '12px 14px', borderRadius: '14px',
+                              border: `2px solid ${isSelected ? '#0D9F6E' : isRecommended ? 'rgba(13,159,110,0.3)' : 'var(--border)'}`,
+                              background: isSelected ? 'rgba(13,159,110,0.08)' : isRecommended ? 'rgba(13,159,110,0.03)' : 'var(--bg-2)',
+                              cursor: canSelect || isSelected ? 'pointer' : 'not-allowed',
+                              textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '10px',
+                              opacity: !canSelect && !isSelected ? 0.5 : 1,
+                            }}
+                          >
+                            <div style={{
+                              width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, marginTop: '1px',
+                              border: `2px solid ${isSelected ? '#0D9F6E' : 'var(--border)'}`,
+                              background: isSelected ? '#0D9F6E' : 'transparent',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                              {isSelected && <Check size={12} color="#fff" strokeWidth={3} />}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)' }}>{ex.name}</span>
+                                {isRecommended && (
+                                  <span style={{ fontSize: '9px', fontWeight: 700, color: '#0D9F6E', background: 'rgba(13,159,110,0.12)', padding: '1px 6px', borderRadius: '99px' }}>
+                                    RECOMENDADO
+                                  </span>
+                                )}
+                              </div>
+                              <p style={{ fontSize: '11px', color: 'var(--text-3)', margin: 0, lineHeight: 1.4 }}>{ex.tip}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Isolamento */}
+                {isolation.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: '11px', fontWeight: 700, color: '#8B5CF6', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                      Exercícios de Isolamento
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {isolation.map(ex => {
+                        const isSelected = mbSelectedIds.has(ex.id);
+                        const isRecommended = recommended.has(ex.id);
+                        const canSelect = isSelected || mbSelectedIds.size < 8;
+                        return (
+                          <button
+                            key={ex.id}
+                            onClick={() => {
+                              if (!canSelect && !isSelected) return;
+                              setMbSelectedIds(prev => {
+                                const next = new Set(prev);
+                                isSelected ? next.delete(ex.id) : next.add(ex.id);
+                                return next;
+                              });
+                            }}
+                            style={{
+                              padding: '12px 14px', borderRadius: '14px',
+                              border: `2px solid ${isSelected ? '#8B5CF6' : isRecommended ? 'rgba(139,92,246,0.3)' : 'var(--border)'}`,
+                              background: isSelected ? 'rgba(139,92,246,0.08)' : isRecommended ? 'rgba(139,92,246,0.03)' : 'var(--bg-2)',
+                              cursor: canSelect || isSelected ? 'pointer' : 'not-allowed',
+                              textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '10px',
+                              opacity: !canSelect && !isSelected ? 0.5 : 1,
+                            }}
+                          >
+                            <div style={{
+                              width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, marginTop: '1px',
+                              border: `2px solid ${isSelected ? '#8B5CF6' : 'var(--border)'}`,
+                              background: isSelected ? '#8B5CF6' : 'transparent',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                              {isSelected && <Check size={12} color="#fff" strokeWidth={3} />}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)' }}>{ex.name}</span>
+                                {isRecommended && (
+                                  <span style={{ fontSize: '9px', fontWeight: 700, color: '#8B5CF6', background: 'rgba(139,92,246,0.12)', padding: '1px 6px', borderRadius: '99px' }}>
+                                    RECOMENDADO
+                                  </span>
+                                )}
+                              </div>
+                              <p style={{ fontSize: '11px', color: 'var(--text-3)', margin: 0, lineHeight: 1.4 }}>{ex.tip}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Footer CTA */}
+          {mbPhase === 'exercises' && (
+            <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 20px', background: 'var(--bg)', borderTop: '1px solid var(--border)' }}>
+              <button
+                onClick={handleStartMuscleBuilder}
+                disabled={mbSelectedIds.size === 0}
+                style={{
+                  width: '100%', padding: '14px', borderRadius: '14px',
+                  background: mbSelectedIds.size > 0
+                    ? 'linear-gradient(135deg, #0D9F6E, #059669)'
+                    : 'var(--bg-3)',
+                  color: mbSelectedIds.size > 0 ? '#fff' : 'var(--text-3)',
+                  border: 'none', fontWeight: 700, fontSize: '15px',
+                  cursor: mbSelectedIds.size > 0 ? 'pointer' : 'not-allowed',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <Play size={16} fill={mbSelectedIds.size > 0 ? '#fff' : 'var(--text-3)'} />
+                {mbSelectedIds.size > 0 ? `Iniciar Treino com ${mbSelectedIds.size} exercício${mbSelectedIds.size !== 1 ? 's' : ''}` : 'Selecione ao menos 1 exercício'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── PLAYER ── */}
       {view === 'player' && activeSession && (
         <WorkoutPlayer
@@ -843,6 +1180,65 @@ function NutritionCard({ nutrition, goal, restDay = false }: { nutrition: Workou
       ) : (
         <p style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.5 }}>💡 Concentre <strong>35-40% dos carboidratos</strong> no pré-treino e <strong>30%</strong> no pós-treino para máxima recuperação.</p>
       )}
+    </div>
+  );
+}
+
+function CalorieBurnCard({ consumedKcal, sessionMinutes, weight, goal }: {
+  consumedKcal: number;
+  sessionMinutes: number;
+  weight: number;
+  goal: WorkoutGoal;
+}) {
+  const MET_MAP: Record<WorkoutGoal, number> = {
+    hypertrophy: 5.0,
+    strength: 4.5,
+    fat_loss: 6.0,
+    endurance: 6.5,
+    wellness: 4.0,
+  };
+  const met = MET_MAP[goal] ?? 5.0;
+  const estimatedBurn = Math.round(met * weight * (sessionMinutes / 60));
+  const net = consumedKcal - estimatedBurn;
+  const pct = Math.min(100, Math.round((estimatedBurn / Math.max(1, consumedKcal)) * 100));
+
+  return (
+    <div style={{ padding: '16px 18px', borderRadius: '18px', background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+        <Flame size={15} style={{ color: '#EF4444' }} />
+        <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-1)' }}>Balanço Calórico do Dia</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
+        <div style={{ padding: '10px', borderRadius: '12px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', textAlign: 'center' }}>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '16px', fontWeight: 700, color: '#EF4444' }}>{consumedKcal.toLocaleString('pt-BR')}</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>Consumidas</div>
+        </div>
+        <div style={{ padding: '10px', borderRadius: '12px', background: 'rgba(13,159,110,0.06)', border: '1px solid rgba(13,159,110,0.15)', textAlign: 'center' }}>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '16px', fontWeight: 700, color: '#0D9F6E' }}>{estimatedBurn.toLocaleString('pt-BR')}</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>Queima est.</div>
+        </div>
+        <div style={{ padding: '10px', borderRadius: '12px', background: net <= 0 ? 'rgba(13,159,110,0.06)' : 'rgba(245,158,11,0.06)', border: `1px solid ${net <= 0 ? 'rgba(13,159,110,0.15)' : 'rgba(245,158,11,0.15)'}`, textAlign: 'center' }}>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '16px', fontWeight: 700, color: net <= 0 ? '#0D9F6E' : '#F59E0B' }}>
+            {net > 0 ? '+' : ''}{net.toLocaleString('pt-BR')}
+          </div>
+          <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>Saldo líq.</div>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ marginBottom: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-3)', marginBottom: '4px' }}>
+          <span>Queima vs Consumo</span>
+          <span>{pct}%</span>
+        </div>
+        <div style={{ height: '6px', borderRadius: '99px', background: 'var(--bg-3)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', borderRadius: '99px', width: `${pct}%`, background: pct >= 80 ? 'linear-gradient(90deg, #0D9F6E, #10B981)' : 'linear-gradient(90deg, #F59E0B, #EF4444)', transition: 'width 0.6s ease' }} />
+        </div>
+      </div>
+      <p style={{ fontSize: '11px', color: 'var(--text-3)', margin: 0, lineHeight: 1.4 }}>
+        💡 Estimativa baseada em {sessionMinutes} min de treino a MET {met.toFixed(1)} para {weight}kg.
+      </p>
     </div>
   );
 }
