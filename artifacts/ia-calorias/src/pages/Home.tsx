@@ -754,7 +754,7 @@ export default function Home() {
                   <span style={{ fontSize: '20px', flexShrink: 0 }}>⚠️</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444', marginBottom: '2px' }}>
-                      +{calorieOverrunKcal} kcal acima da meta
+                      Você ultrapassou sua meta de hoje em {calorieOverrunKcal} kcal
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
                       Prefira vegetais, proteínas magras e bastante água nas próximas refeições.
