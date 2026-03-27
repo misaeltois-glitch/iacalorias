@@ -329,7 +329,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
       estimatedMinutes,
       isRestDay: false,
     };
-    setCustomSession(session);
+    handleSaveCustomForDay(selectedDayKey, session);
     setView('plan');
   };
 
