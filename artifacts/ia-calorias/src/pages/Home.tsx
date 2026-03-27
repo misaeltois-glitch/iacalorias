@@ -232,7 +232,7 @@ export default function Home() {
         showNextCelebration(600);
       }
     }
-  }, [dailySummary, isPremium, showNextCelebration, celebration.show]);
+  }, [dailySummary, todaySummary, isPremium, showNextCelebration, celebration.show]);
 
 
   useEffect(() => {
