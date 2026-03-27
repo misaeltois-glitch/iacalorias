@@ -123,6 +123,8 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
   const [savedCustomSessions, setSavedCustomSessions] = useState<Map<string, WorkoutSession>>(new Map());
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  const [planHeaderExpanded, setPlanHeaderExpanded] = useState(false);
+
   // calorie dashboard state
   const [todayCalories, setTodayCalories] = useState<{ consumed: number } | null>(null);
 
@@ -694,22 +696,30 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
       {view === 'plan' && plan && (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
           {/* Plan Header */}
-          <div style={{ background: `linear-gradient(135deg, ${accent} 0%, #057A55 100%)`, padding: '20px 20px 24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div style={{ background: `linear-gradient(135deg, ${accent} 0%, #057A55 100%)`, padding: planHeaderExpanded ? '20px 20px 20px' : '16px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <button onClick={onClose} style={{ padding: '8px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', color: '#fff' }}>
                 <X size={18} />
               </button>
-              <span style={{ fontWeight: 700, color: '#fff', fontSize: '15px' }}>Meu Plano de Treino</span>
+              <button
+                onClick={() => setPlanHeaderExpanded(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}
+              >
+                <span style={{ fontWeight: 700, color: '#fff', fontSize: '15px' }}>Meu Plano de Treino</span>
+                <ChevronDown size={16} color="#fff" style={{ transform: planHeaderExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+              </button>
               <button onClick={() => { setStep(1); setView('questionnaire'); }} style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '20px', cursor: 'pointer', color: '#fff', fontSize: '12px', fontWeight: 600 }}>
                 Editar
               </button>
             </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <Badge label={plan.splitName} />
-              <Badge label={getGoalLabel(profile.goal as WorkoutGoal)} />
-              <Badge label={getLevelLabel(profile.level as ExperienceLevel)} />
-              <Badge label={`${profile.trainingDays?.length ?? 0}x/semana`} />
-            </div>
+            {planHeaderExpanded && (
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '14px' }}>
+                <Badge label={plan.splitName} />
+                <Badge label={getGoalLabel(profile.goal as WorkoutGoal)} />
+                <Badge label={getLevelLabel(profile.level as ExperienceLevel)} />
+                <Badge label={`${profile.trainingDays?.length ?? 0}x/semana`} />
+              </div>
+            )}
           </div>
 
           {/* Custom session card — replaces "Treino do Dia" when set */}
