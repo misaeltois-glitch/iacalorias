@@ -62,8 +62,9 @@ interface WorkoutLog {
   sessionName: string;
   date: string;
   durationMinutes: number | null;
-  exercises: { name: string; sets?: number; reps?: number }[];
+  exercises: { name: string; primaryMuscle?: string; sets?: number; reps?: number }[];
   notes: string | null;
+  muscleGroup?: string | null;
   createdAt: string;
 }
 
@@ -708,7 +709,7 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                         const dateStr = `${d.getDate().toString().padStart(2, '0')}/${MONTH_PT[d.getMonth()]}`;
                         const exercises = Array.isArray(log.exercises) ? log.exercises : [];
                         const topNames = exercises.slice(0, 3).map(e => e.name).filter(Boolean);
-                        const muscleGroup = (log as any).muscleGroup || deriveMuscleGroup(log.sessionName);
+                        const muscleGroup = log.muscleGroup || deriveMuscleGroup(log.sessionName);
                         return (
                           <div key={log.id} style={{
                             padding: '10px 12px', borderRadius: '10px',
