@@ -568,75 +568,6 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                     </div>
                   )}
 
-                  {/* Workout History */}
-                  {(workoutsLoading || workoutLogs.length > 0) && (
-                    <div style={{
-                      background: 'var(--bg-2)',
-                      borderRadius: '16px', border: '1.5px solid var(--border)',
-                      padding: '16px',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                        <Dumbbell style={{ width: '14px', height: '14px', color: '#8B5CF6' }} />
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)' }}>
-                          Treinos recentes
-                        </span>
-                        {workoutLogs.length > 0 && (
-                          <span style={{
-                            fontSize: '10px', fontWeight: 600,
-                            padding: '2px 7px', borderRadius: '99px',
-                            background: 'rgba(139,92,246,0.12)', color: '#8B5CF6',
-                          }}>
-                            {workoutLogs.length}
-                          </span>
-                        )}
-                      </div>
-                      {workoutsLoading ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <SkeletonBlock h={52} />
-                          <SkeletonBlock h={52} />
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {workoutLogs.map(log => {
-                            const d = new Date(log.date + 'T12:00:00');
-                            const dateStr = `${d.getDate().toString().padStart(2, '0')}/${MONTH_PT[d.getMonth()]}`;
-                            const exCount = Array.isArray(log.exercises) ? log.exercises.length : 0;
-                            return (
-                              <div key={log.id} style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                padding: '10px 12px', borderRadius: '10px',
-                                background: 'var(--bg-3)',
-                              }}>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{
-                                    fontSize: '13px', fontWeight: 600, color: 'var(--text-1)',
-                                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                  }}>
-                                    {log.sessionName}
-                                  </div>
-                                  <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
-                                    {dateStr}
-                                    {exCount > 0 && ` · ${exCount} exercício${exCount !== 1 ? 's' : ''}`}
-                                  </div>
-                                </div>
-                                {log.durationMinutes != null && (
-                                  <div style={{
-                                    flexShrink: 0, marginLeft: '10px',
-                                    fontSize: '12px', fontWeight: 700, color: '#8B5CF6',
-                                    background: 'rgba(139,92,246,0.1)',
-                                    padding: '3px 8px', borderRadius: '8px',
-                                  }}>
-                                    {log.durationMinutes}min
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* Meals list */}
                   {data.meals.length > 0 && (
                     <div style={{
@@ -706,6 +637,98 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                     </div>
                   )}
                 </>
+              )}
+
+              {/* Workout History — shown for premium users independent of meal data */}
+              {!loading && isPremium && (workoutsLoading || workoutLogs.length > 0) && (
+                <div style={{
+                  background: 'var(--bg-2)',
+                  borderRadius: '16px', border: '1.5px solid var(--border)',
+                  padding: '16px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <Dumbbell style={{ width: '14px', height: '14px', color: '#8B5CF6' }} />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)' }}>
+                      Treinos recentes
+                    </span>
+                    {workoutLogs.length > 0 && (
+                      <span style={{
+                        fontSize: '10px', fontWeight: 600,
+                        padding: '2px 7px', borderRadius: '99px',
+                        background: 'rgba(139,92,246,0.12)', color: '#8B5CF6',
+                      }}>
+                        {workoutLogs.length}
+                      </span>
+                    )}
+                  </div>
+                  {workoutsLoading ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <SkeletonBlock h={64} />
+                      <SkeletonBlock h={64} />
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {workoutLogs.map(log => {
+                        const d = new Date(log.date + 'T12:00:00');
+                        const dateStr = `${d.getDate().toString().padStart(2, '0')}/${MONTH_PT[d.getMonth()]}`;
+                        const exercises = Array.isArray(log.exercises) ? log.exercises : [];
+                        const topNames = exercises.slice(0, 3).map(e => e.name).filter(Boolean);
+                        return (
+                          <div key={log.id} style={{
+                            padding: '10px 12px', borderRadius: '10px',
+                            background: 'var(--bg-3)',
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: topNames.length > 0 ? '6px' : 0 }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{
+                                  fontSize: '13px', fontWeight: 600, color: 'var(--text-1)',
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                }}>
+                                  {log.sessionName}
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
+                                  {dateStr}
+                                  {exercises.length > 0 && ` · ${exercises.length} exercício${exercises.length !== 1 ? 's' : ''}`}
+                                </div>
+                              </div>
+                              {log.durationMinutes != null && (
+                                <div style={{
+                                  flexShrink: 0, marginLeft: '10px',
+                                  fontSize: '12px', fontWeight: 700, color: '#8B5CF6',
+                                  background: 'rgba(139,92,246,0.1)',
+                                  padding: '3px 8px', borderRadius: '8px',
+                                }}>
+                                  {log.durationMinutes}min
+                                </div>
+                              )}
+                            </div>
+                            {topNames.length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {topNames.map((name, idx) => (
+                                  <span key={idx} style={{
+                                    fontSize: '10px', color: 'var(--text-2)',
+                                    background: 'var(--bg-2)', border: '1px solid var(--border)',
+                                    borderRadius: '99px', padding: '2px 7px',
+                                  }}>
+                                    {name}
+                                  </span>
+                                ))}
+                                {exercises.length > 3 && (
+                                  <span style={{
+                                    fontSize: '10px', color: 'var(--text-3)',
+                                    padding: '2px 4px',
+                                  }}>
+                                    +{exercises.length - 3}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </motion.div>

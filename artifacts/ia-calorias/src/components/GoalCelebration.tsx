@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface GoalCelebrationProps {
   show: boolean;
-  goalType: 'calories' | 'meals' | 'protein';
+  goalType: 'calories' | 'meals';
   onClose: () => void;
 }
 
@@ -15,21 +15,14 @@ const CONFETTI_COLORS = [
   '#8B5CF6', '#A78BFA',
 ];
 
-const MESSAGES: Record<GoalCelebrationProps['goalType'], { title: string; subtitle: string; emoji: string }> = {
+const MESSAGES: Record<GoalCelebrationProps['goalType'], { title: string; subtitle: string }> = {
   calories: {
-    emoji: '🔥',
     title: 'Meta de calorias atingida!',
-    subtitle: 'Você chegou perto da sua meta calórica de hoje. Ótimo equilíbrio!',
+    subtitle: 'Você bateu sua meta calórica de hoje. Equilíbrio perfeito — continue assim!',
   },
   meals: {
-    emoji: '🍽️',
     title: 'Refeições do dia completas!',
-    subtitle: 'Você registrou todas as refeições planejadas. Consistência é tudo!',
-  },
-  protein: {
-    emoji: '💪',
-    title: 'Meta de proteína batida!',
-    subtitle: 'Sua ingestão de proteína está excelente hoje. Continue assim!',
+    subtitle: 'Você registrou todas as refeições planejadas. Consistência é a chave do progresso!',
   },
 };
 
@@ -88,10 +81,10 @@ export function GoalCelebration({ show, goalType, onClose }: GoalCelebrationProp
           ))}
 
           <motion.div
-            initial={{ opacity: 0, scale: 0.7, y: 40 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.85, y: 20 }}
-            transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             onClick={onClose}
             style={{
               position: 'fixed',
@@ -106,9 +99,10 @@ export function GoalCelebration({ show, goalType, onClose }: GoalCelebrationProp
             }}
           >
             <motion.div
-              initial={{ scale: 0.8 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', damping: 15, stiffness: 400, delay: 0.05 }}
+              initial={{ scale: 0.7, y: 40 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.85, y: 20 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
               onClick={e => e.stopPropagation()}
               style={{
                 background: 'var(--bg-2)',
@@ -130,12 +124,16 @@ export function GoalCelebration({ show, goalType, onClose }: GoalCelebrationProp
               }} />
 
               <motion.div
-                animate={{ scale: [1, 1.15, 1], rotate: [0, -8, 8, 0] }}
-                transition={{ duration: 0.6, delay: 0.2, repeat: 1 }}
-                style={{ fontSize: '56px', lineHeight: 1, marginBottom: '16px' }}
+                animate={{ scale: [1, 1.2, 1], rotate: [0, -10, 10, 0] }}
+                transition={{ duration: 0.7, delay: 0.15 }}
+                style={{ fontSize: '56px', lineHeight: 1, marginBottom: '8px' }}
               >
-                {msg.emoji}
+                🏆
               </motion.div>
+
+              <div style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: 700, marginBottom: '10px', letterSpacing: '0.5px' }}>
+                META ATINGIDA
+              </div>
 
               <div style={{
                 fontSize: '18px', fontWeight: 800,
@@ -173,15 +171,12 @@ export function GoalCelebration({ show, goalType, onClose }: GoalCelebrationProp
 
 const CELEBRATION_KEY_PREFIX = 'ia-calorias-celebration-';
 
-export function getTodayCelebrationKey(type: GoalCelebrationProps['goalType']) {
-  const today = new Date().toISOString().slice(0, 10);
-  return `${CELEBRATION_KEY_PREFIX}${type}-${today}`;
-}
-
 export function hasCelebratedToday(type: GoalCelebrationProps['goalType']): boolean {
-  return !!localStorage.getItem(getTodayCelebrationKey(type));
+  const today = new Date().toISOString().slice(0, 10);
+  return !!localStorage.getItem(`${CELEBRATION_KEY_PREFIX}${type}-${today}`);
 }
 
 export function markCelebratedToday(type: GoalCelebrationProps['goalType']): void {
-  localStorage.setItem(getTodayCelebrationKey(type), '1');
+  const today = new Date().toISOString().slice(0, 10);
+  localStorage.setItem(`${CELEBRATION_KEY_PREFIX}${type}-${today}`, '1');
 }
