@@ -178,12 +178,24 @@ export default function Home() {
     }
   }, []);
 
-  const showNextCelebration = useCallback(() => {
+  const showNextCelebration = useCallback((delay = 0) => {
     const next = celebrationQueue.current.shift();
     if (next) {
-      setCelebration({ show: true, type: next });
+      markCelebratedToday(next);
+      if (delay > 0) {
+        setTimeout(() => setCelebration({ show: true, type: next }), delay);
+      } else {
+        setCelebration({ show: true, type: next });
+      }
     }
   }, []);
+
+  const handleCelebrationClose = useCallback(() => {
+    setCelebration(c => ({ ...c, show: false }));
+    if (celebrationQueue.current.length > 0) {
+      setTimeout(() => showNextCelebration(0), 500);
+    }
+  }, [showNextCelebration]);
 
   useEffect(() => {
     if (!dailySummary || !dailySummary.rawGoals || dailySummary.period !== 'day' || !isPremium) return;
@@ -191,16 +203,14 @@ export default function Home() {
 
     const toQueue: Array<'calories' | 'meals'> = [];
     if (rawGoals.calories && totals.calories >= rawGoals.calories && !hasCelebratedToday('calories')) {
-      markCelebratedToday('calories');
       toQueue.push('calories');
     }
     if (rawGoals.mealsPerDay && totals.meals >= rawGoals.mealsPerDay && !hasCelebratedToday('meals')) {
-      markCelebratedToday('meals');
       toQueue.push('meals');
     }
     if (toQueue.length > 0) {
       celebrationQueue.current.push(...toQueue);
-      setTimeout(showNextCelebration, 600);
+      showNextCelebration(600);
     }
   }, [dailySummary, isPremium, showNextCelebration]);
 
@@ -918,7 +928,7 @@ export default function Home() {
       <GoalCelebration
         show={celebration.show}
         goalType={celebration.type}
-        onClose={() => setCelebration(c => ({ ...c, show: false }))}
+        onClose={handleCelebrationClose}
       />
 
       <style>{`
