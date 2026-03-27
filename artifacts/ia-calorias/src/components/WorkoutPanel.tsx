@@ -116,6 +116,10 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
   const [mbSelectedIds, setMbSelectedIds] = useState<Map<MuscleGroup, Set<string>>>(new Map());
   const [customSession, setCustomSession] = useState<WorkoutSession | null>(null);
 
+  // saved custom sessions per day (persisted in localStorage)
+  const [savedCustomSessions, setSavedCustomSessions] = useState<Map<string, WorkoutSession>>(new Map());
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
   // calorie dashboard state
   const [todayCalories, setTodayCalories] = useState<{ consumed: number } | null>(null);
 
@@ -154,6 +158,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
         const p = generateWorkoutPlan(loaded);
         setPlan(p);
         onNutritionTargets?.({ ...p.nutritionTargets, weight: loaded.weight, height: loaded.height, age: loaded.age, sex: loaded.sex, activityFactor: p.nutritionTargets.activityFactor });
+        loadSavedCustomSessions();
         setView('plan');
       } else {
         setView('questionnaire');
@@ -172,6 +177,47 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
       body: JSON.stringify({ ...p, sessionId }),
     });
   };
+
+  const getCustomStorageKey = useCallback(() => `ia-workout-customs-${sessionId}`, [sessionId]);
+
+  const persistCustomSessions = useCallback((map: Map<string, WorkoutSession>) => {
+    try {
+      const obj: Record<string, WorkoutSession> = {};
+      for (const [k, v] of map) obj[k] = v;
+      localStorage.setItem(getCustomStorageKey(), JSON.stringify(obj));
+    } catch {}
+  }, [getCustomStorageKey]);
+
+  const loadSavedCustomSessions = useCallback(() => {
+    try {
+      const raw = localStorage.getItem(getCustomStorageKey());
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, WorkoutSession>;
+      setSavedCustomSessions(new Map(Object.entries(parsed)));
+    } catch {}
+  }, [getCustomStorageKey]);
+
+  const handleSaveCustomForDay = useCallback((dayKey: string, session: WorkoutSession) => {
+    const dayLabel = DAYS.find(d => d.key === dayKey)?.label ?? session.dayLabel;
+    setSavedCustomSessions(prev => {
+      const next = new Map(prev);
+      next.set(dayKey, { ...session, dayKey, dayLabel });
+      persistCustomSessions(next);
+      return next;
+    });
+    setCustomSession(null);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2500);
+  }, [persistCustomSessions]);
+
+  const handleClearCustomForDay = useCallback((dayKey: string) => {
+    setSavedCustomSessions(prev => {
+      const next = new Map(prev);
+      next.delete(dayKey);
+      persistCustomSessions(next);
+      return next;
+    });
+  }, [persistCustomSessions]);
 
   const handleFinishQuestionnaire = async () => {
     if (!profile.goal || !profile.sex || !profile.age || !profile.weight || !profile.height || !profile.level) return;
@@ -784,77 +830,123 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
 
           {/* Session Detail */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 100px' }}>
-            {selectedSession && !selectedSession.isRestDay ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {/* Session title card */}
-                <div style={{ padding: '18px 20px', borderRadius: '20px', background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{selectedSession.sessionName}</h2>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: 'var(--text-2)', fontWeight: 600 }}>
-                      <Clock size={13} /> ~{selectedSession.estimatedMinutes}min
-                    </span>
-                  </div>
-                  <p style={{ fontSize: '13px', color: accent, fontWeight: 600, margin: '0 0 14px' }}>{selectedSession.focusLabel}</p>
-
-                  {/* Start Workout Button */}
-                  {isPremium ? (
-                    <button onClick={() => handleStartPlayer(selectedSession)} style={{ width: '100%', padding: '13px', borderRadius: '12px', background: `linear-gradient(135deg, ${accent}, #057A55)`, color: '#fff', border: 'none', fontWeight: 700, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                      <Play size={16} fill="#fff" /> Iniciar Treino
-                    </button>
-                  ) : (
-                    <button onClick={onUpgrade} style={{ width: '100%', padding: '13px', borderRadius: '12px', background: 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(139,92,246,0.08))', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', fontWeight: 700, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                      <Crown size={16} /> Desbloqueie o Player de Treino
-                    </button>
-                  )}
-                </div>
-
-                {/* Warmup */}
-                {selectedSession.warmup.length > 0 && (
-                  <SectionCard title="🔥 Aquecimento" items={selectedSession.warmup.map(w => `${w.name} — ${w.duration}`)} />
-                )}
-
-                {/* Exercises */}
-                <div style={{ borderRadius: '20px', background: 'var(--bg-2)', border: '1px solid var(--border)', overflow: 'hidden' }}>
-                  <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid var(--border)' }}>
-                    <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>💪 {selectedSession.exercises.length} Exercícios</h3>
-                  </div>
-                  {selectedSession.exercises.map((se, i) => (
-                    <div key={se.exercise.id} style={{ padding: '14px 18px', borderBottom: i < selectedSession.exercises.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                      <div style={{ width: '26px', height: '26px', borderRadius: '8px', background: 'rgba(13,159,110,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontFamily: "'DM Mono', monospace", fontSize: '11px', fontWeight: 700, color: accent }}>
-                        {String(i + 1).padStart(2, '0')}
+            {selectedSession && !selectedSession.isRestDay ? (() => {
+              const savedSession = savedCustomSessions.get(selectedDayKey);
+              const displaySession = savedSession ?? selectedSession;
+              const isCustomized = !!savedSession;
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {/* Session title card */}
+                  <div style={{ padding: '18px 20px', borderRadius: '20px', background: 'var(--bg-2)', border: `1.5px solid ${isCustomized ? '#0D9F6E' : 'var(--border)'}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{displaySession.sessionName}</h2>
+                        {isCustomized && (
+                          <span style={{ fontSize: '10px', fontWeight: 800, color: '#0D9F6E', background: 'rgba(13,159,110,0.1)', padding: '2px 8px', borderRadius: '99px', flexShrink: 0 }}>
+                            🎯 Personalizado
+                          </span>
+                        )}
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-1)', marginBottom: '4px' }}>{se.exercise.name}</div>
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          <Pill label={`${se.sets} séries`} />
-                          <Pill label={`${se.reps} reps`} />
-                          <Pill label={`${formatRest(se.restSeconds)} desc.`} />
-                          <Pill label={`RPE ${se.rpe}`} />
-                        </div>
-                        {se.notes && <p style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '4px', lineHeight: 1.4 }}>💡 {se.notes}</p>}
-                      </div>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: 'var(--text-2)', fontWeight: 600, flexShrink: 0 }}>
+                        <Clock size={13} /> ~{displaySession.estimatedMinutes}min
+                      </span>
                     </div>
-                  ))}
+                    <p style={{ fontSize: '13px', color: accent, fontWeight: 600, margin: '0 0 14px' }}>{displaySession.focusLabel}</p>
+
+                    {/* Save custom session button — shown when customSession exists */}
+                    {customSession && (
+                      <button
+                        onClick={() => handleSaveCustomForDay(selectedDayKey, customSession)}
+                        style={{
+                          width: '100%', padding: '11px', borderRadius: '12px', marginBottom: '8px',
+                          background: saveSuccess ? 'rgba(13,159,110,0.12)' : 'rgba(13,159,110,0.07)',
+                          border: `2px solid ${saveSuccess ? '#0D9F6E' : 'rgba(13,159,110,0.4)'}`,
+                          color: '#0D9F6E', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        {saveSuccess
+                          ? <><Check size={14} /> Treino salvo com sucesso!</>
+                          : <>💾 Salvar Treino Personalizado para {DAYS.find(d => d.key === selectedDayKey)?.label ?? selectedDayKey}</>}
+                      </button>
+                    )}
+
+                    {/* Start Workout Button */}
+                    {isPremium ? (
+                      <button onClick={() => handleStartPlayer(displaySession)} style={{ width: '100%', padding: '13px', borderRadius: '12px', background: `linear-gradient(135deg, ${accent}, #057A55)`, color: '#fff', border: 'none', fontWeight: 700, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <Play size={16} fill="#fff" /> Iniciar Treino
+                      </button>
+                    ) : (
+                      <button onClick={onUpgrade} style={{ width: '100%', padding: '13px', borderRadius: '12px', background: 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(139,92,246,0.08))', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', fontWeight: 700, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <Crown size={16} /> Desbloqueie o Player de Treino
+                      </button>
+                    )}
+
+                    {/* Restore recommendation link — shown when saved custom exists */}
+                    {isCustomized && (
+                      <button
+                        onClick={() => handleClearCustomForDay(selectedDayKey)}
+                        style={{ background: 'none', border: 'none', padding: '8px 0 0', cursor: 'pointer', color: 'var(--text-3)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px', width: '100%', justifyContent: 'center' }}
+                      >
+                        <RotateCcw size={11} /> Restaurar treino recomendado pela IA
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Warmup */}
+                  {displaySession.warmup.length > 0 && (
+                    <SectionCard title="🔥 Aquecimento" items={displaySession.warmup.map(w => `${w.name} — ${w.duration}`)} />
+                  )}
+
+                  {/* Exercises */}
+                  <div style={{ borderRadius: '20px', background: 'var(--bg-2)', border: `1.5px solid ${isCustomized ? 'rgba(13,159,110,0.25)' : 'var(--border)'}`, overflow: 'hidden' }}>
+                    <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
+                        💪 {displaySession.exercises.length} Exercícios
+                      </h3>
+                      {isCustomized && (
+                        <span style={{ fontSize: '11px', color: '#0D9F6E', fontWeight: 600 }}>Personalizado</span>
+                      )}
+                    </div>
+                    {displaySession.exercises.map((se, i) => (
+                      <div key={`${se.exercise.id}-${i}`} style={{ padding: '14px 18px', borderBottom: i < displaySession.exercises.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                        <div style={{ width: '26px', height: '26px', borderRadius: '8px', background: 'rgba(13,159,110,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontFamily: "'DM Mono', monospace", fontSize: '11px', fontWeight: 700, color: accent }}>
+                          {String(i + 1).padStart(2, '0')}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-1)', marginBottom: '4px' }}>{se.exercise.name}</div>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            <Pill label={`${se.sets} séries`} />
+                            <Pill label={`${se.reps} reps`} />
+                            <Pill label={`${formatRest(se.restSeconds)} desc.`} />
+                            <Pill label={`RPE ${se.rpe}`} />
+                          </div>
+                          {se.notes && <p style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '4px', lineHeight: 1.4 }}>💡 {se.notes}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Cooldown */}
+                  {displaySession.cooldown.length > 0 && (
+                    <SectionCard title="🧊 Volta à Calma" items={displaySession.cooldown.map(w => `${w.name} — ${w.duration}`)} />
+                  )}
+
+                  {/* Calorie Balance Card */}
+                  <CalorieBurnCard
+                    consumedKcal={todayCalories?.consumed ?? 0}
+                    sessionMinutes={displaySession.estimatedMinutes}
+                    weight={profile.weight ?? 75}
+                    goal={(profile.goal ?? 'hypertrophy') as WorkoutGoal}
+                    hasData={todayCalories !== null}
+                  />
+
+                  {/* Nutrition Integration Card */}
+                  <NutritionCard nutrition={plan.nutritionTargets} goal={profile.goal as WorkoutGoal} />
                 </div>
-
-                {/* Cooldown */}
-                {selectedSession.cooldown.length > 0 && (
-                  <SectionCard title="🧊 Volta à Calma" items={selectedSession.cooldown.map(w => `${w.name} — ${w.duration}`)} />
-                )}
-
-                {/* Calorie Balance Card — always rendered; falls back to 0 if no data loaded yet */}
-                <CalorieBurnCard
-                  consumedKcal={todayCalories?.consumed ?? 0}
-                  sessionMinutes={selectedSession!.estimatedMinutes}
-                  weight={profile.weight ?? 75}
-                  goal={(profile.goal ?? 'hypertrophy') as WorkoutGoal}
-                  hasData={todayCalories !== null}
-                />
-
-                {/* Nutrition Integration Card */}
-                <NutritionCard nutrition={plan.nutritionTargets} goal={profile.goal as WorkoutGoal} />
-              </div>
-            ) : (
+              );
+            })() : (
               <div style={{ padding: '40px 20px', textAlign: 'center' }}>
                 <div style={{ fontSize: '48px', marginBottom: '12px' }}>😴</div>
                 <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '8px' }}>Dia de Descanso</h3>
