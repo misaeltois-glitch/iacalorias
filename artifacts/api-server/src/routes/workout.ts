@@ -99,7 +99,13 @@ router.get("/logs", async (req: Request, res: Response) => {
   const logs = await db.query.workoutLogsTable.findMany({
     where, orderBy: (t, { desc }) => [desc(t.createdAt)], limit: 50,
   });
-  res.json(logs);
+
+  const enriched = logs.map(log => {
+    const exercises = Array.isArray(log.exercises) ? log.exercises as Array<{primaryMuscle?: string; [k: string]: unknown}> : [];
+    const primaryMuscle = exercises.find(e => e.primaryMuscle)?.primaryMuscle ?? null;
+    return { ...log, muscleGroup: primaryMuscle };
+  });
+  res.json(enriched);
 });
 
 // POST /api/workout/ai-quick — generate a targeted workout via AI
