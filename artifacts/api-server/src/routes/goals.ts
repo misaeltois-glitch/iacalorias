@@ -55,10 +55,12 @@ function withPerMeal(goals: typeof goalsTable.$inferSelect | null) {
 router.get("/", async (req: Request, res: Response) => {
   const sessionId = req.query.sessionId as string;
   const userId = req.user?.userId;
+  const userEmail = req.user?.email;
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
-  const tier = await resolveSubTier(userId, sessionId);
+  const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
+  const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
   if (tier === "free") {
     res.status(403).json({ error: "plan_required", message: "Metas disponíveis apenas em planos pagos.", requiresUpgrade: true });
     return;
@@ -72,10 +74,12 @@ router.get("/", async (req: Request, res: Response) => {
 router.post("/", async (req: Request, res: Response) => {
   const { sessionId, calories, protein, carbs, fat, fiber, mealsPerDay, weight, height, age, sex, objective, activityLevel, restrictions } = req.body;
   const userId = req.user?.userId;
+  const userEmail = req.user?.email;
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
-  const tier = await resolveSubTier(userId, sessionId);
+  const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
+  const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
   if (tier === "free") {
     res.status(403).json({ error: "plan_required", message: "Metas disponíveis apenas em planos pagos.", requiresUpgrade: true });
     return;
@@ -108,10 +112,12 @@ router.post("/", async (req: Request, res: Response) => {
 router.patch("/", async (req: Request, res: Response) => {
   const { sessionId, ...fields } = req.body;
   const userId = req.user?.userId;
+  const userEmail = req.user?.email;
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
-  const tier = await resolveSubTier(userId, sessionId);
+  const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
+  const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
   if (tier === "free") {
     res.status(403).json({ error: "plan_required", message: "Metas disponíveis apenas em planos pagos.", requiresUpgrade: true });
     return;

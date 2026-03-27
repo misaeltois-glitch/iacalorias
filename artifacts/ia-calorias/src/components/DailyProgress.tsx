@@ -137,34 +137,35 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
           </span>
         </div>
 
-        {/* Period filter — hidden when no period change handler */}
-        {onPeriodChange && <div style={{
-          display: 'flex',
-          background: 'var(--bg-3)',
-          borderRadius: '8px',
-          padding: '2px',
-          gap: '2px',
-        }}>
-          {(['day', 'week', 'month'] as Period[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => onPeriodChange(p)}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '6px',
-                border: 'none',
-                fontSize: '11px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-                background: period === p ? 'var(--accent)' : 'transparent',
-                color: period === p ? '#fff' : 'var(--text-2)',
-              }}
-            >
-              {PERIOD_LABELS[p]}
-            </button>
-          ))}
-        </div>}
+        {/* Right side: period filter OR "Visualize suas metas" */}
+        {onPeriodChange ? (
+          <div style={{ display: 'flex', background: 'var(--bg-3)', borderRadius: '8px', padding: '2px', gap: '2px' }}>
+            {(['day', 'week', 'month'] as Period[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => onPeriodChange(p)}
+                style={{
+                  padding: '4px 10px', borderRadius: '6px', border: 'none',
+                  fontSize: '11px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                  background: period === p ? 'var(--accent)' : 'transparent',
+                  color: period === p ? '#fff' : 'var(--text-2)',
+                }}
+              >
+                {PERIOD_LABELS[p]}
+              </button>
+            ))}
+          </div>
+        ) : goals ? (
+          <button
+            onClick={onSetGoals}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0',
+              fontSize: '12px', fontWeight: 600, color: 'var(--accent)',
+            }}
+          >
+            Visualize suas metas →
+          </button>
+        ) : null}
       </div>
 
       {/* Macro rings */}

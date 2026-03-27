@@ -263,6 +263,39 @@ export function ProgressView({ sessionId, isPremium, refreshSignal, onUpgrade, o
 
       {!loading && isPremium && data && (
         <>
+          {/* "Visualize suas metas" CTA when goals are set */}
+          {data.goals?.calories ? (
+            <button
+              onClick={onSetGoals}
+              style={{
+                width: '100%', padding: '12px 16px', borderRadius: '14px',
+                background: 'rgba(13,159,110,0.08)', border: '1px solid rgba(13,159,110,0.2)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>🎯</span>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)' }}>Visualize suas metas</span>
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#0D9F6E' }}>Ver e editar →</span>
+            </button>
+          ) : (
+            <button
+              onClick={onSetGoals}
+              style={{
+                width: '100%', padding: '12px 16px', borderRadius: '14px',
+                background: 'var(--bg-2)', border: '1.5px dashed var(--border)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>🎯</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)' }}>Configure suas metas nutricionais</span>
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#0D9F6E' }}>Definir →</span>
+            </button>
+          )}
+
           {/* ─── Calorie Balance ─── */}
           <div style={{ background: 'var(--bg-2)', borderRadius: '18px', border: '1.5px solid var(--border)', overflow: 'hidden' }}>
             <div style={{ padding: '13px 16px 10px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
