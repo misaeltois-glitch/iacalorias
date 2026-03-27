@@ -21,7 +21,7 @@ type FeatureRow = {
 
 const FEATURES: FeatureRow[] = [
   { label: 'Análise de refeições por IA',     free: '3 por mês',        limited: '20 por mês',      unlimited: 'Ilimitadas',          highlight: true },
-  { label: 'Macros completos (proteína, carbo, gordura, fibra)', free: '✓', limited: true,           unlimited: true },
+  { label: 'Proteínas, carboidratos, gordura e fibra', free: '✓', limited: true,           unlimited: true },
   { label: 'Score de saúde da refeição',       free: false,              limited: true,              unlimited: true },
   { label: 'Histórico de refeições',           free: false,              limited: '30 dias',         unlimited: 'Ilimitado',           highlight: true },
   { label: 'Metas diárias personalizadas',     free: false,              limited: true,              unlimited: true },
@@ -134,7 +134,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
               Nutrição + Treino com IA,<br />tudo no mesmo app
             </h2>
             <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.55 }}>
-              Análise de refeições, macros precisos, treinos personalizados e acompanhamento inteligente — do jeito que um nutricionista faria.
+              Análise de refeições, calorias e nutrientes detalhados, treinos personalizados e acompanhamento inteligente — do jeito que um nutricionista faria.
             </p>
           </div>
 
@@ -249,7 +249,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
                   {[
                     '20 análises/mês',
-                    'Macros completos',
+                    'Nutrientes completos',
                     'Score de saúde',
                     'Metas personalizadas',
                     'Analytics básico',

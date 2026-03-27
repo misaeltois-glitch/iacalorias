@@ -105,7 +105,7 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
         <div style={{ fontSize: '32px', marginBottom: '10px' }}>🎯</div>
         <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px' }}>Metas e progresso diário</h3>
         <p style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '16px', lineHeight: 1.5 }}>
-          Configure metas de macronutrientes personalizadas e acompanhe seu progresso em tempo real com anéis de meta.
+          Configure suas metas de calorias, proteínas, carboidratos e gordura e acompanhe seu progresso em tempo real.
         </p>
         <button onClick={onSetGoals} style={{
           padding: '10px 20px', borderRadius: '10px',

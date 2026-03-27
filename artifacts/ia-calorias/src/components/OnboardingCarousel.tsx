@@ -13,7 +13,7 @@ const slides = [
   },
   {
     emoji: '📊',
-    title: 'Acompanhe seus macros',
+    title: 'Veja o que tem no seu prato',
     desc: 'Veja proteína, carboidrato, fibra e gordura de cada refeição de forma clara e visual.',
   },
   {

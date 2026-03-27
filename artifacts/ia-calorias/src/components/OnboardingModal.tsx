@@ -187,7 +187,7 @@ export function OnboardingModal({ isOpen, onComplete, onSkip }: OnboardingModalP
                       <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Etapa 1 de 6</span>
                     </div>
                     <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px' }}>Qual é seu objetivo?</h2>
-                    <p style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.5 }}>Suas metas de macronutrientes serão calibradas para esse foco.</p>
+                    <p style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.5 }}>Suas metas de calorias e nutrientes serão ajustadas para esse objetivo.</p>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {OBJECTIVES.map(o => (

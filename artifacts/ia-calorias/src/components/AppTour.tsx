@@ -19,7 +19,7 @@ const STEPS: TourStep[] = [
   {
     selector: '[data-tour="upload-zone"]',
     title: '📸 Analisar refeição',
-    description: 'O coração do app. Fotografe qualquer refeição ou envie da galeria — a IA identifica os alimentos e calcula calorias e macros em segundos.',
+    description: 'O coração do app. Fotografe qualquer refeição ou envie da galeria — a IA identifica os alimentos e calcula calorias e nutrientes em segundos.',
     tooltipSide: 'above',
     padding: 12,
   },
@@ -40,7 +40,7 @@ const STEPS: TourStep[] = [
   {
     selector: '[data-tour="daily-progress"]',
     title: '🎯 Progresso do dia',
-    description: 'Acompanhe seu consumo diário de calorias e macronutrientes em tempo real. Complete o questionário de metas para personalizar seus alvos.',
+    description: 'Acompanhe seu consumo diário de calorias, proteínas, carboidratos e gorduras em tempo real. Complete o questionário de metas para personalizar seus alvos.',
     tooltipSide: 'above',
     padding: 10,
   },
@@ -68,7 +68,7 @@ const STEPS: TourStep[] = [
   {
     selector: '[data-tour="nav-analytics"]',
     title: '📊 Aba Progresso',
-    description: 'Gráficos de calorias, histórico de refeições e tendências de macros ao longo do tempo. Veja sua evolução semanal e mensal.',
+    description: 'Gráficos de calorias, histórico de refeições e evolução dos seus nutrientes ao longo do tempo. Veja sua evolução semanal e mensal.',
     tooltipSide: 'above',
     padding: 6,
   },

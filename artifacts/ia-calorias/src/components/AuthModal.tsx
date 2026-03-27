@@ -167,7 +167,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, sessionId, initialTab = 
           }}>
             {[
               { icon: '💾', text: 'Histórico completo de todas as refeições' },
-              { icon: '📊', text: 'Acompanhe macros e metas diárias' },
+              { icon: '📊', text: 'Acompanhe calorias, proteínas e metas diárias' },
               { icon: '🔥', text: 'Sequência de dias e analytics detalhados' },
             ].map(({ icon, text }) => (
               <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

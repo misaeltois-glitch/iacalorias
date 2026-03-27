@@ -788,7 +788,7 @@ export default function Home() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
                   {[
                     { num: '01', title: 'Fotografe', desc: 'Tire uma foto clara da sua refeição ou faça upload de uma imagem.', emoji: '📸' },
-                    { num: '02', title: 'IA analisa', desc: 'GPT-4o Vision identifica alimentos e calcula macronutrientes automaticamente.', emoji: '⚡' },
+                    { num: '02', title: 'IA analisa', desc: 'GPT-4o Vision identifica os alimentos e calcula calorias, proteínas, carboidratos e gordura automaticamente.', emoji: '⚡' },
                     { num: '03', title: 'Acompanhe', desc: 'Acumule refeições e veja seu progresso diário em tempo real.', emoji: '📊' },
                   ].map(({ num, title, desc, emoji }) => (
                     <div key={num} style={{

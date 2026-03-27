@@ -538,7 +538,7 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                     display: 'flex', flexDirection: 'column', gap: '14px',
                   }}>
                     <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)' }}>
-                      {period === 'day' ? 'Macros de hoje' : 'Macros totais do período'}
+                      {period === 'day' ? 'Nutrientes de hoje' : 'Nutrientes do período'}
                     </div>
                     {[
                       { label: 'Calorias', emoji: '🔥', color: '#f97316', key: 'calories' as const, unit: 'kcal' },
@@ -860,7 +860,7 @@ function FreemiumTeaser({ onUpgrade, data }: { onUpgrade: () => void; data: Anal
           Análises completas
         </h3>
         <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.5, marginBottom: '18px' }}>
-          Gráficos de barras diários, progresso de macros, streak de dias dentro da meta e histórico completo de refeições.
+          Gráficos de barras diários, acompanhamento de nutrientes, streak de dias dentro da meta e histórico completo de refeições.
         </p>
         <button
           onClick={onUpgrade}
