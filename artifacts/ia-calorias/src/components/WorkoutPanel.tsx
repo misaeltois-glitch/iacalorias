@@ -23,6 +23,7 @@ interface WorkoutPanelProps {
 }
 
 type PanelView = 'loading' | 'questionnaire' | 'plan' | 'player' | 'quick-picker' | 'muscle-builder';
+type MbPhase = 'groups' | 'exercises';
 
 const MB_MUSCLES: { label: string; muscle: MuscleGroup; emoji: string; desc: string }[] = [
   { label: 'Peito', muscle: 'chest', emoji: '🏋️', desc: 'Peitoral maior e menor' },
@@ -109,9 +110,11 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
   const restRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // muscle-builder state
-  const [mbPhase, setMbPhase] = useState<'groups' | 'exercises'>('groups');
-  const [mbMuscle, setMbMuscle] = useState<{ label: string; muscle: MuscleGroup; emoji: string } | null>(null);
-  const [mbSelectedIds, setMbSelectedIds] = useState<Set<string>>(new Set());
+  const [mbPhase, setMbPhase] = useState<MbPhase>('groups');
+  const [mbMuscles, setMbMuscles] = useState<Set<MuscleGroup>>(new Set());
+  const [mbCurrentMuscle, setMbCurrentMuscle] = useState<MuscleGroup | null>(null);
+  const [mbSelectedIds, setMbSelectedIds] = useState<Map<MuscleGroup, Set<string>>>(new Map());
+  const [customSession, setCustomSession] = useState<WorkoutSession | null>(null);
 
   // calorie dashboard state
   const [todayCalories, setTodayCalories] = useState<{ consumed: number } | null>(null);
@@ -220,36 +223,55 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
     }
   };
 
-  const handleStartMuscleBuilder = () => {
-    if (!mbMuscle || mbSelectedIds.size === 0) return;
+  const mbTotalSelected = [...mbSelectedIds.values()].reduce((a, s) => a + s.size, 0);
+
+  const handleSaveMuscleBuilder = () => {
+    if (mbMuscles.size === 0 || mbTotalSelected === 0) return;
     const goal = (profile.goal ?? 'hypertrophy') as WorkoutGoal;
     const level = (profile.level ?? 'intermediate') as ExperienceLevel;
-    const allExs = getExercisesByMuscle(mbMuscle.muscle);
-    const selectedExs = allExs.filter(e => mbSelectedIds.has(e.id));
 
-    const sessionExercises: SessionExercise[] = selectedExs.map((ex, idx) => {
-      const isCompound = ex.category !== 'isolation';
-      const presc = calcPrescriptionLocal(goal, level, isCompound);
-      return { exercise: ex, order: idx + 1, ...presc, notes: ex.tip };
-    });
+    let allSessionExercises: SessionExercise[] = [];
+    const muscleLabels: string[] = [];
+    const muscleList: MuscleGroup[] = [];
 
-    const totalSecs = sessionExercises.reduce((a, e) => a + e.sets * (35 + e.restSeconds), 0);
+    for (const muscle of mbMuscles) {
+      const info = MB_MUSCLES.find(m => m.muscle === muscle);
+      if (!info) continue;
+      const selectedForMuscle = mbSelectedIds.get(muscle) ?? new Set<string>();
+      if (selectedForMuscle.size === 0) continue;
+      muscleList.push(muscle);
+      muscleLabels.push(info.label);
+      const allExs = getExercisesByMuscle(muscle);
+      const selectedExs = allExs.filter(e => selectedForMuscle.has(e.id));
+      const exs: SessionExercise[] = selectedExs.map((ex, idx) => {
+        const isCompound = ex.category !== 'isolation';
+        const presc = calcPrescriptionLocal(goal, level, isCompound);
+        return { exercise: ex, order: allSessionExercises.length + idx + 1, ...presc, notes: ex.tip };
+      });
+      allSessionExercises = [...allSessionExercises, ...exs];
+    }
+
+    if (allSessionExercises.length === 0) return;
+
+    const focusLabel = muscleLabels.join(' + ');
+    const totalSecs = allSessionExercises.reduce((a, e) => a + e.sets * (35 + e.restSeconds), 0);
     const estimatedMinutes = Math.round(totalSecs / 60) + 5;
 
     const session: WorkoutSession = {
       dayKey: 'custom',
       dayLabel: 'Personalizado',
-      sessionName: `Treino de ${mbMuscle.label}`,
-      focusLabel: mbMuscle.label,
-      primaryMuscles: [mbMuscle.muscle],
+      sessionName: muscleLabels.length === 1 ? `Treino de ${muscleLabels[0]}` : `Treino Personalizado`,
+      focusLabel,
+      primaryMuscles: muscleList,
       secondaryMuscles: [],
       warmup: [{ name: 'Aquecimento articular e mobilidade', duration: '5 min' }],
-      exercises: sessionExercises,
-      cooldown: [{ name: `Alongamento de ${mbMuscle.label} — mantido`, duration: '3 min' }],
+      exercises: allSessionExercises,
+      cooldown: [{ name: 'Alongamento e relaxamento geral', duration: '3 min' }],
       estimatedMinutes,
       isRestDay: false,
     };
-    handleStartPlayer(session);
+    setCustomSession(session);
+    setView('plan');
   };
 
   const startRest = (seconds: number) => {
@@ -589,6 +611,100 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
             </div>
           </div>
 
+          {/* Custom session card — replaces "Treino do Dia" when set */}
+          {customSession && (
+            <div style={{ padding: '12px 16px 0' }}>
+              <div style={{
+                borderRadius: '20px', overflow: 'hidden',
+                border: '2px solid #0D9F6E',
+                background: 'linear-gradient(135deg, rgba(13,159,110,0.06), rgba(13,159,110,0.02))',
+              }}>
+                <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid rgba(13,159,110,0.15)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: '#0D9F6E', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                      🎯 Meu Treino Personalizado
+                    </span>
+                    <button
+                      onClick={() => setCustomSession(null)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '2px', display: 'flex', alignItems: 'center' }}
+                      title="Remover treino personalizado"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-1)', marginBottom: '2px' }}>{customSession.sessionName}</div>
+                      <div style={{ fontSize: '12px', color: '#0D9F6E', fontWeight: 600 }}>{customSession.focusLabel}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--text-2)' }}>
+                      <Clock size={12} />&nbsp;~{customSession.estimatedMinutes}min
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: '10px 16px', display: 'flex', gap: '8px' }}>
+                  {isPremium ? (
+                    <button
+                      onClick={() => handleStartPlayer(customSession)}
+                      style={{
+                        flex: 1, padding: '11px', borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+                        color: '#fff', border: 'none', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
+                      }}
+                    >
+                      <Play size={14} fill="#fff" /> Iniciar Treino
+                    </button>
+                  ) : (
+                    <button
+                      onClick={onUpgrade}
+                      style={{
+                        flex: 1, padding: '11px', borderRadius: '12px',
+                        background: 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(139,92,246,0.08))',
+                        border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B',
+                        fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
+                      }}
+                    >
+                      <Crown size={14} /> Desbloquear Player
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setMbPhase('groups');
+                      setMbMuscles(new Set());
+                      setMbCurrentMuscle(null);
+                      setMbSelectedIds(new Map());
+                      setView('muscle-builder');
+                    }}
+                    style={{
+                      padding: '11px 14px', borderRadius: '12px',
+                      background: 'var(--bg-2)', border: '1px solid var(--border)',
+                      color: 'var(--text-2)', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '5px',
+                    }}
+                  >
+                    <RotateCcw size={13} /> Refazer
+                  </button>
+                </div>
+                <div style={{ padding: '0 16px 12px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-3)', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {customSession.exercises.slice(0, 6).map(se => (
+                      <span key={se.exercise.id} style={{ background: 'var(--bg-3)', padding: '2px 8px', borderRadius: '99px' }}>
+                        {se.exercise.name}
+                      </span>
+                    ))}
+                    {customSession.exercises.length > 6 && (
+                      <span style={{ background: 'var(--bg-3)', padding: '2px 8px', borderRadius: '99px' }}>
+                        +{customSession.exercises.length - 6} mais
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Action banners */}
           <div style={{ padding: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {/* Treino do Dia IA banner */}
@@ -617,7 +733,13 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
 
             {/* Montar Treino Personalizado banner */}
             <button
-              onClick={() => { setMbPhase('groups'); setMbMuscle(null); setMbSelectedIds(new Set()); setView('muscle-builder'); }}
+              onClick={() => {
+                setMbPhase('groups');
+                setMbMuscles(new Set());
+                setMbCurrentMuscle(null);
+                setMbSelectedIds(new Map());
+                setView('muscle-builder');
+              }}
               style={{
                 width: '100%', padding: '13px 16px', borderRadius: '16px',
                 background: 'linear-gradient(135deg, rgba(13,159,110,0.09), rgba(59,130,246,0.06))',
@@ -633,7 +755,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
                   Montar Meu Treino 🎯
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
-                  Escolha exercício por músculo, do seu jeito
+                  {customSession ? `Editar: ${customSession.focusLabel}` : 'Escolha músculos e exercícios, do seu jeito'}
                 </div>
               </div>
               <ChevronRight size={16} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
@@ -855,8 +977,8 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
       {view === 'muscle-builder' && (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
           {/* Header */}
-          <div style={{ background: 'linear-gradient(135deg, #0D9F6E 0%, #059669 100%)', padding: '20px 20px 28px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <div style={{ background: 'linear-gradient(135deg, #0D9F6E 0%, #059669 100%)', padding: '20px 20px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
               <button
                 onClick={() => mbPhase === 'exercises' ? setMbPhase('groups') : setView(plan ? 'plan' : 'questionnaire')}
                 style={{ padding: '8px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', color: '#fff' }}
@@ -864,7 +986,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
                 <ChevronLeft size={18} />
               </button>
               <span style={{ fontWeight: 700, color: '#fff', fontSize: '15px' }}>
-                {mbPhase === 'groups' ? 'Montar Meu Treino' : `${mbMuscle?.emoji} ${mbMuscle?.label}`}
+                {mbPhase === 'groups' ? 'Montar Meu Treino' : 'Escolher Exercícios'}
               </span>
               <button onClick={onClose} style={{ padding: '8px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', color: '#fff' }}>
                 <X size={18} />
@@ -872,202 +994,230 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
             </div>
             <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
               {mbPhase === 'groups'
-                ? 'Escolha o grupo muscular e monte um treino com os exercícios que quiser.'
-                : `Selecione os exercícios de ${mbMuscle?.label}. Os recomendados para seu nível estão destacados.`}
+                ? 'Selecione um ou mais grupos musculares que quer treinar hoje.'
+                : `Escolha os exercícios por músculo. Você pode adicionar e remover à vontade.`}
             </p>
           </div>
 
-          {/* ── Muscle Groups Grid ── */}
+          {/* ── Muscle Groups Phase ── */}
           {mbPhase === 'groups' && (
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 40px' }}>
-              <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '14px', letterSpacing: '0.3px' }}>
-                QUAL MÚSCULO VOCÊ QUER TRABALHAR?
-              </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                {MB_MUSCLES.map(m => (
-                  <button
-                    key={m.muscle}
-                    onClick={() => { setMbMuscle(m); setMbSelectedIds(new Set()); setMbPhase('exercises'); }}
-                    style={{
-                      padding: '14px 12px', borderRadius: '16px',
-                      border: '1.5px solid var(--border)',
-                      background: 'var(--bg-2)',
-                      cursor: 'pointer', textAlign: 'left',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    <div style={{ fontSize: '22px', marginBottom: '6px' }}>{m.emoji}</div>
-                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>{m.label}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-3)', lineHeight: 1.3 }}>{m.desc}</div>
-                  </button>
-                ))}
+            <>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 100px' }}>
+                <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', marginBottom: '12px', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
+                  QUAIS MÚSCULOS VOCÊ QUER TRABALHAR?
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                  {MB_MUSCLES.map(m => {
+                    const isSelected = mbMuscles.has(m.muscle);
+                    return (
+                      <button
+                        key={m.muscle}
+                        onClick={() => {
+                          setMbMuscles(prev => {
+                            const next = new Set(prev);
+                            isSelected ? next.delete(m.muscle) : next.add(m.muscle);
+                            return next;
+                          });
+                        }}
+                        style={{
+                          padding: '14px 12px', borderRadius: '16px',
+                          border: `2px solid ${isSelected ? '#0D9F6E' : 'var(--border)'}`,
+                          background: isSelected ? 'rgba(13,159,110,0.09)' : 'var(--bg-2)',
+                          cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
+                          position: 'relative',
+                        }}
+                      >
+                        {isSelected && (
+                          <div style={{
+                            position: 'absolute', top: '8px', right: '8px',
+                            width: '18px', height: '18px', borderRadius: '50%',
+                            background: '#0D9F6E', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            <Check size={11} color="#fff" strokeWidth={3} />
+                          </div>
+                        )}
+                        <div style={{ fontSize: '22px', marginBottom: '6px' }}>{m.emoji}</div>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: isSelected ? '#0D9F6E' : 'var(--text-1)', marginBottom: '2px' }}>{m.label}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-3)', lineHeight: 1.3 }}>{m.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+              {/* Footer CTA — groups */}
+              <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 20px', background: 'var(--bg)', borderTop: '1px solid var(--border)' }}>
+                <button
+                  onClick={() => {
+                    const first = [...mbMuscles][0];
+                    if (first) { setMbCurrentMuscle(first); setMbPhase('exercises'); }
+                  }}
+                  disabled={mbMuscles.size === 0}
+                  style={{
+                    width: '100%', padding: '14px', borderRadius: '14px',
+                    background: mbMuscles.size > 0 ? 'linear-gradient(135deg, #0D9F6E, #059669)' : 'var(--bg-3)',
+                    color: mbMuscles.size > 0 ? '#fff' : 'var(--text-3)',
+                    border: 'none', fontWeight: 700, fontSize: '15px',
+                    cursor: mbMuscles.size > 0 ? 'pointer' : 'not-allowed',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {mbMuscles.size > 0
+                    ? `Escolher Exercícios (${mbMuscles.size} músculo${mbMuscles.size !== 1 ? 's' : ''}) →`
+                    : 'Selecione ao menos 1 músculo'}
+                </button>
+              </div>
+            </>
           )}
 
-          {/* ── Exercise Selection ── */}
-          {mbPhase === 'exercises' && mbMuscle && (() => {
+          {/* ── Exercises Phase ── */}
+          {mbPhase === 'exercises' && (() => {
             const goal = (profile.goal ?? 'hypertrophy') as WorkoutGoal;
             const level = (profile.level ?? 'intermediate') as ExperienceLevel;
-            const allExs = getExercisesByMuscle(mbMuscle.muscle);
+            const activeMuscle = mbCurrentMuscle ?? [...mbMuscles][0];
+            const activeMuscleInfo = MB_MUSCLES.find(m => m.muscle === activeMuscle);
+            const allExs = activeMuscle ? getExercisesByMuscle(activeMuscle) : [];
             const injuryKeys = (profile.injuries ?? []) as InjuryKey[];
             const filtered = filterByInjuries(allExs, injuryKeys);
             const compounds = filtered.filter(e => e.category !== 'isolation');
             const isolation = filtered.filter(e => e.category === 'isolation');
-            // Recommend by both level AND goal: compounds prioritized for strength/hypertrophy,
-            // isolation prioritized for fat_loss/endurance. Advanced gets more of each.
             const isStrengthFocus = goal === 'strength' || goal === 'hypertrophy';
-            const maxCompRec = isStrengthFocus ? (level === 'advanced' ? 2 : 1) : (level === 'advanced' ? 1 : 1);
-            const maxIsoRec = !isStrengthFocus ? (level !== 'beginner' ? (level === 'advanced' ? 2 : 1) : 1) : (level === 'beginner' ? 0 : (level === 'advanced' ? 2 : 1));
-            const recommended = new Set(
-              [...compounds.slice(0, maxCompRec), ...isolation.slice(0, maxIsoRec)].map(e => e.id)
-            );
+            const maxCompRec = isStrengthFocus ? (level === 'advanced' ? 2 : 1) : 1;
+            const maxIsoRec = !isStrengthFocus ? (level === 'advanced' ? 2 : 1) : (level === 'beginner' ? 0 : (level === 'advanced' ? 2 : 1));
+            const recommended = new Set([...compounds.slice(0, maxCompRec), ...isolation.slice(0, maxIsoRec)].map(e => e.id));
+            const currentSelected = activeMuscle ? (mbSelectedIds.get(activeMuscle) ?? new Set<string>()) : new Set<string>();
+            const currentCount = currentSelected.size;
+
+            const toggleExercise = (exId: string) => {
+              if (!activeMuscle) return;
+              setMbSelectedIds(prev => {
+                const next = new Map(prev);
+                const cur = new Set(next.get(activeMuscle) ?? []);
+                cur.has(exId) ? cur.delete(exId) : cur.add(exId);
+                next.set(activeMuscle, cur);
+                return next;
+              });
+            };
+
+            const renderExerciseButton = (ex: ReturnType<typeof getExercisesByMuscle>[number], color: string) => {
+              const isSelected = currentSelected.has(ex.id);
+              const isRecommended = recommended.has(ex.id);
+              return (
+                <button
+                  key={ex.id}
+                  onClick={() => toggleExercise(ex.id)}
+                  style={{
+                    padding: '12px 14px', borderRadius: '14px',
+                    border: `2px solid ${isSelected ? color : isRecommended ? `${color}40` : 'var(--border)'}`,
+                    background: isSelected ? `${color}14` : isRecommended ? `${color}06` : 'var(--bg-2)',
+                    cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '10px',
+                  }}
+                >
+                  <div style={{
+                    width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, marginTop: '1px',
+                    border: `2px solid ${isSelected ? color : 'var(--border)'}`,
+                    background: isSelected ? color : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {isSelected && <Check size={12} color="#fff" strokeWidth={3} />}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)' }}>{ex.name}</span>
+                      {isRecommended && (
+                        <span style={{ fontSize: '9px', fontWeight: 700, color, background: `${color}20`, padding: '1px 6px', borderRadius: '99px' }}>
+                          RECOMENDADO
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '11px', color: 'var(--text-3)', margin: 0, lineHeight: 1.4 }}>{ex.tip}</p>
+                  </div>
+                </button>
+              );
+            };
+
             return (
-              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 120px' }}>
-                <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '12px' }}>
-                  {mbSelectedIds.size} selecionado{mbSelectedIds.size !== 1 ? 's' : ''} · máx. 8 exercícios
-                </p>
+              <>
+                {/* Muscle tabs */}
+                <div style={{ display: 'flex', gap: '6px', padding: '12px 16px 0', overflowX: 'auto' }}>
+                  {[...mbMuscles].map(muscle => {
+                    const info = MB_MUSCLES.find(m => m.muscle === muscle)!;
+                    const count = mbSelectedIds.get(muscle)?.size ?? 0;
+                    const isActive = activeMuscle === muscle;
+                    return (
+                      <button
+                        key={muscle}
+                        onClick={() => setMbCurrentMuscle(muscle)}
+                        style={{
+                          padding: '7px 12px', borderRadius: '99px', whiteSpace: 'nowrap', flexShrink: 0,
+                          background: isActive ? '#0D9F6E' : 'var(--bg-2)',
+                          color: isActive ? '#fff' : 'var(--text-2)',
+                          border: `1.5px solid ${isActive ? '#0D9F6E' : 'var(--border)'}`,
+                          fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                        }}
+                      >
+                        {info.emoji} {info.label}{count > 0 ? ` (${count})` : ''}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                {/* Compostos */}
-                {compounds.length > 0 && (
-                  <div style={{ marginBottom: '16px' }}>
-                    <p style={{ fontSize: '11px', fontWeight: 700, color: '#0D9F6E', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-                      Exercícios Compostos
-                    </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {compounds.map(ex => {
-                        const isSelected = mbSelectedIds.has(ex.id);
-                        const isRecommended = recommended.has(ex.id);
-                        const canSelect = isSelected || mbSelectedIds.size < 8;
-                        return (
-                          <button
-                            key={ex.id}
-                            onClick={() => {
-                              if (!canSelect && !isSelected) return;
-                              setMbSelectedIds(prev => {
-                                const next = new Set(prev);
-                                isSelected ? next.delete(ex.id) : next.add(ex.id);
-                                return next;
-                              });
-                            }}
-                            style={{
-                              padding: '12px 14px', borderRadius: '14px',
-                              border: `2px solid ${isSelected ? '#0D9F6E' : isRecommended ? 'rgba(13,159,110,0.3)' : 'var(--border)'}`,
-                              background: isSelected ? 'rgba(13,159,110,0.08)' : isRecommended ? 'rgba(13,159,110,0.03)' : 'var(--bg-2)',
-                              cursor: canSelect || isSelected ? 'pointer' : 'not-allowed',
-                              textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '10px',
-                              opacity: !canSelect && !isSelected ? 0.5 : 1,
-                            }}
-                          >
-                            <div style={{
-                              width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, marginTop: '1px',
-                              border: `2px solid ${isSelected ? '#0D9F6E' : 'var(--border)'}`,
-                              background: isSelected ? '#0D9F6E' : 'transparent',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                              {isSelected && <Check size={12} color="#fff" strokeWidth={3} />}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                                <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)' }}>{ex.name}</span>
-                                {isRecommended && (
-                                  <span style={{ fontSize: '9px', fontWeight: 700, color: '#0D9F6E', background: 'rgba(13,159,110,0.12)', padding: '1px 6px', borderRadius: '99px' }}>
-                                    RECOMENDADO
-                                  </span>
-                                )}
-                              </div>
-                              <p style={{ fontSize: '11px', color: 'var(--text-3)', margin: 0, lineHeight: 1.4 }}>{ex.tip}</p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                {/* Counter */}
+                <div style={{ padding: '8px 18px 0' }}>
+                  <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', margin: 0 }}>
+                    {currentCount} exercício{currentCount !== 1 ? 's' : ''} selecionado{currentCount !== 1 ? 's' : ''} em {activeMuscleInfo?.label ?? ''}
+                    {mbTotalSelected > 0 && ` · ${mbTotalSelected} no total`}
+                  </p>
+                </div>
 
-                {/* Isolamento */}
-                {isolation.length > 0 && (
-                  <div>
-                    <p style={{ fontSize: '11px', fontWeight: 700, color: '#8B5CF6', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-                      Exercícios de Isolamento
-                    </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {isolation.map(ex => {
-                        const isSelected = mbSelectedIds.has(ex.id);
-                        const isRecommended = recommended.has(ex.id);
-                        const canSelect = isSelected || mbSelectedIds.size < 8;
-                        return (
-                          <button
-                            key={ex.id}
-                            onClick={() => {
-                              if (!canSelect && !isSelected) return;
-                              setMbSelectedIds(prev => {
-                                const next = new Set(prev);
-                                isSelected ? next.delete(ex.id) : next.add(ex.id);
-                                return next;
-                              });
-                            }}
-                            style={{
-                              padding: '12px 14px', borderRadius: '14px',
-                              border: `2px solid ${isSelected ? '#8B5CF6' : isRecommended ? 'rgba(139,92,246,0.3)' : 'var(--border)'}`,
-                              background: isSelected ? 'rgba(139,92,246,0.08)' : isRecommended ? 'rgba(139,92,246,0.03)' : 'var(--bg-2)',
-                              cursor: canSelect || isSelected ? 'pointer' : 'not-allowed',
-                              textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '10px',
-                              opacity: !canSelect && !isSelected ? 0.5 : 1,
-                            }}
-                          >
-                            <div style={{
-                              width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, marginTop: '1px',
-                              border: `2px solid ${isSelected ? '#8B5CF6' : 'var(--border)'}`,
-                              background: isSelected ? '#8B5CF6' : 'transparent',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                              {isSelected && <Check size={12} color="#fff" strokeWidth={3} />}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                                <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)' }}>{ex.name}</span>
-                                {isRecommended && (
-                                  <span style={{ fontSize: '9px', fontWeight: 700, color: '#8B5CF6', background: 'rgba(139,92,246,0.12)', padding: '1px 6px', borderRadius: '99px' }}>
-                                    RECOMENDADO
-                                  </span>
-                                )}
-                              </div>
-                              <p style={{ fontSize: '11px', color: 'var(--text-3)', margin: 0, lineHeight: 1.4 }}>{ex.tip}</p>
-                            </div>
-                          </button>
-                        );
-                      })}
+                {/* Exercise list */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 100px' }}>
+                  {compounds.length > 0 && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <p style={{ fontSize: '11px', fontWeight: 700, color: '#0D9F6E', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                        Exercícios Compostos
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {compounds.map(ex => renderExerciseButton(ex, '#0D9F6E'))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                  {isolation.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: '11px', fontWeight: 700, color: '#8B5CF6', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                        Exercícios de Isolamento
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {isolation.map(ex => renderExerciseButton(ex, '#8B5CF6'))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer CTA — exercises */}
+                <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '12px 20px', background: 'var(--bg)', borderTop: '1px solid var(--border)' }}>
+                  <button
+                    onClick={handleSaveMuscleBuilder}
+                    disabled={mbTotalSelected === 0}
+                    style={{
+                      width: '100%', padding: '14px', borderRadius: '14px',
+                      background: mbTotalSelected > 0 ? 'linear-gradient(135deg, #0D9F6E, #059669)' : 'var(--bg-3)',
+                      color: mbTotalSelected > 0 ? '#fff' : 'var(--text-3)',
+                      border: 'none', fontWeight: 700, fontSize: '15px',
+                      cursor: mbTotalSelected > 0 ? 'pointer' : 'not-allowed',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <Check size={16} />
+                    {mbTotalSelected > 0
+                      ? `Salvar Meu Treino (${mbTotalSelected} exercício${mbTotalSelected !== 1 ? 's' : ''})`
+                      : 'Selecione ao menos 1 exercício'}
+                  </button>
+                </div>
+              </>
             );
           })()}
-
-          {/* Footer CTA */}
-          {mbPhase === 'exercises' && (
-            <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 20px', background: 'var(--bg)', borderTop: '1px solid var(--border)' }}>
-              <button
-                onClick={handleStartMuscleBuilder}
-                disabled={mbSelectedIds.size === 0}
-                style={{
-                  width: '100%', padding: '14px', borderRadius: '14px',
-                  background: mbSelectedIds.size > 0
-                    ? 'linear-gradient(135deg, #0D9F6E, #059669)'
-                    : 'var(--bg-3)',
-                  color: mbSelectedIds.size > 0 ? '#fff' : 'var(--text-3)',
-                  border: 'none', fontWeight: 700, fontSize: '15px',
-                  cursor: mbSelectedIds.size > 0 ? 'pointer' : 'not-allowed',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <Play size={16} fill={mbSelectedIds.size > 0 ? '#fff' : 'var(--text-3)'} />
-                {mbSelectedIds.size > 0 ? `Iniciar Treino com ${mbSelectedIds.size} exercício${mbSelectedIds.size !== 1 ? 's' : ''}` : 'Selecione ao menos 1 exercício'}
-              </button>
-            </div>
-          )}
         </div>
       )}
 
