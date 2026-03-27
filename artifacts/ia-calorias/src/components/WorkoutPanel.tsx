@@ -642,12 +642,12 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
                     </div>
                   </div>
                 </div>
-                <div style={{ padding: '10px 16px', display: 'flex', gap: '8px' }}>
+                <div style={{ padding: '10px 16px 6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {isPremium ? (
                     <button
                       onClick={() => handleStartPlayer(customSession)}
                       style={{
-                        flex: 1, padding: '11px', borderRadius: '12px',
+                        width: '100%', padding: '12px', borderRadius: '12px',
                         background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
                         color: '#fff', border: 'none', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
@@ -659,7 +659,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
                     <button
                       onClick={onUpgrade}
                       style={{
-                        flex: 1, padding: '11px', borderRadius: '12px',
+                        width: '100%', padding: '12px', borderRadius: '12px',
                         background: 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(139,92,246,0.08))',
                         border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B',
                         fontWeight: 700, fontSize: '14px', cursor: 'pointer',
@@ -671,20 +671,21 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
                   )}
                   <button
                     onClick={() => {
+                      const preloaded = new Set(customSession.primaryMuscles as MuscleGroup[]);
                       setMbPhase('groups');
-                      setMbMuscles(new Set());
+                      setMbMuscles(preloaded);
                       setMbCurrentMuscle(null);
                       setMbSelectedIds(new Map());
                       setView('muscle-builder');
                     }}
                     style={{
-                      padding: '11px 14px', borderRadius: '12px',
-                      background: 'var(--bg-2)', border: '1px solid var(--border)',
-                      color: 'var(--text-2)', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', gap: '5px',
+                      width: '100%', padding: '10px', borderRadius: '12px',
+                      background: 'var(--bg-3)', border: '1.5px solid var(--border)',
+                      color: 'var(--text-1)', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                     }}
                   >
-                    <RotateCcw size={13} /> Refazer
+                    <RotateCcw size={13} /> Alterar Treino
                   </button>
                 </div>
                 <div style={{ padding: '0 16px 12px' }}>
