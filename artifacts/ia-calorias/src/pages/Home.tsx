@@ -125,6 +125,22 @@ export default function Home() {
   const [celebration, setCelebration] = useState<{ show: boolean; type: 'calories' | 'meals' }>({ show: false, type: 'calories' });
   const celebrationQueue = useRef<Array<'calories' | 'meals'>>([]);
   const celebrationInflight = useRef<Set<'calories' | 'meals'>>(new Set());
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [showUserMenu]);
 
   const [savedGoals, setSavedGoals] = useState<any>(null);
   const [dailySummary, setDailySummary] = useState<any>(null);
@@ -384,6 +400,7 @@ export default function Home() {
 
   const handleTabChange = (tab: BottomNavTab) => {
     setActiveTab(tab);
+    if (tab !== 'profile') setShowUserMenu(false);
     if (tab === 'home') { setCurrentResult(null); }
     if (tab === 'workout') { setShowWorkout(true); }
     if (tab === 'analyze') { setCurrentResult(null); }
@@ -502,7 +519,7 @@ export default function Home() {
             )}
 
             {isAuthenticated ? (
-              <div style={{ position: 'relative' }}>
+              <div ref={userMenuRef} style={{ position: 'relative' }}>
                 <button
                   onClick={() => setShowUserMenu(v => !v)}
                   style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
@@ -511,7 +528,6 @@ export default function Home() {
                 </button>
                 {showUserMenu && (
                   <>
-                    <div style={{ position: 'fixed', inset: 0, zIndex: 100 }} onClick={() => setShowUserMenu(false)} />
                     <div style={{
                       position: 'absolute', right: 0, top: '42px',
                       background: 'var(--bg-2)', border: '1px solid var(--border)',
