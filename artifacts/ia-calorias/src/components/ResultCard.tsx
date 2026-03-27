@@ -88,16 +88,6 @@ export function ResultCard({ result, onReset, photoUrl }: ResultCardProps) {
         overflow: 'hidden',
         boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
       }}>
-        {photoUrl && (
-          <div style={{ width: '100%', aspectRatio: '16/9', overflow: 'hidden' }}>
-            <img
-              src={photoUrl}
-              alt="Prato analisado"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            />
-          </div>
-        )}
-
         <div style={{ padding: '20px 22px 22px' }}>
           <div style={{ marginBottom: '6px' }}>
             <span style={{

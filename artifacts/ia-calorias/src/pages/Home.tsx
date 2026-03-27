@@ -164,10 +164,23 @@ export default function Home() {
     setGoalsLoaded(true);
   }, [sessionId, isPremium, period]);
 
+  const loadGoalsDirect = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      const r = await fetch(`${BASE}api/goals?sessionId=${sessionId}`, { headers: authHeaders() });
+      if (r.ok) {
+        const data = await r.json();
+        if (data) setSavedGoals(data);
+      }
+    } finally {
+      setGoalsLoaded(true);
+    }
+  }, [sessionId]);
+
   useEffect(() => {
     if (sessionId && isPremium) refreshSummary();
-    else if (sessionId && !isPremium) setGoalsLoaded(true);
-  }, [sessionId, isPremium, refreshSummary]);
+    else if (sessionId && !isPremium) loadGoalsDirect();
+  }, [sessionId, isPremium, refreshSummary, loadGoalsDirect]);
 
   useEffect(() => {
     const t = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -953,7 +966,7 @@ export default function Home() {
         {showGoalsPanel && (
           <GoalsPanel
             isOpen={showGoalsPanel}
-            onClose={() => { setShowGoalsPanel(false); refreshSummary(); setGoalsRefreshKey(k => k + 1); }}
+            onClose={() => { setShowGoalsPanel(false); if (isPremium) refreshSummary(); else loadGoalsDirect(); setGoalsRefreshKey(k => k + 1); }}
             sessionId={sessionId}
             onOpenBiometrics={() => setShowOnboarding(true)}
           />

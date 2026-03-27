@@ -457,44 +457,82 @@ export function ProgressView({ sessionId, isPremium, refreshSignal, onUpgrade, o
 
           {/* ─── Refeições ─── */}
           {data.meals.length > 0 ? (
-            <div style={{ background: 'var(--bg-2)', borderRadius: '18px', border: '1.5px solid var(--border)', overflow: 'hidden' }}>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }}>
                 <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)' }}>🍽 Refeições</span>
                 <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
                   {data.totals.meals} {data.totals.meals === 1 ? 'registro' : 'registros'}
                 </span>
               </div>
-              {data.meals.map((meal, i) => {
-                const mealDate = new Date(meal.createdAt);
-                const timeStr = mealDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                const dateStr2 = mealDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-                const score = meal.healthScore;
-                return (
-                  <div key={meal.id} style={{
-                    padding: '12px 16px',
-                    borderBottom: i < data.meals.length - 1 ? '1px solid var(--border)' : 'none',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-                  }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-1)', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {meal.dishName}
+
+              {/* Grouped by date */}
+              {(() => {
+                const groups: Map<string, typeof data.meals> = new Map();
+                for (const meal of data.meals) {
+                  const d = new Date(meal.createdAt).toISOString().slice(0, 10);
+                  if (!groups.has(d)) groups.set(d, []);
+                  groups.get(d)!.push(meal);
+                }
+                const todayLocal = new Date().toISOString().slice(0, 10);
+                const yesterdayLocal = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+                function dayLabel(dateKey: string): string {
+                  if (dateKey === todayLocal) return 'Hoje';
+                  if (dateKey === yesterdayLocal) return 'Ontem';
+                  const d = new Date(dateKey + 'T12:00:00');
+                  return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
+                }
+
+                return Array.from(groups.entries()).map(([dateKey, meals]) => (
+                  <div key={dateKey} style={{ background: 'var(--bg-2)', borderRadius: '18px', border: '1.5px solid var(--border)', overflow: 'hidden' }}>
+                    {/* Date header — only when multiple days */}
+                    {(period !== 'day' || groups.size > 1) && (
+                      <div style={{
+                        padding: '8px 16px', background: 'var(--bg-3)',
+                        borderBottom: '1px solid var(--border)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      }}>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-1)', textTransform: 'capitalize' }}>
+                          {dayLabel(dateKey)}
+                        </span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+                          {Math.round(meals.reduce((s, m) => s + m.calories, 0))} kcal
+                        </span>
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>
-                        {period !== 'day' ? `${dateStr2} · ` : ''}{timeStr}
-                        {score != null && ` · ⭐ ${score}/10`}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums' }}>
-                        {meal.calories} kcal
-                      </div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
-                        P {Math.round(meal.protein)}g · C {Math.round(meal.carbs)}g · G {Math.round(meal.fat)}g
-                      </div>
-                    </div>
+                    )}
+                    {meals.map((meal, i) => {
+                      const mealDate = new Date(meal.createdAt);
+                      const timeStr = mealDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                      const score = meal.healthScore;
+                      return (
+                        <div key={meal.id} style={{
+                          padding: '12px 16px',
+                          borderBottom: i < meals.length - 1 ? '1px solid var(--border)' : 'none',
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+                        }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-1)', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {meal.dishName}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+                              {timeStr}{score != null && ` · ⭐ ${score}/10`}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums' }}>
+                              {meal.calories} kcal
+                            </div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
+                              P {Math.round(meal.protein)}g · C {Math.round(meal.carbs)}g · G {Math.round(meal.fat)}g
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                ));
+              })()}
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--text-3)', fontSize: '13px', lineHeight: 1.6 }}>
