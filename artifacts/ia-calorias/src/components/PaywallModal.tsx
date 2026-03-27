@@ -9,8 +9,58 @@ interface PaywallModalProps {
   onShowAuth?: () => void;
 }
 
+const accent = '#0D9F6E';
+
+type FeatureRow = {
+  label: string;
+  free: string | false;
+  limited: string | true;
+  unlimited: string | true;
+  highlight?: boolean;
+};
+
+const FEATURES: FeatureRow[] = [
+  { label: 'Análise de refeições por IA',     free: '3 por mês',        limited: '20 por mês',      unlimited: 'Ilimitadas',          highlight: true },
+  { label: 'Macros completos (proteína, carbo, gordura, fibra)', free: '✓', limited: true,           unlimited: true },
+  { label: 'Score de saúde da refeição',       free: false,              limited: true,              unlimited: true },
+  { label: 'Histórico de refeições',           free: false,              limited: '30 dias',         unlimited: 'Ilimitado',           highlight: true },
+  { label: 'Metas diárias personalizadas',     free: false,              limited: true,              unlimited: true },
+  { label: 'Painel de progresso & gráficos',   free: false,              limited: true,              unlimited: true },
+  { label: 'Treino do Dia gerado por IA',      free: false,              limited: '5/mês',           unlimited: 'Ilimitado',           highlight: true },
+  { label: 'Player de treino com cronômetro',  free: false,              limited: false,             unlimited: true,                  highlight: true },
+  { label: 'Plano semanal personalizado',      free: false,              limited: false,             unlimited: true },
+  { label: 'Resumo da nutricionista (IA)',     free: false,              limited: false,             unlimited: true,                  highlight: true },
+  { label: 'Relatório semanal inteligente',    free: false,              limited: false,             unlimited: true },
+  { label: 'Suporte prioritário',              free: false,              limited: false,             unlimited: true },
+];
+
+function FeatureCell({ val, isUnlimited }: { val: string | boolean | false; isUnlimited?: boolean }) {
+  if (val === false) {
+    return <span style={{ color: 'var(--text-3)', fontSize: 15 }}>—</span>;
+  }
+  if (val === true) {
+    return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 20, height: 20, borderRadius: '50%',
+        background: isUnlimited ? 'rgba(13,159,110,0.18)' : 'rgba(255,255,255,0.08)',
+        color: isUnlimited ? accent : 'var(--text-2)',
+        fontSize: 12, fontWeight: 700,
+      }}>✓</span>
+    );
+  }
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 700,
+      color: isUnlimited ? accent : 'var(--text-2)',
+      whiteSpace: 'nowrap',
+    }}>{val}</span>
+  );
+}
+
 export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowAuth }: PaywallModalProps) {
   const [loadingPlan, setLoadingPlan] = useState<'limited' | 'unlimited' | null>(null);
+  const [tab, setTab] = useState<'cards' | 'compare'>('cards');
   const checkoutMutation = useCreateCheckoutSession();
 
   const handleCheckout = (plan: 'limited' | 'unlimited') => {
@@ -28,9 +78,9 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0,0,0,0.8)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
+        background: 'rgba(0,0,0,0.85)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       }}
       onClick={(e) => { if (!disableClose && e.target === e.currentTarget) onClose(); }}
@@ -39,184 +89,302 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%', maxWidth: '480px',
-          background: 'var(--bg-surface)',
-          borderRadius: '24px 24px 0 0',
-          padding: '28px 20px 36px',
-          boxShadow: '0 -8px 40px rgba(0,0,0,0.4)',
-          maxHeight: '92dvh',
-          overflowY: 'auto',
+          background: 'var(--bg)',
+          borderRadius: '28px 28px 0 0',
+          boxShadow: '0 -12px 60px rgba(0,0,0,0.5)',
+          maxHeight: '93dvh',
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
         }}
       >
-        {/* Handle bar + close */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: '24px' }}>
+        {/* Drag handle + close */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '14px 20px 0' }}>
           <div style={{ width: '36px', height: '4px', borderRadius: '99px', background: 'var(--border-strong)' }} />
           {!disableClose && (
             <button
               onClick={onClose}
               style={{
-                position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)',
+                position: 'absolute', right: 20, top: '50%', transform: 'translateY(-50%)',
                 width: '30px', height: '30px', borderRadius: '50%',
-                background: 'var(--bg-3)', border: '1px solid var(--border)',
+                background: 'var(--bg-2)', border: '1px solid var(--border)',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: 'var(--text-2)', fontSize: '16px', lineHeight: 1,
               }}
-            >
-              ✕
-            </button>
+            >✕</button>
           )}
         </div>
 
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            padding: '5px 14px', borderRadius: '99px',
-            background: 'rgba(239,68,68,0.12)', color: '#f87171',
-            fontSize: '12px', fontWeight: 600, marginBottom: '14px',
-          }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-            </svg>
-            Análises gratuitas esgotadas
-          </div>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.4px', color: 'var(--text-1)', marginBottom: '6px', lineHeight: 1.3 }}>
-            Continue monitorando sua nutrição
-          </h2>
-          <p style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.5 }}>
-            Escolha o plano ideal e continue usando o IA Calorias.
-          </p>
-        </div>
+        {/* Scrollable body */}
+        <div style={{ overflowY: 'auto', flex: 1, padding: '20px 20px 32px' }}>
 
-        {/* Plans — stacked vertically */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '18px' }}>
-
-          {/* Ilimitado — destacado */}
-          <div style={{
-            border: '2px solid var(--accent)', borderRadius: '16px',
-            padding: '18px 20px', background: 'var(--accent-glow)',
-            position: 'relative',
-          }}>
+          {/* Hero */}
+          <div style={{ textAlign: 'center', marginBottom: 22 }}>
             <div style={{
-              position: 'absolute', top: '-11px', right: '16px',
-              background: 'var(--accent)', color: '#fff',
-              fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px',
-              padding: '3px 10px', borderRadius: '99px',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '5px 14px', borderRadius: 99,
+              background: 'rgba(239,68,68,0.12)', color: '#f87171',
+              fontSize: 12, fontWeight: 600, marginBottom: 14,
             }}>
-              MAIS POPULAR
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+              {disableClose ? 'Análises gratuitas esgotadas' : 'Desbloqueie o IA Calorias completo'}
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>Ilimitado</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>Análises ilimitadas por mês</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--text-1)', lineHeight: 1 }}>
-                  R$&nbsp;49<span style={{ fontSize: '18px' }}>,90</span>
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '2px' }}>/mês</div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
-              {['✓ Análises ilimitadas', '✓ Macros completos', '✓ Score de saúde', '✓ Metas personalizadas', '✓ Resumo da nutricionista'].map(f => (
-                <span key={f} style={{
-                  fontSize: '12px', color: 'var(--text-2)',
-                  background: 'rgba(34,197,94,0.08)', padding: '3px 8px',
-                  borderRadius: '99px', border: '1px solid rgba(34,197,94,0.2)',
-                }}>{f}</span>
-              ))}
-            </div>
-
-            <button
-              onClick={() => handleCheckout('unlimited')}
-              disabled={!!loadingPlan}
-              style={{
-                width: '100%', padding: '13px', borderRadius: '12px',
-                background: loadingPlan ? 'var(--bg-3)' : 'linear-gradient(135deg, var(--accent), #059669)',
-                color: '#fff', border: 'none',
-                fontSize: '15px', fontWeight: 700,
-                cursor: loadingPlan ? 'not-allowed' : 'pointer',
-                opacity: loadingPlan && loadingPlan !== 'unlimited' ? 0.5 : 1,
-                transition: 'all 0.2s',
-              }}
-            >
-              {loadingPlan === 'unlimited' ? 'Redirecionando...' : 'Assinar Ilimitado'}
-            </button>
+            <h2 style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.4px', color: 'var(--text-1)', marginBottom: 6, lineHeight: 1.3 }}>
+              Nutrição + Treino com IA,<br />tudo no mesmo app
+            </h2>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.55 }}>
+              Análise de refeições, macros precisos, treinos personalizados e acompanhamento inteligente — do jeito que um nutricionista faria.
+            </p>
           </div>
 
-          {/* Limitado */}
-          <div style={{
-            border: '1.5px solid var(--border-strong)', borderRadius: '16px',
-            padding: '18px 20px', background: 'var(--bg-2)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>Limitado</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>20 análises por mês</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--text-1)', lineHeight: 1 }}>
-                  R$&nbsp;29<span style={{ fontSize: '18px' }}>,90</span>
+          {/* Tab switcher */}
+          <div style={{ display: 'flex', gap: 4, background: 'var(--bg-2)', borderRadius: 12, padding: 4, marginBottom: 18 }}>
+            {(['cards', 'compare'] as const).map(t => (
+              <button key={t} onClick={() => setTab(t)} style={{
+                flex: 1, padding: '8px', borderRadius: 9, border: 'none',
+                background: tab === t ? 'var(--bg)' : 'transparent',
+                color: tab === t ? 'var(--text-1)' : 'var(--text-2)',
+                fontWeight: tab === t ? 700 : 500, fontSize: 13,
+                cursor: 'pointer',
+                boxShadow: tab === t ? '0 1px 4px rgba(0,0,0,0.15)' : 'none',
+                transition: 'all 0.15s',
+              }}>
+                {t === 'cards' ? 'Planos' : 'Comparar tudo'}
+              </button>
+            ))}
+          </div>
+
+          {/* ── CARDS VIEW ── */}
+          {tab === 'cards' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+              {/* ILIMITADO — destaque */}
+              <div style={{
+                borderRadius: 20, padding: '2px',
+                background: `linear-gradient(135deg, ${accent}, #057A55, #8B5CF6)`,
+                position: 'relative',
+              }}>
+                <div style={{
+                  position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)',
+                  background: `linear-gradient(135deg, ${accent}, #057A55)`,
+                  color: '#fff', fontSize: 11, fontWeight: 800, letterSpacing: '0.8px',
+                  padding: '3px 14px', borderRadius: 99, whiteSpace: 'nowrap',
+                }}>
+                  ⭐ MELHOR ESCOLHA
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '2px' }}>/mês</div>
+                <div style={{ background: 'var(--bg)', borderRadius: 18, padding: '20px 18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', marginBottom: 3 }}>Ilimitado</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Tudo ilimitado, sem restrições</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1, fontFamily: "'DM Mono', monospace" }}>
+                        R$&nbsp;49<span style={{ fontSize: 18 }}>,90</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>/mês</div>
+                    </div>
+                  </div>
+
+                  {/* Feature highlights */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}>
+                    {[
+                      { icon: '📸', text: 'Análises de refeições ILIMITADAS' },
+                      { icon: '💪', text: 'Treino do Dia com IA — ilimitado' },
+                      { icon: '▶️', text: 'Player de treino com cronômetro' },
+                      { icon: '🩺', text: 'Resumo da nutricionista por IA' },
+                      { icon: '📊', text: 'Analytics avançado + relatório semanal' },
+                      { icon: '📅', text: 'Plano semanal personalizado' },
+                      { icon: '♾️', text: 'Histórico ilimitado de refeições' },
+                      { icon: '🎯', text: 'Metas nutricionais personalizadas' },
+                    ].map(f => (
+                      <div key={f.text} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 15, flexShrink: 0 }}>{f.icon}</span>
+                        <span style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 500 }}>{f.text}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => handleCheckout('unlimited')}
+                    disabled={!!loadingPlan}
+                    style={{
+                      width: '100%', padding: '14px', borderRadius: 13,
+                      background: loadingPlan ? 'var(--bg-3)' : `linear-gradient(135deg, ${accent}, #057A55)`,
+                      color: '#fff', border: 'none',
+                      fontSize: 15, fontWeight: 800, letterSpacing: '-0.2px',
+                      cursor: loadingPlan ? 'not-allowed' : 'pointer',
+                      opacity: loadingPlan && loadingPlan !== 'unlimited' ? 0.5 : 1,
+                      boxShadow: loadingPlan ? 'none' : '0 4px 20px rgba(13,159,110,0.35)',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {loadingPlan === 'unlimited' ? 'Redirecionando...' : 'Assinar Ilimitado — R$49,90/mês'}
+                  </button>
+                  <p style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'center', margin: '8px 0 0' }}>
+                    Cancele quando quiser · 7 dias grátis
+                  </p>
+                </div>
+              </div>
+
+              {/* LIMITADO */}
+              <div style={{
+                border: '1.5px solid var(--border-strong)', borderRadius: 18,
+                padding: '18px', background: 'var(--bg-2)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>Limitado</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Para quem está começando</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1, fontFamily: "'DM Mono', monospace" }}>
+                      R$&nbsp;29<span style={{ fontSize: 16 }}>,90</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>/mês</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                  {[
+                    '20 análises/mês',
+                    'Macros completos',
+                    'Score de saúde',
+                    'Metas personalizadas',
+                    'Analytics básico',
+                    'Histórico 30 dias',
+                    '5 Treinos IA/mês',
+                  ].map(f => (
+                    <span key={f} style={{
+                      fontSize: 11.5, color: 'var(--text-2)',
+                      background: 'var(--bg-3)', padding: '3px 9px',
+                      borderRadius: 99, border: '1px solid var(--border)',
+                    }}>✓ {f}</span>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => handleCheckout('limited')}
+                  disabled={!!loadingPlan}
+                  style={{
+                    width: '100%', padding: '12px', borderRadius: 12,
+                    background: 'var(--bg-3)', color: 'var(--text-1)',
+                    border: '1.5px solid var(--border-strong)',
+                    fontSize: 14, fontWeight: 600,
+                    cursor: loadingPlan ? 'not-allowed' : 'pointer',
+                    opacity: loadingPlan && loadingPlan !== 'limited' ? 0.5 : 1,
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {loadingPlan === 'limited' ? 'Redirecionando...' : 'Começar com Limitado'}
+                </button>
               </div>
             </div>
+          )}
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
-              {['✓ 20 análises/mês', '✓ Macros completos', '✓ Score de saúde', '✓ Metas personalizadas'].map(f => (
-                <span key={f} style={{
-                  fontSize: '12px', color: 'var(--text-2)',
-                  background: 'var(--bg-3)', padding: '3px 8px',
-                  borderRadius: '99px', border: '1px solid var(--border)',
-                }}>{f}</span>
+          {/* ── COMPARE VIEW ── */}
+          {tab === 'compare' && (
+            <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)' }}>
+              {/* Table header */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: '1fr 56px 72px 80px',
+                gap: 0, background: 'var(--bg-2)',
+                borderBottom: '1px solid var(--border)',
+              }}>
+                <div style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.4px' }}>FUNÇÃO</div>
+                {['Grátis', 'Limitado', 'Ilimitado'].map((h, i) => (
+                  <div key={h} style={{
+                    padding: '10px 4px', textAlign: 'center',
+                    fontSize: 10, fontWeight: 800, letterSpacing: '0.3px',
+                    color: i === 2 ? accent : 'var(--text-2)',
+                    borderLeft: '1px solid var(--border)',
+                  }}>{h}</div>
+                ))}
+              </div>
+
+              {FEATURES.map((row, idx) => (
+                <div
+                  key={row.label}
+                  style={{
+                    display: 'grid', gridTemplateColumns: '1fr 56px 72px 80px',
+                    borderBottom: idx < FEATURES.length - 1 ? '1px solid var(--border)' : 'none',
+                    background: row.highlight ? 'rgba(13,159,110,0.04)' : 'transparent',
+                  }}
+                >
+                  <div style={{ padding: '9px 12px', fontSize: 12, color: row.highlight ? 'var(--text-1)' : 'var(--text-2)', fontWeight: row.highlight ? 600 : 400, lineHeight: 1.35 }}>
+                    {row.label}
+                  </div>
+                  {(['free', 'limited', 'unlimited'] as const).map((plan, pi) => (
+                    <div key={plan} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '9px 4px', borderLeft: '1px solid var(--border)',
+                      background: pi === 2 ? 'rgba(13,159,110,0.05)' : 'transparent',
+                    }}>
+                      <FeatureCell val={row[plan]} isUnlimited={pi === 2} />
+                    </div>
+                  ))}
+                </div>
               ))}
-            </div>
 
-            <button
-              onClick={() => handleCheckout('limited')}
-              disabled={!!loadingPlan}
-              style={{
-                width: '100%', padding: '12px', borderRadius: '12px',
-                background: 'var(--bg-3)', color: 'var(--text-1)',
-                border: '1.5px solid var(--border-strong)',
-                fontSize: '15px', fontWeight: 600,
-                cursor: loadingPlan ? 'not-allowed' : 'pointer',
-                opacity: loadingPlan && loadingPlan !== 'limited' ? 0.5 : 1,
-                transition: 'all 0.2s',
-              }}
-            >
-              {loadingPlan === 'limited' ? 'Redirecionando...' : 'Começar com Limitado'}
-            </button>
+              {/* CTA row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 56px 72px 80px', background: 'var(--bg-2)', borderTop: '1px solid var(--border)' }}>
+                <div style={{ padding: '12px' }} />
+                <div style={{ padding: '8px 4px', borderLeft: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-3)', textAlign: 'center' }}>Atual</span>
+                </div>
+                <div style={{ padding: '8px 4px', borderLeft: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <button onClick={() => handleCheckout('limited')} disabled={!!loadingPlan} style={{
+                    fontSize: 10, fontWeight: 700, color: 'var(--text-1)',
+                    background: 'var(--bg-3)', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '5px 6px', cursor: 'pointer',
+                  }}>
+                    {loadingPlan === 'limited' ? '...' : 'R$29,90'}
+                  </button>
+                </div>
+                <div style={{ padding: '8px 4px', borderLeft: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <button onClick={() => handleCheckout('unlimited')} disabled={!!loadingPlan} style={{
+                    fontSize: 10, fontWeight: 800, color: '#fff',
+                    background: `linear-gradient(135deg, ${accent}, #057A55)`,
+                    border: 'none', borderRadius: 8, padding: '5px 6px', cursor: 'pointer',
+                  }}>
+                    {loadingPlan === 'unlimited' ? '...' : 'R$49,90'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Auth link */}
+          {onShowAuth && (
+            <div style={{ textAlign: 'center', marginTop: 18 }}>
+              <button
+                onClick={() => { onClose(); onShowAuth(); }}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-2)', fontSize: 13, fontWeight: 500,
+                  textDecoration: 'underline', textDecorationStyle: 'dotted',
+                }}
+              >
+                Já tenho conta → Fazer login
+              </button>
+            </div>
+          )}
+
+          {/* Footer trust */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 20 }}>
+            {[
+              { icon: '🔒', label: 'Pagamento seguro' },
+              { icon: '↩️', label: 'Cancele quando quiser' },
+              { icon: '🇧🇷', label: 'Stripe · Pix em breve' },
+            ].map(t => (
+              <div key={t.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <span style={{ fontSize: 16 }}>{t.icon}</span>
+                <span style={{ fontSize: 9.5, color: 'var(--text-3)', fontWeight: 500, textAlign: 'center' }}>{t.label}</span>
+              </div>
+            ))}
           </div>
         </div>
-
-        {onShowAuth && (
-          <div style={{ textAlign: 'center', marginBottom: '12px' }}>
-            <button
-              onClick={() => { onClose(); onShowAuth(); }}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--text-2)', fontSize: '13px', fontWeight: 500,
-                textDecoration: 'underline', textDecorationStyle: 'dotted',
-              }}
-            >
-              Já tenho conta → Fazer login
-            </button>
-          </div>
-        )}
-
-        {/* Footer */}
-        <p style={{
-          textAlign: 'center', fontSize: '12px', color: 'var(--text-2)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
-        }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
-          Pagamento seguro via Stripe · Cancele quando quiser
-        </p>
       </div>
     </div>
   );

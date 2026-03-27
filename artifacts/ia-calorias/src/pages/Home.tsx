@@ -657,11 +657,13 @@ export default function Home() {
                     <Crown size={18} color="#fff" />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>
-                      Desbloqueie análises ilimitadas
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '4px' }}>
+                      Desbloqueie o IA Calorias completo
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
-                      Metas personalizadas · Histórico completo · Alertas de nutricionista
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {['📸 Ilimitado', '💪 Treino IA', '📊 Analytics', '🩺 Nutricionista'].map(tag => (
+                        <span key={tag} style={{ fontSize: '10.5px', color: 'var(--text-2)', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: 99, padding: '1.5px 7px' }}>{tag}</span>
+                      ))}
                     </div>
                   </div>
                   <span style={{ fontSize: '13px', color: '#0D9F6E', fontWeight: 700, flexShrink: 0 }}>Ver planos →</span>
