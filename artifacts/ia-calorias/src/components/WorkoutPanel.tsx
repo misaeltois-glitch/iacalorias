@@ -22,7 +22,7 @@ interface WorkoutPanelProps {
   onNutritionTargets?: (targets: { calories: number; protein: number; carbs: number; fat: number; fiber: number; weight: number; height: number; age: number; sex: string; activityFactor: number }) => void;
 }
 
-type PanelView = 'loading' | 'questionnaire' | 'plan' | 'player' | 'quick-picker' | 'muscle-builder';
+type PanelView = 'loading' | 'questionnaire' | 'plan' | 'player' | 'quick-picker' | 'muscle-builder' | 'done';
 type MbPhase = 'groups' | 'exercises';
 
 const MB_MUSCLES: { label: string; muscle: MuscleGroup; emoji: string; desc: string }[] = [
@@ -108,6 +108,8 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
   const [restTimer, setRestTimer] = useState(0);
   const [isResting, setIsResting] = useState(false);
   const restRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const workoutStartRef = useRef<Date | null>(null);
+  const [completedSession, setCompletedSession] = useState<{ sessionName: string; durationMinutes: number; exerciseCount: number; estimatedBurn: number } | null>(null);
 
   // muscle-builder state
   const [mbPhase, setMbPhase] = useState<MbPhase>('groups');
@@ -238,6 +240,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
     setPlayerSetIdx(0);
     setIsResting(false);
     setRestTimer(0);
+    workoutStartRef.current = new Date();
     setView('player');
   };
 
@@ -261,6 +264,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
       setPlayerSetIdx(0);
       setIsResting(false);
       setRestTimer(0);
+      workoutStartRef.current = new Date();
       setView('player');
     } catch (e: any) {
       setQuickError(e.message ?? 'Tente novamente');
@@ -335,6 +339,49 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
     }, 1000);
   };
 
+  const handleWorkoutDone = async (session: WorkoutSession) => {
+    clearInterval(restRef.current!);
+    const endTime = new Date();
+    const startTime = workoutStartRef.current ?? endTime;
+    const durationMinutes = Math.max(1, Math.round((endTime.getTime() - startTime.getTime()) / 60000));
+    const weight = profile.weight ?? 75;
+    const goal = (profile.goal ?? 'hypertrophy') as WorkoutGoal;
+    const MET_MAP: Record<WorkoutGoal, number> = { hypertrophy: 5.0, strength: 4.5, fat_loss: 6.0, endurance: 6.5, wellness: 4.0 };
+    const estimatedBurn = Math.round((MET_MAP[goal] ?? 5.0) * weight * (durationMinutes / 60));
+
+    setCompletedSession({
+      sessionName: session.sessionName,
+      durationMinutes,
+      exerciseCount: session.exercises.length,
+      estimatedBurn,
+    });
+    setView('done');
+
+    try {
+      await fetch(`${BASE}api/workout/log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          sessionId,
+          sessionName: session.sessionName,
+          date: new Date().toISOString().slice(0, 10),
+          durationMinutes,
+          exercises: session.exercises.map(se => ({
+            name: se.exercise.name,
+            sets: se.sets,
+            reps: se.reps,
+            muscle: se.exercise.primaryMuscle,
+          })),
+        }),
+      });
+    } catch {}
+
+    fetch(`${BASE}api/goals/daily-summary?sessionId=${sessionId}`, { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.totals) setTodayCalories({ consumed: Math.round(data.totals.calories ?? 0) }); })
+      .catch(() => null);
+  };
+
   const handleCompleteSet = (session: WorkoutSession) => {
     const ex = session.exercises[playerExIdx];
     if (playerSetIdx < ex.sets - 1) {
@@ -345,8 +392,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
       setPlayerSetIdx(0);
       startRest(ex.restSeconds);
     } else {
-      setView('plan');
-      clearInterval(restRef.current!);
+      handleWorkoutDone(session);
     }
   };
 
@@ -1328,6 +1374,87 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
           onClose={() => { clearInterval(restRef.current!); setView('plan'); }}
           goal={profile.goal as WorkoutGoal}
         />
+      )}
+
+      {/* ── DONE ── */}
+      {view === 'done' && completedSession && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+          <div style={{ background: 'linear-gradient(135deg, #0D9F6E 0%, #057A55 100%)', padding: '40px 24px 32px', textAlign: 'center' }}>
+            <div style={{ fontSize: '56px', marginBottom: '12px' }}>🏆</div>
+            <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#fff', margin: '0 0 6px', letterSpacing: '-0.4px' }}>Treino Concluído!</h2>
+            <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.85)', margin: 0 }}>{completedSession.sessionName}</p>
+          </div>
+
+          <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+              {[
+                { icon: '⏱', label: 'Duração', value: `${completedSession.durationMinutes} min` },
+                { icon: '💪', label: 'Exercícios', value: `${completedSession.exerciseCount}` },
+                { icon: '🔥', label: 'Queima est.', value: `${completedSession.estimatedBurn} kcal` },
+              ].map(({ icon, label, value }) => (
+                <div key={label} style={{ padding: '14px 10px', borderRadius: '16px', background: 'var(--bg-2)', border: '1px solid var(--border)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '22px', marginBottom: '4px' }}>{icon}</div>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '15px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>{value}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ padding: '16px', borderRadius: '16px', background: 'rgba(13,159,110,0.08)', border: '1px solid rgba(13,159,110,0.2)' }}>
+              <p style={{ fontSize: '13px', color: 'var(--text-2)', margin: 0, lineHeight: 1.6 }}>
+                💡 <strong style={{ color: 'var(--text-1)' }}>Recuperação nutricional:</strong> Consuma proteína e carboidratos na janela pós-treino (até 45 min) para maximizar a síntese muscular.
+              </p>
+            </div>
+
+            {todayCalories !== null && (
+              <div style={{ padding: '14px 16px', borderRadius: '16px', background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-3)', marginBottom: '6px', fontWeight: 600 }}>Saldo calórico de hoje</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-2)' }}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: '#EF4444' }}>{todayCalories.consumed.toLocaleString('pt-BR')}</span> kcal consumidas
+                  </div>
+                  <span style={{ fontSize: '12px', color: 'var(--text-3)' }}>−</span>
+                  <div style={{ fontSize: '13px', color: 'var(--text-2)' }}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: '#0D9F6E' }}>{completedSession.estimatedBurn.toLocaleString('pt-BR')}</span> kcal queimadas
+                  </div>
+                </div>
+                <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center' }}>
+                  <span style={{
+                    fontFamily: "'DM Mono', monospace", fontSize: '16px', fontWeight: 800,
+                    color: (todayCalories.consumed - completedSession.estimatedBurn) < 0 ? '#0D9F6E' : '#F59E0B',
+                  }}>
+                    {todayCalories.consumed - completedSession.estimatedBurn > 0 ? '+' : ''}
+                    {(todayCalories.consumed - completedSession.estimatedBurn).toLocaleString('pt-BR')} kcal líquidas
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => { setCompletedSession(null); setView('plan'); }}
+              style={{
+                width: '100%', padding: '15px', borderRadius: '14px',
+                background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+                color: '#fff', border: 'none', fontSize: '15px', fontWeight: 700,
+                cursor: 'pointer', marginTop: '4px',
+              }}
+            >
+              Ver meu plano de treino →
+            </button>
+
+            <button
+              onClick={onClose}
+              style={{
+                width: '100%', padding: '13px', borderRadius: '14px',
+                background: 'var(--bg-2)', border: '1px solid var(--border)',
+                color: 'var(--text-2)', fontSize: '14px', fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

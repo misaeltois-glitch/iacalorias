@@ -19,7 +19,7 @@ export const goalsTable = pgTable("goals", {
   age: integer("age"),
   sex: text("sex"),
   objective: text("objective"),
-  activityLevel: integer("activity_level"),
+  activityLevel: real("activity_level"),
   restrictions: text("restrictions"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

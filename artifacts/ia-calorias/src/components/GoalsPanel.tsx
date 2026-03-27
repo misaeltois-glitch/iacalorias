@@ -247,6 +247,7 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
   const mpdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [fromWorkout, setFromWorkout] = useState(false);
 
   const hasAnyGoal = !!(goals.calories || goals.protein || goals.carbs || goals.fat || goals.fiber);
 
@@ -269,8 +270,10 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
           setMealsPerDayLocal(String(g.mealsPerDay));
           const anySet = !!(g.calories || g.protein || g.carbs || g.fat || g.fiber);
           setIsEditing(!anySet);
+          setFromWorkout(!!(data.activityLevel && data.objective));
         } else {
           setIsEditing(true);
+          setFromWorkout(false);
         }
       })
       .finally(() => setLoading(false));
@@ -342,11 +345,21 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
           flexShrink: 0,
         }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
               <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
                 {isEditing ? 'Configurar metas' : 'Minhas metas'}
               </h2>
-              {!isEditing && hasAnyGoal && (
+              {!isEditing && hasAnyGoal && fromWorkout && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  padding: '2px 8px', borderRadius: '99px',
+                  background: 'rgba(13,159,110,0.12)', border: '1px solid rgba(13,159,110,0.3)',
+                }}>
+                  <span style={{ fontSize: '10px' }}>💪</span>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#0D9F6E' }}>GERADO PELO TREINO</span>
+                </div>
+              )}
+              {!isEditing && hasAnyGoal && !fromWorkout && (
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: '4px',
                   padding: '2px 8px', borderRadius: '99px',
@@ -360,7 +373,9 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
             <p style={{ fontSize: '13px', color: 'var(--text-2)', margin: 0 }}>
               {isEditing
                 ? 'Edite um valor e saia do campo para salvar automaticamente'
-                : 'Suas metas nutricionais diárias'}
+                : fromWorkout
+                  ? 'Metas calculadas com base no seu plano de treino'
+                  : 'Suas metas nutricionais diárias'}
             </p>
           </div>
           <button
