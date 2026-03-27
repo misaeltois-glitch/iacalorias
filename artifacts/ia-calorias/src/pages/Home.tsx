@@ -124,7 +124,6 @@ export default function Home() {
   const [celebration, setCelebration] = useState<{ show: boolean; type: 'calories' | 'meals' }>({ show: false, type: 'calories' });
   const celebrationQueue = useRef<Array<'calories' | 'meals'>>([]);
   const celebrationInflight = useRef<Set<'calories' | 'meals'>>(new Set());
-  const [dismissedOverrun, setDismissedOverrun] = useState(false);
 
   const [savedGoals, setSavedGoals] = useState<any>(null);
   const [dailySummary, setDailySummary] = useState<any>(null);
@@ -227,9 +226,6 @@ export default function Home() {
     }
   }, [dailySummary, isPremium, showNextCelebration, celebration.show]);
 
-  useEffect(() => {
-    setDismissedOverrun(false);
-  }, [dailySummary?.totals?.calories]);
 
   useEffect(() => {
     if (subStatus?.tier === 'free' && prevTrialRemaining.current !== null) {
@@ -733,8 +729,8 @@ export default function Home() {
                 </button>
               )}
 
-              {/* Calorie overrun banner */}
-              {calorieOverrunKcal > 0 && !dismissedOverrun && (
+              {/* Calorie overrun banner — stays visible while calories > goal */}
+              {calorieOverrunKcal > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -755,12 +751,6 @@ export default function Home() {
                       Prefira vegetais, proteínas magras e bastante água nas próximas refeições.
                     </div>
                   </div>
-                  <button
-                    onClick={() => setDismissedOverrun(true)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '4px', flexShrink: 0, fontSize: '16px', lineHeight: 1 }}
-                  >
-                    ×
-                  </button>
                 </motion.div>
               )}
 
