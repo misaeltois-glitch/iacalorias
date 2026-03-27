@@ -33,8 +33,8 @@ interface DailyProgressProps {
 }
 
 function MacroRingComponent({ label, emoji, current, goal, unit, color, trackColor }: MacroRing) {
-  const size = 80;
-  const strokeWidth = 7;
+  const size = 58;
+  const strokeWidth = 5;
   const r = (size - strokeWidth) / 2;
   const circ = 2 * Math.PI * r;
   const pct = goal > 0 ? Math.min(1, current / goal) : 0;
@@ -42,7 +42,7 @@ function MacroRingComponent({ label, emoji, current, goal, unit, color, trackCol
   const isOver = goal > 0 && current > goal * 1.1;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0 }}>
       <div style={{ position: 'relative', width: size, height: size }}>
         <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
           <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={trackColor} strokeWidth={strokeWidth} />
@@ -60,15 +60,15 @@ function MacroRingComponent({ label, emoji, current, goal, unit, color, trackCol
           position: 'absolute', inset: 0, display: 'flex',
           flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         }}>
-          <span style={{ fontSize: '9px' }}>{emoji}</span>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: isOver ? '#ef4444' : color, lineHeight: 1 }}>
+          <span style={{ fontSize: '8px', lineHeight: 1 }}>{emoji}</span>
+          <span style={{ fontSize: '10px', fontWeight: 700, color: isOver ? '#ef4444' : color, lineHeight: 1.1 }}>
             {Math.round(current)}
           </span>
         </div>
       </div>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-2)' }}>{label}</div>
-        <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>/ {goal}{unit}</div>
+      <div style={{ textAlign: 'center', width: '100%' }}>
+        <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+        <div style={{ fontSize: '9px', color: 'var(--text-3)' }}>/{goal}{unit}</div>
       </div>
     </div>
   );
@@ -170,11 +170,11 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
 
       {/* Macro rings */}
       <div style={{
-        padding: '20px', borderRadius: '20px', background: 'var(--bg-2)',
+        padding: '16px 12px', borderRadius: '20px', background: 'var(--bg-2)',
         border: '1.5px solid var(--border)',
       }}>
         {goals ? (
-          <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '2px' }}>
             {macros.map(m => <MacroRingComponent key={m.label} {...m} />)}
           </div>
         ) : (
