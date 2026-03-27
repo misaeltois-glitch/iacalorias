@@ -1,7 +1,9 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, subscriptionsTable, analysesTable, goalsTable } from "@workspace/db";
-import { eq, gte, and, lt } from "drizzle-orm";
+import { eq, gte, and, lt, or, inArray, isNull } from "drizzle-orm";
 import OpenAI from "openai";
+
+const DEV_EMAILS = new Set(["dev@iacalorias.com.br"]);
 
 const router: IRouter = Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -152,42 +154,68 @@ router.patch("/", async (req: Request, res: Response) => {
 router.get("/daily-summary", async (req: Request, res: Response) => {
   const sessionId = req.query.sessionId as string;
   const userId = req.user?.userId;
+  const userEmail = req.user?.email;
   const period = (req.query.period as string) ?? "day";
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
-  const tier = await resolveSubTier(userId, sessionId);
-  if (tier === "free") {
-    res.status(403).json({ error: "plan_required", message: "Resumo disponível apenas em planos pagos.", requiresUpgrade: true });
-    return;
+  // Dev account bypass
+  const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
+
+  if (!isDevAccount) {
+    const tier = await resolveSubTier(userId, sessionId);
+    if (tier === "free") {
+      res.status(403).json({ error: "plan_required", message: "Resumo disponível apenas em planos pagos.", requiresUpgrade: true });
+      return;
+    }
   }
 
   const goals = await findGoals(userId, sessionId);
 
   const now = new Date();
   let periodStart: Date;
-  let periodEnd: Date = new Date(now);
+  let periodEnd: Date;
 
   if (period === "week") {
-    const dow = now.getDay();
-    periodStart = new Date(now);
-    periodStart.setDate(now.getDate() - dow);
-    periodStart.setHours(0, 0, 0, 0);
-    periodEnd.setHours(23, 59, 59, 999);
+    // ISO week: Monday–Sunday in UTC
+    const day = now.getUTCDay(); // 0=Sun
+    const daysFromMon = (day + 6) % 7;
+    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysFromMon, 0, 0, 0, 0));
+    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + (6 - daysFromMon) + 1, 0, 0, 0, 0));
   } else if (period === "month") {
-    periodStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    periodEnd.setHours(23, 59, 59, 999);
+    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
   } else {
-    periodStart = new Date(now);
-    periodStart.setHours(0, 0, 0, 0);
-    periodEnd.setHours(23, 59, 59, 999);
+    // day: UTC midnight to next midnight (covers full UTC day)
+    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0));
+  }
+
+  // Collect all session IDs linked to this userId (to find analyses from before login)
+  let linkedSessionIds: string[] = [];
+  if (userId) {
+    const linkedSubs = await db.query.subscriptionsTable.findMany({
+      where: eq(subscriptionsTable.userId, userId),
+    });
+    linkedSessionIds = linkedSubs.map(s => s.sessionId).filter(Boolean);
+  }
+  if (sessionId && !linkedSessionIds.includes(sessionId)) {
+    linkedSessionIds.push(sessionId);
   }
 
   let periodAnalyses;
   if (userId) {
+    // Query by userId OR any session linked to this user (catches pre-login analyses)
+    const whereConditions = linkedSessionIds.length > 0
+      ? or(
+          eq(analysesTable.userId, userId),
+          and(inArray(analysesTable.sessionId, linkedSessionIds), isNull(analysesTable.userId)),
+        )
+      : eq(analysesTable.userId, userId);
+
     periodAnalyses = await db.query.analysesTable.findMany({
       where: and(
-        eq(analysesTable.userId, userId),
+        whereConditions,
         gte(analysesTable.createdAt, periodStart),
         lt(analysesTable.createdAt, periodEnd),
       ),

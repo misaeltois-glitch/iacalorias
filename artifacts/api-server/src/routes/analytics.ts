@@ -1,8 +1,10 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, subscriptionsTable, analysesTable, goalsTable } from "@workspace/db";
-import { eq, and, gte, lt, desc } from "drizzle-orm";
+import { eq, and, gte, lt, desc, or, inArray, isNull } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+const DEV_EMAILS = new Set(["dev@iacalorias.com.br"]);
 
 async function resolveSubTier(userId?: string, sessionId?: string): Promise<"free" | "limited" | "unlimited"> {
   if (userId) {
@@ -42,6 +44,7 @@ function toLocalDateStr(date: Date, tzOffset = 0): string {
 router.get("/summary", async (req: Request, res: Response) => {
   const sessionId = req.query.sessionId as string | undefined;
   const userId = req.user?.userId;
+  const userEmail = req.user?.email;
   const rawPeriod = (req.query.period as string) ?? "week";
   const period: "day" | "week" | "month" = rawPeriod === "month" ? "month" : rawPeriod === "day" ? "day" : "week";
   const dateParam = req.query.date as string | undefined;
@@ -51,7 +54,9 @@ router.get("/summary", async (req: Request, res: Response) => {
     return;
   }
 
-  const tier = await resolveSubTier(userId, sessionId);
+  // Dev account bypass
+  const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
+  const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
   const isPremium = tier !== "free";
 
   const goals = await findGoals(userId, sessionId);
@@ -63,38 +68,52 @@ router.get("/summary", async (req: Request, res: Response) => {
 
   if (period === "day") {
     periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0));
     daysInPeriod = 1;
   } else if (period === "month") {
     periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
-    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
     daysInPeriod = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 0).getDate();
   } else {
     // ISO week: Monday–Sunday
     const day = now.getUTCDay(); // 0=Sun
     const daysFromMon = (day + 6) % 7;
-    periodStart = new Date(now);
-    periodStart.setUTCDate(now.getUTCDate() - daysFromMon);
-    periodStart.setUTCHours(0, 0, 0, 0);
-    periodEnd = new Date(periodStart);
-    periodEnd.setUTCDate(periodStart.getUTCDate() + 6);
-    periodEnd.setUTCHours(23, 59, 59, 999);
+    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysFromMon, 0, 0, 0, 0));
+    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + (6 - daysFromMon) + 1, 0, 0, 0, 0));
     daysInPeriod = 7;
   }
 
   // For free users: only last 7 days, limited to 10 meals
   const effectiveStart = isPremium ? periodStart : (() => {
-    const s = new Date(now);
-    s.setUTCDate(now.getUTCDate() - 6);
-    s.setUTCHours(0, 0, 0, 0);
+    const s = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 6, 0, 0, 0, 0));
     return s;
   })();
 
+  // Collect all session IDs linked to this userId (to find analyses from before login)
+  let linkedSessionIds: string[] = [];
+  if (userId) {
+    const linkedSubs = await db.query.subscriptionsTable.findMany({
+      where: eq(subscriptionsTable.userId, userId),
+    });
+    linkedSessionIds = linkedSubs.map(s => s.sessionId).filter(Boolean);
+  }
+  if (sessionId && !linkedSessionIds.includes(sessionId)) {
+    linkedSessionIds.push(sessionId);
+  }
+
   let analyses;
   if (userId) {
+    // Query by userId OR any session linked to this user (catches pre-login analyses)
+    const whereConditions = linkedSessionIds.length > 0
+      ? or(
+          eq(analysesTable.userId, userId),
+          and(inArray(analysesTable.sessionId, linkedSessionIds), isNull(analysesTable.userId)),
+        )
+      : eq(analysesTable.userId, userId);
+
     analyses = await db.query.analysesTable.findMany({
       where: and(
-        eq(analysesTable.userId, userId),
+        whereConditions,
         gte(analysesTable.createdAt, effectiveStart),
         lt(analysesTable.createdAt, periodEnd),
       ),

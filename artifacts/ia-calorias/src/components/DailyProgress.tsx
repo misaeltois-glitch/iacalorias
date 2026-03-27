@@ -179,7 +179,7 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
         ) : (
           <div style={{ textAlign: 'center', padding: '12px 0' }}>
             <p style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '12px' }}>
-              Você registrou <strong style={{ color: 'var(--text-1)' }}>{analysesCount} refeição{analysesCount !== 1 ? 'ões' : ''}</strong>. Configure metas para ver o progresso.
+              Você registrou <strong style={{ color: 'var(--text-1)' }}>{analysesCount} {analysesCount === 1 ? 'refeição' : 'refeições'}</strong>. Configure metas para ver o progresso.
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap' }}>
               {[
