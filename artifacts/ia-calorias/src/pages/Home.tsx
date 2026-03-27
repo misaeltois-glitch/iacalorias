@@ -18,6 +18,7 @@ import { SplashScreen } from '@/components/SplashScreen';
 import { OnboardingCarousel } from '@/components/OnboardingCarousel';
 import { BottomNav, type BottomNavTab } from '@/components/BottomNav';
 import { WorkoutPanel } from '@/components/WorkoutPanel';
+import { ProgressView } from '@/components/ProgressView';
 import { AppTour } from '@/components/AppTour';
 import { useTour } from '@/hooks/use-tour';
 import { GoalCelebration, hasCelebratedToday, markCelebratedToday } from '@/components/GoalCelebration';
@@ -372,7 +373,6 @@ export default function Home() {
     if (tab === 'home') { setCurrentResult(null); }
     if (tab === 'workout') { setShowWorkout(true); }
     if (tab === 'analyze') { setCurrentResult(null); }
-    if (tab === 'analytics') { setShowAnalytics(true); }
     if (tab === 'profile') { isAuthenticated ? setShowUserMenu(v => !v) : setShowAuth(true); }
   };
 
@@ -603,7 +603,43 @@ export default function Home() {
       }}>
 
         <AnimatePresence mode="wait">
-          {!currentResult ? (
+
+          {/* ─── Aba Progresso ─── */}
+          {activeTab === 'analytics' ? (
+            <motion.div
+              key="progress-tab"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              style={{ width: '100%', paddingTop: '4px' }}
+            >
+              {/* Title row */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div>
+                  <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-0.3px', margin: 0 }}>
+                    Progresso
+                  </h1>
+                  <p style={{ fontSize: '12px', color: 'var(--text-3)', margin: 0, marginTop: '2px' }}>
+                    Seu histórico nutricional
+                  </p>
+                </div>
+                {isPremium && (
+                  <button
+                    onClick={() => setShowGoalsPanel(true)}
+                    style={{ padding: '8px 14px', borderRadius: '10px', background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Settings size={13} /> Metas
+                  </button>
+                )}
+              </div>
+              <ProgressView
+                sessionId={sessionId}
+                isPremium={isPremium}
+                onUpgrade={() => { setPaywallDisableClose(false); setShowPaywall(true); }}
+                onSetGoals={() => setShowGoalsPanel(true)}
+              />
+            </motion.div>
+          ) : !currentResult ? (
             <motion.div
               key="hero"
               initial={{ opacity: 0, y: 16 }}
