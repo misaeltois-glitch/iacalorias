@@ -22,8 +22,8 @@ pnpm workspace monorepo using TypeScript. This is **IA Calorias** — an AI-powe
 ## Application Features
 
 - **Smart Alerts**: Server-side nutrition alerts (tip/warning/ok) for protein, fiber, carbs, fat, calories, meals — shown in DailyProgress component. Detects late-night protein gaps, early-day calorie overruns, empty meal days, etc.
-- **Goal Celebration**: `GoalCelebration` component with CSS confetti animation triggered when user hits 90%+ of calorie goal, 95%+ of protein goal, or full meal count. Fires once per day per goal type (localStorage guard). Located at `artifacts/ia-calorias/src/components/GoalCelebration.tsx`
-- **Calorie Overrun Banner**: Dismissable red banner in home hero when calories exceed goal by >50kcal. Resets on new analyses.
+- **Goal Celebration**: `GoalCelebration` component with CSS confetti animation triggered when `totals.calories >= rawGoals.calories` (100%) OR `totals.meals >= rawGoals.mealsPerDay`. Supports back-to-back dual celebrations via a queue. Fires once per day per goal type (localStorage guard: `ia-calorias-celebration-{type}-{YYYY-MM-DD}`). Auto-closes at 4000ms. Located at `artifacts/ia-calorias/src/components/GoalCelebration.tsx`
+- **Calorie Overrun Banner**: Dismissable inline banner in home when `totals.calories > rawGoals.calories` (any positive overrun). Resets automatically when calorie total changes.
 - **Workout History in Analytics**: `AnalyticsPanel` fetches `GET /api/workout/logs` and shows last 8 sessions with date, exercise count, and duration badge.
 - **Chart Legend Enhancement**: StackedCaloriesChart in `AnalyticsPanel` now shows dashed reference line entry in legend ("Meta diária")
 - **Free Trial**: 3 free analyses per session (stored by sessionId in localStorage + IndexedDB + Cookie — multi-layer anti-bypass)
