@@ -20,6 +20,7 @@ import { BottomNav, type BottomNavTab } from '@/components/BottomNav';
 import { WorkoutPanel } from '@/components/WorkoutPanel';
 import { AppTour } from '@/components/AppTour';
 import { useTour } from '@/hooks/use-tour';
+import { GoalCelebration, hasCelebratedToday, markCelebratedToday } from '@/components/GoalCelebration';
 
 import {
   useAnalyzeFood,
@@ -120,6 +121,8 @@ export default function Home() {
 
   const [showSplash, setShowSplash] = useState(false);
   const [showCarousel, setShowCarousel] = useState(false);
+  const [celebration, setCelebration] = useState<{ show: boolean; type: 'calories' | 'meals' | 'protein' }>({ show: false, type: 'calories' });
+  const [dismissedOverrun, setDismissedOverrun] = useState(false);
 
   const [savedGoals, setSavedGoals] = useState<any>(null);
   const [dailySummary, setDailySummary] = useState<any>(null);
@@ -173,6 +176,26 @@ export default function Home() {
       maybeStartTour(1200);
     }
   }, []);
+
+  useEffect(() => {
+    if (!dailySummary || !dailySummary.rawGoals || dailySummary.period !== 'day' || !isPremium) return;
+    const { rawGoals, totals } = dailySummary;
+
+    if (rawGoals.calories && totals.calories >= rawGoals.calories * 0.9 && !hasCelebratedToday('calories')) {
+      markCelebratedToday('calories');
+      setTimeout(() => setCelebration({ show: true, type: 'calories' }), 600);
+    } else if (rawGoals.protein && totals.protein >= rawGoals.protein * 0.95 && !hasCelebratedToday('protein')) {
+      markCelebratedToday('protein');
+      setTimeout(() => setCelebration({ show: true, type: 'protein' }), 600);
+    } else if (rawGoals.mealsPerDay && totals.meals >= rawGoals.mealsPerDay && !hasCelebratedToday('meals')) {
+      markCelebratedToday('meals');
+      setTimeout(() => setCelebration({ show: true, type: 'meals' }), 600);
+    }
+  }, [dailySummary, isPremium]);
+
+  useEffect(() => {
+    setDismissedOverrun(false);
+  }, [dailySummary?.totals?.calories]);
 
   useEffect(() => {
     if (subStatus?.tier === 'free' && prevTrialRemaining.current !== null) {
@@ -353,6 +376,12 @@ export default function Home() {
 
   const greeting = getHourGreeting();
   const displayName = user?.email?.split('@')[0] ?? null;
+
+  const calorieOverrunKcal = (() => {
+    if (!dailySummary || !dailySummary.rawGoals?.calories || period !== 'day' || !isPremium) return 0;
+    const over = Math.round(dailySummary.totals.calories - dailySummary.rawGoals.calories);
+    return over > 50 ? over : 0;
+  })();
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -670,6 +699,37 @@ export default function Home() {
                 </button>
               )}
 
+              {/* Calorie overrun banner */}
+              {calorieOverrunKcal > 0 && !dismissedOverrun && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '12px 14px', borderRadius: '14px',
+                    background: 'rgba(239,68,68,0.08)',
+                    border: '1px solid rgba(239,68,68,0.25)',
+                  }}
+                >
+                  <span style={{ fontSize: '20px', flexShrink: 0 }}>⚠️</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444', marginBottom: '2px' }}>
+                      +{calorieOverrunKcal} kcal acima da meta
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                      Prefira vegetais, proteínas magras e bastante água nas próximas refeições.
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDismissedOverrun(true)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '4px', flexShrink: 0, fontSize: '16px', lineHeight: 1 }}
+                  >
+                    ×
+                  </button>
+                </motion.div>
+              )}
+
               {/* Daily progress */}
               {goalsLoaded && (
                 <div data-tour="daily-progress">
@@ -843,6 +903,12 @@ export default function Home() {
       />
 
       {showTour && <AppTour onDone={endTour} />}
+
+      <GoalCelebration
+        show={celebration.show}
+        goalType={celebration.type}
+        onClose={() => setCelebration(c => ({ ...c, show: false }))}
+      />
 
       <style>{`
         @keyframes ping {

@@ -228,23 +228,46 @@ router.get("/daily-summary", async (req: Request, res: Response) => {
   const alerts: { type: "tip" | "warning" | "ok"; macro: string; message: string }[] = [];
   if (goals && period === "day") {
     const hour = now.getHours();
+
     if (goals.protein && totals.meals > 0) {
       const remaining = goals.protein - totals.protein;
-      if (remaining > 20 && hour >= 20) {
-        alerts.push({ type: "tip", macro: "protein", message: `Você ainda tem espaço para ~${Math.round(remaining)}g de proteína hoje. Que tal iogurte grego ou ovos no jantar?` });
+      if (remaining > 20 && hour >= 19) {
+        alerts.push({ type: "tip", macro: "protein", message: `Faltam ~${Math.round(remaining)}g de proteína para fechar o dia. Iogurte grego, ovos ou cottage são ótimas pedidas!` });
       }
     }
+
     if (goals.fiber && totals.fiber < goals.fiber * 0.5 && hour >= 18) {
-      alerts.push({ type: "tip", macro: "fiber", message: `Fibras abaixo da meta hoje (${Math.round(totals.fiber)}g de ${goals.fiber}g). Adicione leguminosas ou frutas.` });
+      alerts.push({ type: "tip", macro: "fiber", message: `Fibras abaixo da meta (${Math.round(totals.fiber)}g de ${goals.fiber}g). Adicione leguminosas, verduras ou frutas na próxima refeição.` });
     }
+
     if (goals.carbs && totals.carbs > goals.carbs * 1.3) {
-      alerts.push({ type: "warning", macro: "carbs", message: `Carboidratos ultrapassaram 30% acima da meta. Prefira integrais nas próximas refeições.` });
+      alerts.push({ type: "warning", macro: "carbs", message: `Carboidratos 30% acima da meta. Para as próximas refeições, prefira vegetais, proteínas e grãos integrais.` });
     }
+
+    if (goals.fat && totals.fat > goals.fat * 1.4) {
+      alerts.push({ type: "warning", macro: "fat", message: `Gorduras bem acima da meta (${Math.round(totals.fat)}g de ${goals.fat}g). Atenção com frituras, embutidos e molhos cremosos.` });
+    }
+
     if (goals.calories && totals.calories > goals.calories * 1.3) {
-      alerts.push({ type: "warning", macro: "calories", message: `Calorias 30% acima da meta diária. Opte por alimentos de alto volume e baixa caloria.` });
+      alerts.push({ type: "warning", macro: "calories", message: `Calorias 30% acima da meta diária. Opte por alimentos de alto volume e baixa caloria nas próximas refeições.` });
+    } else if (goals.calories && totals.calories > goals.calories * 1.1 && hour < 18) {
+      alerts.push({ type: "warning", macro: "calories", message: `Já ultrapassou a meta calórica e ainda é cedo. Prefira refeições leves e água para o restante do dia.` });
     }
+
+    if (goals.calories && totals.calories >= goals.calories * 0.85 && totals.calories <= goals.calories * 1.05) {
+      alerts.push({ type: "ok", macro: "calories", message: `Calorias bem calibradas hoje! Você está dentro da zona ideal da meta.` });
+    }
+
     if (totals.protein > 0 && goals.protein && totals.protein >= goals.protein * 0.9) {
-      alerts.push({ type: "ok", macro: "protein", message: `Ótimo com a proteína hoje! Chegando perto da meta de ${goals.protein}g.` });
+      alerts.push({ type: "ok", macro: "protein", message: `Excelente ingestão de proteína hoje! Perto da meta de ${goals.protein}g — ótimo para recuperação muscular.` });
+    }
+
+    if (goals.calories && totals.calories < goals.calories * 0.4 && hour >= 20 && totals.meals > 0) {
+      alerts.push({ type: "tip", macro: "calories", message: `Consumiu bem menos calorias que o necessário hoje. Um lanche leve antes de dormir pode ajudar a preservar a massa muscular.` });
+    }
+
+    if (totals.meals === 0 && hour >= 13) {
+      alerts.push({ type: "tip", macro: "meals", message: `Nenhuma refeição registrada ainda. Lembre-se de registrar o que você come para acompanhar sua nutrição!` });
     }
   }
 

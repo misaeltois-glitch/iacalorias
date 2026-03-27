@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, TrendingUp, CalendarDays, Trophy, Lock, Flame } from 'lucide-react';
+import { X, TrendingUp, CalendarDays, Trophy, Lock, Flame, Dumbbell } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell,
   type TooltipProps,
@@ -55,6 +55,16 @@ interface AnalyticsSummary {
   pagination: Pagination;
   isPremium: boolean;
   requiresUpgrade: boolean;
+}
+
+interface WorkoutLog {
+  id: string;
+  sessionName: string;
+  date: string;
+  durationMinutes: number | null;
+  exercises: { name: string; sets?: number; reps?: number }[];
+  notes: string | null;
+  createdAt: string;
 }
 
 interface AnalyticsPanelProps {
@@ -250,6 +260,13 @@ function StackedCaloriesChart({ days, period, goalCalories }: {
               <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#ef4444' }} />
               <span style={{ fontSize: '10px', color: 'var(--text-3)' }}>Acima da meta</span>
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{
+                width: '14px', height: '2px',
+                background: 'repeating-linear-gradient(to right, #6366f1 0px, #6366f1 4px, transparent 4px, transparent 7px)',
+              }} />
+              <span style={{ fontSize: '10px', color: 'var(--text-3)' }}>Meta diária</span>
+            </div>
           </>
         )}
       </div>
@@ -262,6 +279,8 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
   const [data, setData] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
+  const [workoutsLoading, setWorkoutsLoading] = useState(false);
 
   const fetchData = useCallback(async (p: Period, page = 1) => {
     if (!sessionId) return;
@@ -291,9 +310,28 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
     }
   }, [sessionId]);
 
+  const fetchWorkoutLogs = useCallback(async () => {
+    if (!sessionId || !isPremium) return;
+    setWorkoutsLoading(true);
+    try {
+      const r = await fetch(`${BASE}api/workout/logs?sessionId=${sessionId}`, { headers: authHeaders() });
+      if (r.ok) {
+        const logs: WorkoutLog[] = await r.json();
+        setWorkoutLogs(logs.slice(0, 8));
+      }
+    } catch {
+      // silent
+    } finally {
+      setWorkoutsLoading(false);
+    }
+  }, [sessionId, isPremium]);
+
   useEffect(() => {
-    if (isOpen) fetchData(period, 1);
-  }, [isOpen, period, fetchData]);
+    if (isOpen) {
+      fetchData(period, 1);
+      fetchWorkoutLogs();
+    }
+  }, [isOpen, period, fetchData, fetchWorkoutLogs]);
 
   const handlePeriod = (p: Period) => {
     setPeriod(p);
@@ -527,6 +565,75 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Workout History */}
+                  {(workoutsLoading || workoutLogs.length > 0) && (
+                    <div style={{
+                      background: 'var(--bg-2)',
+                      borderRadius: '16px', border: '1.5px solid var(--border)',
+                      padding: '16px',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                        <Dumbbell style={{ width: '14px', height: '14px', color: '#8B5CF6' }} />
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)' }}>
+                          Treinos recentes
+                        </span>
+                        {workoutLogs.length > 0 && (
+                          <span style={{
+                            fontSize: '10px', fontWeight: 600,
+                            padding: '2px 7px', borderRadius: '99px',
+                            background: 'rgba(139,92,246,0.12)', color: '#8B5CF6',
+                          }}>
+                            {workoutLogs.length}
+                          </span>
+                        )}
+                      </div>
+                      {workoutsLoading ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <SkeletonBlock h={52} />
+                          <SkeletonBlock h={52} />
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {workoutLogs.map(log => {
+                            const d = new Date(log.date + 'T12:00:00');
+                            const dateStr = `${d.getDate().toString().padStart(2, '0')}/${MONTH_PT[d.getMonth()]}`;
+                            const exCount = Array.isArray(log.exercises) ? log.exercises.length : 0;
+                            return (
+                              <div key={log.id} style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                padding: '10px 12px', borderRadius: '10px',
+                                background: 'var(--bg-3)',
+                              }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{
+                                    fontSize: '13px', fontWeight: 600, color: 'var(--text-1)',
+                                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                  }}>
+                                    {log.sessionName}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
+                                    {dateStr}
+                                    {exCount > 0 && ` · ${exCount} exercício${exCount !== 1 ? 's' : ''}`}
+                                  </div>
+                                </div>
+                                {log.durationMinutes != null && (
+                                  <div style={{
+                                    flexShrink: 0, marginLeft: '10px',
+                                    fontSize: '12px', fontWeight: 700, color: '#8B5CF6',
+                                    background: 'rgba(139,92,246,0.1)',
+                                    padding: '3px 8px', borderRadius: '8px',
+                                  }}>
+                                    {log.durationMinutes}min
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
 
