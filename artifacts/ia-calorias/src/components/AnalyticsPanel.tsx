@@ -662,7 +662,7 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
               )}
 
               {/* Workout History — shown for premium users independent of meal data */}
-              {!loading && isPremium && (workoutsLoading || workoutLogs.length > 0) && (
+              {!loading && isPremium && (
                 <div style={{
                   background: 'var(--bg-2)',
                   borderRadius: '16px', border: '1.5px solid var(--border)',
@@ -687,6 +687,19 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <SkeletonBlock h={64} />
                       <SkeletonBlock h={64} />
+                    </div>
+                  ) : workoutLogs.length === 0 ? (
+                    <div style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      gap: '6px', padding: '20px 8px', textAlign: 'center',
+                    }}>
+                      <span style={{ fontSize: '28px' }}>🏋️</span>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)' }}>
+                        Nenhum treino registrado
+                      </span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-3)' }}>
+                        Complete um treino na aba Treino para ver seu histórico aqui
+                      </span>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
