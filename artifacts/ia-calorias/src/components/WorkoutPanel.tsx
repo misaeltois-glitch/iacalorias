@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Dumbbell, Clock, Flame, Target, Apple, Play, Check, RotateCcw, Crown, Zap, Heart, Wind, Smile, BarChart2, ChevronDown, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { generateWorkoutPlan, calculateNutrition, getGoalLabel, getLevelLabel, formatRest, getTodayKey, type WorkoutProfile, type WorkoutPlan, type WorkoutSession, type SessionExercise, type WorkoutGoal, type ExperienceLevel, type GymType } from '@/lib/workout-engine';
-import { getExercisesByMuscle, filterByEquipment, filterByInjuries, type Exercise, type MuscleGroup, type InjuryKey } from '@/lib/exercise-database';
+import { getExercisesByMuscle, filterByInjuries, type MuscleGroup, type InjuryKey } from '@/lib/exercise-database';
 
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 const BASE = import.meta.env.BASE_URL ?? '/';
