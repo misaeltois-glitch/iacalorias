@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, subscriptionsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, subscriptionsTable, analysesTable } from "@workspace/db";
+import { eq, or, and } from "drizzle-orm";
 import { GetMeResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -51,6 +51,31 @@ router.get("/me", async (req: Request, res: Response) => {
   });
 
   res.json(data);
+});
+
+// DELETE /api/user/data — apaga todas as análises do usuário autenticado (LGPD)
+router.delete("/data", async (req: Request, res: Response) => {
+  const userId = req.user?.userId;
+  const sessionId = req.headers["x-session-id"] as string || req.query.sessionId as string;
+
+  if (!userId && !sessionId) {
+    res.status(401).json({ error: "unauthorized", message: "Autenticação necessária" });
+    return;
+  }
+
+  let deleted = 0;
+
+  if (userId) {
+    const rows = await db.delete(analysesTable).where(eq(analysesTable.userId, userId)).returning();
+    deleted += rows.length;
+  }
+
+  if (sessionId) {
+    const rows = await db.delete(analysesTable).where(eq(analysesTable.sessionId, sessionId)).returning();
+    deleted += rows.length;
+  }
+
+  res.json({ success: true, deleted, message: `${deleted} análise(s) removida(s)` });
 });
 
 export default router;

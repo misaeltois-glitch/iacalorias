@@ -1,5 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { db, usersTable, analysesTable } from "@workspace/db";
+import { eq, inArray } from "drizzle-orm";
 
 const rawPort = process.env["PORT"];
 
@@ -15,11 +17,32 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+async function cleanupDevAccount() {
+  try {
+    const devUsers = await db.query.usersTable.findMany({
+      where: eq(usersTable.email, "dev@iacalorias.com.br"),
+      columns: { id: true },
+    });
+    if (devUsers.length === 0) return;
+    const devUserIds = devUsers.map((u) => u.id);
+    const deleted = await db
+      .delete(analysesTable)
+      .where(inArray(analysesTable.userId, devUserIds))
+      .returning();
+    if (deleted.length > 0) {
+      logger.info({ deleted: deleted.length }, "Dev account analyses cleaned up");
+    }
+  } catch (err) {
+    logger.warn({ err }, "Dev account cleanup failed (non-critical)");
+  }
+}
+
+app.listen(port, async (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
 
   logger.info({ port }, "Server listening");
+  await cleanupDevAccount();
 });
