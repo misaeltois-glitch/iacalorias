@@ -127,6 +127,7 @@ export default function Home() {
 
   const [savedGoals, setSavedGoals] = useState<any>(null);
   const [dailySummary, setDailySummary] = useState<any>(null);
+  const [todaySummary, setTodaySummary] = useState<any>(null);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
   const [period, setPeriod] = useState<Period>('day');
 
@@ -151,6 +152,12 @@ export default function Home() {
     if (summary) {
       setDailySummary(summary);
       setSavedGoals(summary.rawGoals ?? summary.goals);
+    }
+    if (activePeriod !== 'day') {
+      const daySummary = await fetchDailySummary(sessionId, 'day');
+      if (daySummary) setTodaySummary(daySummary);
+    } else {
+      setTodaySummary(summary);
     }
     setGoalsLoaded(true);
   }, [sessionId, isPremium, period]);
@@ -204,8 +211,9 @@ export default function Home() {
   }, [showNextCelebration]);
 
   useEffect(() => {
-    if (!dailySummary || !dailySummary.rawGoals || dailySummary.period !== 'day' || !isPremium) return;
-    const { rawGoals, totals } = dailySummary;
+    const summary = todaySummary ?? dailySummary;
+    if (!summary || !summary.rawGoals || summary.period !== 'day' || !isPremium) return;
+    const { rawGoals, totals } = summary;
 
     const toQueue: Array<'calories' | 'meals'> = [];
     const types: Array<'calories' | 'meals'> = ['calories', 'meals'];
@@ -408,8 +416,9 @@ export default function Home() {
   const displayName = user?.email?.split('@')[0] ?? null;
 
   const calorieOverrunKcal = (() => {
-    if (!dailySummary || !dailySummary.rawGoals?.calories || period !== 'day' || !isPremium) return 0;
-    const over = Math.round(dailySummary.totals.calories - dailySummary.rawGoals.calories);
+    const s = todaySummary ?? (dailySummary?.period === 'day' ? dailySummary : null);
+    if (!s || !s.rawGoals?.calories || !isPremium) return 0;
+    const over = Math.round(s.totals.calories - s.rawGoals.calories);
     return over > 0 ? over : 0;
   })();
 

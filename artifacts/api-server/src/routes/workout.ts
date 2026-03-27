@@ -101,8 +101,8 @@ router.get("/logs", async (req: Request, res: Response) => {
   });
 
   const enriched = logs.map(log => {
-    const exercises = Array.isArray(log.exercises) ? log.exercises as Array<{primaryMuscle?: string; [k: string]: unknown}> : [];
-    const primaryMuscle = exercises.find(e => e.primaryMuscle)?.primaryMuscle ?? null;
+    const exercises = Array.isArray(log.exercises) ? log.exercises as Array<{primaryMuscle?: string; exercise?: {primaryMuscle?: string}; [k: string]: unknown}> : [];
+    const primaryMuscle = exercises.map(e => e.primaryMuscle ?? e.exercise?.primaryMuscle).find(Boolean) ?? null;
     return { ...log, muscleGroup: primaryMuscle };
   });
   res.json(enriched);
