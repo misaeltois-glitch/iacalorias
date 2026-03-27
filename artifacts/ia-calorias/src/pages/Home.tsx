@@ -454,7 +454,7 @@ export default function Home() {
   })();
 
   return (
-    <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowX: 'hidden', maxWidth: '100vw' }}>
 
       {/* Splash + Onboarding */}
       <AnimatePresence>

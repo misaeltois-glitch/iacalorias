@@ -22,7 +22,7 @@ interface WorkoutPanelProps {
   onNutritionTargets?: (targets: { calories: number; protein: number; carbs: number; fat: number; fiber: number; weight: number; height: number; age: number; sex: string; activityFactor: number }) => void;
 }
 
-type PanelView = 'loading' | 'questionnaire' | 'plan' | 'player' | 'quick-picker' | 'muscle-builder' | 'done';
+type PanelView = 'loading' | 'questionnaire' | 'plan' | 'player' | 'quick-picker' | 'ai-preview' | 'muscle-builder' | 'done';
 type MbPhase = 'groups' | 'exercises';
 
 const MB_MUSCLES: { label: string; muscle: MuscleGroup; emoji: string; desc: string }[] = [
@@ -109,6 +109,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
   const [isResting, setIsResting] = useState(false);
   const restRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const workoutStartRef = useRef<Date | null>(null);
+  const fromAiRef = useRef(false);
   const [completedSession, setCompletedSession] = useState<{ sessionName: string; durationMinutes: number; exerciseCount: number; estimatedBurn: number } | null>(null);
 
   // muscle-builder state
@@ -235,6 +236,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
 
   const handleStartPlayer = (session: WorkoutSession) => {
     if (!isPremium) { onUpgrade(); return; }
+    fromAiRef.current = false;
     setActiveSession(session);
     setPlayerExIdx(0);
     setPlayerSetIdx(0);
@@ -260,17 +262,24 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
       }
       const session: WorkoutSession = await r.json();
       setActiveSession(session);
-      setPlayerExIdx(0);
-      setPlayerSetIdx(0);
-      setIsResting(false);
-      setRestTimer(0);
-      workoutStartRef.current = new Date();
-      setView('player');
+      setView('ai-preview');
     } catch (e: any) {
       setQuickError(e.message ?? 'Tente novamente');
     } finally {
       setIsQuickLoading(false);
     }
+  };
+
+  const handleStartAiPlayer = () => {
+    if (!activeSession) return;
+    if (!isPremium) { onUpgrade(); return; }
+    fromAiRef.current = true;
+    setPlayerExIdx(0);
+    setPlayerSetIdx(0);
+    setIsResting(false);
+    setRestTimer(0);
+    workoutStartRef.current = new Date();
+    setView('player');
   };
 
   const mbTotalSelected = [...mbSelectedIds.values()].reduce((a, s) => a + s.size, 0);
@@ -1112,6 +1121,102 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
         </div>
       )}
 
+      {/* ── AI PREVIEW ── */}
+      {view === 'ai-preview' && activeSession && (
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+          {/* Header */}
+          <div style={{ background: 'linear-gradient(135deg, #8B5CF6 0%, #0D9F6E 100%)', padding: '20px 20px 28px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <button onClick={() => setView('quick-picker')} style={{ padding: '8px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', color: '#fff' }}>
+                <ChevronLeft size={18} />
+              </button>
+              <span style={{ fontWeight: 700, color: '#fff', fontSize: '15px' }}>Treino Gerado pela IA ✨</span>
+              <button onClick={onClose} style={{ padding: '8px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', color: '#fff' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div>
+                <div style={{ fontWeight: 800, color: '#fff', fontSize: '17px', marginBottom: '2px' }}>{activeSession.sessionName}</div>
+                <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🎯 {activeSession.focusLabel}</span>
+                  <span>·</span>
+                  <Clock size={12} />
+                  <span>~{activeSession.estimatedMinutes} min</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Exercise list */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 120px' }}>
+            {/* Stats row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '20px' }}>
+              {[
+                { label: 'Exercícios', value: `${activeSession.exercises.length}`, icon: '💪' },
+                { label: 'Duração est.', value: `${activeSession.estimatedMinutes}min`, icon: '⏱' },
+                { label: 'Foco', value: activeSession.focusLabel.split('+')[0].trim(), icon: '🎯' },
+              ].map(({ label, value, icon }) => (
+                <div key={label} style={{ padding: '12px 8px', borderRadius: '14px', background: 'var(--bg-2)', border: '1px solid var(--border)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '18px', marginBottom: '4px' }}>{icon}</div>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '13px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>{value}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.4px', marginBottom: '10px', textTransform: 'uppercase' }}>
+              Exercícios do treino
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {activeSession.exercises.map((se, idx) => (
+                <div key={idx} style={{ padding: '14px 16px', borderRadius: '14px', background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(139,92,246,0.12)', color: '#8B5CF6', fontWeight: 800, fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {idx + 1}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{se.exercise.name}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-3)' }}>
+                      {se.sets} séries · {se.reps} reps · {formatRest(se.restSeconds)} descanso
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 20px', background: 'var(--bg)', borderTop: '1px solid var(--border)' }}>
+            {isPremium ? (
+              <button
+                onClick={handleStartAiPlayer}
+                style={{
+                  width: '100%', padding: '15px', borderRadius: '14px',
+                  background: 'linear-gradient(135deg, #8B5CF6, #0D9F6E)',
+                  color: '#fff', border: 'none', fontWeight: 700, fontSize: '15px',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                }}
+              >
+                <Play size={16} fill="#fff" /> Iniciar Treino
+              </button>
+            ) : (
+              <button
+                onClick={onUpgrade}
+                style={{
+                  width: '100%', padding: '15px', borderRadius: '14px',
+                  background: 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(139,92,246,0.08))',
+                  border: '1px solid rgba(245,158,11,0.3)',
+                  color: '#F59E0B', fontWeight: 700, fontSize: '15px',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                }}
+              >
+                <Crown size={16} /> Desbloqueie o Player de Treino
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── MUSCLE BUILDER ── */}
       {view === 'muscle-builder' && (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -1370,8 +1475,8 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
           restTimer={restTimer}
           onCompleteSet={() => handleCompleteSet(activeSession)}
           onSkipRest={() => { clearInterval(restRef.current!); setIsResting(false); }}
-          onPrev={() => { clearInterval(restRef.current!); setIsResting(false); if (playerExIdx > 0) { setPlayerExIdx(i => i - 1); setPlayerSetIdx(0); } else setView('plan'); }}
-          onClose={() => { clearInterval(restRef.current!); setView('plan'); }}
+          onPrev={() => { clearInterval(restRef.current!); setIsResting(false); if (playerExIdx > 0) { setPlayerExIdx(i => i - 1); setPlayerSetIdx(0); } else setView(fromAiRef.current ? 'ai-preview' : 'plan'); }}
+          onClose={() => { clearInterval(restRef.current!); setView(fromAiRef.current ? 'ai-preview' : 'plan'); }}
           goal={profile.goal as WorkoutGoal}
         />
       )}
