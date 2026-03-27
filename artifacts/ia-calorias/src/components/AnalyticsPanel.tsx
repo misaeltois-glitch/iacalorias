@@ -86,6 +86,28 @@ function authHeaders(): HeadersInit {
 const DAY_LABELS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MONTH_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
+const MUSCLE_KEYWORDS: Record<string, string> = {
+  peito: 'Peito', chest: 'Peito',
+  costas: 'Costas', back: 'Costas',
+  ombro: 'Ombros', shoulder: 'Ombros',
+  biceps: 'Bíceps', bíceps: 'Bíceps',
+  triceps: 'Tríceps', tríceps: 'Tríceps',
+  perna: 'Pernas', leg: 'Pernas', quads: 'Quadríceps', quadriceps: 'Quadríceps',
+  gluteos: 'Glúteos', glúteos: 'Glúteos', glute: 'Glúteos',
+  panturrilha: 'Panturrilhas', calf: 'Panturrilhas',
+  abdominal: 'Abdômen', abdomen: 'Abdômen', abs: 'Abdômen', core: 'Abdômen',
+  isquiotibial: 'Isquiotibiais', hamstring: 'Isquiotibiais',
+  full: 'Full Body', corpo: 'Full Body',
+};
+
+function deriveMuscleGroup(sessionName: string): string | null {
+  const lower = sessionName.toLowerCase();
+  for (const [keyword, label] of Object.entries(MUSCLE_KEYWORDS)) {
+    if (lower.includes(keyword)) return label;
+  }
+  return null;
+}
+
 function formatDateLabel(dateStr: string, period: Period): string {
   const d = new Date(dateStr + 'T12:00:00Z');
   if (period === 'week') return DAY_LABELS_SHORT[d.getUTCDay()];
@@ -649,7 +671,7 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                     <Dumbbell style={{ width: '14px', height: '14px', color: '#8B5CF6' }} />
                     <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)' }}>
-                      Treinos recentes
+                      Histórico de Treinos
                     </span>
                     {workoutLogs.length > 0 && (
                       <span style={{
@@ -673,12 +695,13 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                         const dateStr = `${d.getDate().toString().padStart(2, '0')}/${MONTH_PT[d.getMonth()]}`;
                         const exercises = Array.isArray(log.exercises) ? log.exercises : [];
                         const topNames = exercises.slice(0, 3).map(e => e.name).filter(Boolean);
+                        const muscleGroup = deriveMuscleGroup(log.sessionName);
                         return (
                           <div key={log.id} style={{
                             padding: '10px 12px', borderRadius: '10px',
                             background: 'var(--bg-3)',
                           }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: topNames.length > 0 ? '6px' : 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (topNames.length > 0 || muscleGroup) ? '6px' : 0 }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{
                                   fontSize: '13px', fontWeight: 600, color: 'var(--text-1)',
@@ -702,8 +725,17 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                                 </div>
                               )}
                             </div>
-                            {topNames.length > 0 && (
+                            {(muscleGroup || topNames.length > 0) && (
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {muscleGroup && (
+                                  <span style={{
+                                    fontSize: '10px', fontWeight: 700, color: '#8B5CF6',
+                                    background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)',
+                                    borderRadius: '99px', padding: '2px 8px',
+                                  }}>
+                                    💪 {muscleGroup}
+                                  </span>
+                                )}
                                 {topNames.map((name, idx) => (
                                   <span key={idx} style={{
                                     fontSize: '10px', color: 'var(--text-2)',

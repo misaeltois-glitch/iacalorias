@@ -65,7 +65,7 @@ export function GoalCelebration({ show, goalType, onClose }: GoalCelebrationProp
 
   useEffect(() => {
     if (show) {
-      timerRef.current = setTimeout(onClose, 4200);
+      timerRef.current = setTimeout(onClose, 4000);
     }
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [show, onClose]);
