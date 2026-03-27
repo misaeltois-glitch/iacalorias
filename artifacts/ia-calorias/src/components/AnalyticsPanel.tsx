@@ -710,7 +710,8 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {workoutLogs.map(log => {
-                        const d = new Date(log.date + 'T12:00:00');
+                        const dateOnly = log.date.slice(0, 10);
+                        const d = new Date(dateOnly + 'T12:00:00');
                         const dateStr = `${d.getDate().toString().padStart(2, '0')}/${MONTH_PT[d.getMonth()]}`;
                         const exercises = Array.isArray(log.exercises) ? log.exercises : [];
                         const topNames = exercises.slice(0, 3).map(e => e.name ?? e.exercise?.name).filter(Boolean) as string[];
