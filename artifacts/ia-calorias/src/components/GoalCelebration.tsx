@@ -171,12 +171,18 @@ export function GoalCelebration({ show, goalType, onClose }: GoalCelebrationProp
 
 const CELEBRATION_KEY_PREFIX = 'ia-calorias-celebration-';
 
+function getLocalDateString(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function hasCelebratedToday(type: GoalCelebrationProps['goalType']): boolean {
-  const today = new Date().toISOString().slice(0, 10);
-  return !!localStorage.getItem(`${CELEBRATION_KEY_PREFIX}${type}-${today}`);
+  return !!localStorage.getItem(`${CELEBRATION_KEY_PREFIX}${type}-${getLocalDateString()}`);
 }
 
 export function markCelebratedToday(type: GoalCelebrationProps['goalType']): void {
-  const today = new Date().toISOString().slice(0, 10);
-  localStorage.setItem(`${CELEBRATION_KEY_PREFIX}${type}-${today}`, '1');
+  localStorage.setItem(`${CELEBRATION_KEY_PREFIX}${type}-${getLocalDateString()}`, '1');
 }
