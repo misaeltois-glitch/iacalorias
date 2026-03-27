@@ -100,7 +100,8 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
   const [selectedDayKey, setSelectedDayKey] = useState(getTodayKey());
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null);
-  const [quickMuscle, setQuickMuscle] = useState<string>('');
+  const [quickMuscles, setQuickMuscles] = useState<Set<string>>(new Set());
+  const [quickCustom, setQuickCustom] = useState<string>('');
   const [isQuickLoading, setIsQuickLoading] = useState(false);
   const [quickError, setQuickError] = useState<string | null>(null);
   const [playerExIdx, setPlayerExIdx] = useState(0);
@@ -249,14 +250,17 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
   };
 
   const handleQuickWorkout = async () => {
-    if (!quickMuscle) return;
+    const selected = [...quickMuscles];
+    if (quickCustom.trim()) selected.push(quickCustom.trim());
+    if (selected.length === 0) return;
+    const muscleGroup = selected.join(' + ');
     setIsQuickLoading(true);
     setQuickError(null);
     try {
       const r = await fetch(`${BASE}api/workout/ai-quick`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ muscleGroup: quickMuscle, sessionId }),
+        body: JSON.stringify({ muscleGroup, sessionId }),
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
@@ -821,7 +825,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
           <div style={{ padding: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {/* Treino do Dia IA banner */}
             <button
-              onClick={() => { setQuickMuscle(''); setQuickError(null); setView('quick-picker'); }}
+              onClick={() => { setQuickMuscles(new Set()); setQuickCustom(''); setQuickError(null); setView('quick-picker'); }}
               style={{
                 width: '100%', padding: '13px 16px', borderRadius: '16px',
                 background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(13,159,110,0.1))',
@@ -834,10 +838,10 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>
-                  Treino do Dia com IA ✨
+                  Treino do Dia com o Personal ✨
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
-                  Escolha o músculo de hoje e a IA monta na hora
+                  Escolha os músculos de hoje e o Personal monta na hora
                 </div>
               </div>
               <ChevronRight size={16} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
@@ -1032,22 +1036,22 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
               <button onClick={() => setView(plan ? 'plan' : 'questionnaire')} style={{ padding: '8px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', color: '#fff' }}>
                 <ChevronLeft size={18} />
               </button>
-              <span style={{ fontWeight: 700, color: '#fff', fontSize: '15px' }}>Treino do Dia com IA</span>
+              <span style={{ fontWeight: 700, color: '#fff', fontSize: '15px' }}>Treino do Dia com o Personal</span>
               <button onClick={onClose} style={{ padding: '8px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', color: '#fff' }}>
                 <X size={18} />
               </button>
             </div>
             <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
-              Selecione o músculo que quer trabalhar hoje e a IA monta um treino personalizado em segundos.
+              Selecione os músculos que quer trabalhar hoje e o Personal monta um treino para você em segundos.
             </p>
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 120px' }}>
-            <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '14px', letterSpacing: '0.3px' }}>
-              QUAL MÚSCULO VOCÊ QUER TREINAR HOJE?
+            <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', marginBottom: '12px', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
+              QUAIS MÚSCULOS VOCÊ QUER TREINAR HOJE?
             </p>
 
-            {/* Muscle grid */}
+            {/* Muscle grid — multi-select */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '20px' }}>
               {[
                 { key: 'Peito', emoji: '🏋️', desc: 'Peitoral maior e menor' },
@@ -1060,34 +1064,44 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
                 { key: 'Abdômen', emoji: '⚡', desc: 'Core, oblíquos e transverso' },
                 { key: 'Panturrilha', emoji: '🦶', desc: 'Gastrocnêmio e sóleo' },
                 { key: 'Antebraço', emoji: '🤜', desc: 'Flexores e extensores' },
-              ].map(m => (
-                <button
-                  key={m.key}
-                  onClick={() => setQuickMuscle(m.key)}
-                  style={{
-                    padding: '14px 12px',
-                    borderRadius: '16px',
-                    border: `2px solid ${quickMuscle === m.key ? '#8B5CF6' : 'var(--border)'}`,
-                    background: quickMuscle === m.key ? 'rgba(139,92,246,0.10)' : 'var(--bg-2)',
-                    cursor: 'pointer', textAlign: 'left',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <div style={{ fontSize: '20px', marginBottom: '6px' }}>{m.emoji}</div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: quickMuscle === m.key ? '#8B5CF6' : 'var(--text-1)', marginBottom: '2px' }}>{m.key}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-3)', lineHeight: 1.3 }}>{m.desc}</div>
-                </button>
-              ))}
+              ].map(m => {
+                const sel = quickMuscles.has(m.key);
+                return (
+                  <button
+                    key={m.key}
+                    onClick={() => setQuickMuscles(prev => {
+                      const next = new Set(prev);
+                      sel ? next.delete(m.key) : next.add(m.key);
+                      return next;
+                    })}
+                    style={{
+                      padding: '14px 12px', borderRadius: '16px', position: 'relative',
+                      border: `2px solid ${sel ? '#8B5CF6' : 'var(--border)'}`,
+                      background: sel ? 'rgba(139,92,246,0.10)' : 'var(--bg-2)',
+                      cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
+                    }}
+                  >
+                    {sel && (
+                      <div style={{ position: 'absolute', top: '8px', right: '8px', width: '18px', height: '18px', borderRadius: '50%', background: '#8B5CF6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Check size={11} color="#fff" strokeWidth={3} />
+                      </div>
+                    )}
+                    <div style={{ fontSize: '20px', marginBottom: '6px' }}>{m.emoji}</div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: sel ? '#8B5CF6' : 'var(--text-1)', marginBottom: '2px' }}>{m.key}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-3)', lineHeight: 1.3 }}>{m.desc}</div>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Custom muscle input */}
             <div style={{ marginBottom: '20px' }}>
-              <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '8px' }}>OU DESCREVA LIVREMENTE:</p>
+              <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '8px' }}>ADICIONAR OUTRO MÚSCULO:</p>
               <input
                 type="text"
-                placeholder="Ex: Posterior de coxa + panturrilha"
-                value={!['Peito','Costas','Ombros','Bíceps','Tríceps','Pernas','Glúteos','Abdômen','Panturrilha','Antebraço'].includes(quickMuscle) ? quickMuscle : ''}
-                onChange={e => setQuickMuscle(e.target.value)}
+                placeholder="Ex: Posterior de coxa"
+                value={quickCustom}
+                onChange={e => setQuickCustom(e.target.value)}
                 style={{
                   width: '100%', padding: '12px 14px', borderRadius: '12px',
                   border: '1px solid var(--border)', background: 'var(--bg-2)',
@@ -1108,22 +1122,22 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
           <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 20px', background: 'var(--bg)', borderTop: '1px solid var(--border)' }}>
             <button
               onClick={handleQuickWorkout}
-              disabled={!quickMuscle || isQuickLoading}
+              disabled={(quickMuscles.size === 0 && !quickCustom.trim()) || isQuickLoading}
               style={{
                 width: '100%', padding: '14px', borderRadius: '14px',
-                background: quickMuscle && !isQuickLoading
+                background: (quickMuscles.size > 0 || quickCustom.trim()) && !isQuickLoading
                   ? 'linear-gradient(135deg, #8B5CF6, #0D9F6E)'
                   : 'var(--bg-3)',
-                color: quickMuscle ? '#fff' : 'var(--text-3)',
+                color: (quickMuscles.size > 0 || quickCustom.trim()) ? '#fff' : 'var(--text-3)',
                 border: 'none', fontWeight: 700, fontSize: '15px',
-                cursor: quickMuscle && !isQuickLoading ? 'pointer' : 'not-allowed',
+                cursor: (quickMuscles.size > 0 || quickCustom.trim()) && !isQuickLoading ? 'pointer' : 'not-allowed',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                 transition: 'all 0.2s',
               }}
             >
               {isQuickLoading
-                ? <><div style={{ width: 18, height: 18, borderRadius: '50%', border: '2.5px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} /> Gerando treino com IA...</>
-                : <><Zap size={16} /> {quickMuscle ? `Gerar treino de ${quickMuscle}` : 'Selecione um músculo'}</>}
+                ? <><div style={{ width: 18, height: 18, borderRadius: '50%', border: '2.5px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} /> Criando treino com o Personal...</>
+                : <><Zap size={16} /> {(quickMuscles.size > 0 || quickCustom.trim()) ? `Crie com o Personal (${quickMuscles.size + (quickCustom.trim() ? 1 : 0)} músculo${quickMuscles.size + (quickCustom.trim() ? 1 : 0) !== 1 ? 's' : ''})` : 'Selecione ao menos 1 músculo'}</>}
             </button>
           </div>
 
