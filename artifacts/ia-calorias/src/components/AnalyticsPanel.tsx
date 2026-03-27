@@ -521,6 +521,114 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
                     )}
                   </div>
 
+                  {/* ── Calorie Balance Card ── */}
+                  {(() => {
+                    const consumed = Math.round(data.totals.calories);
+                    const goal = data.goals?.calories
+                      ? Math.round(data.goals.calories * (period === 'day' ? 1 : data.daysInPeriod))
+                      : null;
+                    const balance = goal !== null ? consumed - goal : null;
+                    const pct = goal ? Math.min(100, (consumed / goal) * 100) : null;
+                    const isExcess = balance !== null && balance > 0;
+                    const isDeficit = balance !== null && balance < 0;
+                    const balanceColor = isExcess ? '#ef4444' : isDeficit ? '#22c55e' : '#6366f1';
+                    const balanceLabel = isExcess ? 'excesso' : isDeficit ? 'déficit' : 'na meta';
+                    const balanceBg = isExcess ? 'rgba(239,68,68,0.08)' : isDeficit ? 'rgba(34,197,94,0.08)' : 'rgba(99,102,241,0.08)';
+                    const balanceBorder = isExcess ? 'rgba(239,68,68,0.2)' : isDeficit ? 'rgba(34,197,94,0.2)' : 'rgba(99,102,241,0.2)';
+                    return (
+                      <div style={{
+                        background: 'var(--bg-2)', borderRadius: '18px',
+                        border: '1.5px solid var(--border)', overflow: 'hidden',
+                      }}>
+                        {/* Title */}
+                        <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)' }}>🔥 Balanço Calórico</span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+                            {period === 'day' ? 'Hoje' : period === 'week' ? 'Esta semana' : 'Este mês'}
+                          </span>
+                        </div>
+
+                        {/* Table rows */}
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          {/* Consumido */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#6366f1', flexShrink: 0 }} />
+                              <span style={{ fontSize: '13px', color: 'var(--text-2)', fontWeight: 500 }}>Consumido</span>
+                            </div>
+                            <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums' }}>
+                              {consumed.toLocaleString('pt-BR')} kcal
+                            </span>
+                          </div>
+
+                          {/* Meta */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--text-3)', flexShrink: 0 }} />
+                              <span style={{ fontSize: '13px', color: 'var(--text-2)', fontWeight: 500 }}>Meta</span>
+                            </div>
+                            <span style={{ fontSize: '15px', fontWeight: 800, color: goal ? 'var(--text-1)' : 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
+                              {goal ? `${goal.toLocaleString('pt-BR')} kcal` : '—'}
+                            </span>
+                          </div>
+
+                          {/* Saldo */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: balanceBg }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: balanceColor, flexShrink: 0 }} />
+                              <span style={{ fontSize: '13px', color: 'var(--text-2)', fontWeight: 500 }}>Saldo</span>
+                            </div>
+                            {balance !== null ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '15px', fontWeight: 800, color: balanceColor, fontVariantNumeric: 'tabular-nums' }}>
+                                  {isExcess ? '+' : ''}{balance.toLocaleString('pt-BR')} kcal
+                                </span>
+                                <span style={{
+                                  fontSize: '10px', fontWeight: 700,
+                                  color: balanceColor, background: balanceBorder,
+                                  padding: '2px 7px', borderRadius: '99px',
+                                  border: `1px solid ${balanceBorder}`,
+                                }}>
+                                  {balanceLabel.toUpperCase()}
+                                </span>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: '13px', color: 'var(--text-3)' }}>Configure sua meta</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Progress bar */}
+                        {pct !== null && (
+                          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '11px', color: 'var(--text-3)', fontWeight: 500 }}>
+                                {pct >= 100 ? '⚠️ Meta atingida' : `${Math.round(pct)}% da meta`}
+                              </span>
+                              {balance !== null && balance < 0 && (
+                                <span style={{ fontSize: '11px', color: '#22c55e', fontWeight: 600 }}>
+                                  Faltam {Math.abs(balance).toLocaleString('pt-BR')} kcal
+                                </span>
+                              )}
+                              {balance !== null && balance > 0 && (
+                                <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: 600 }}>
+                                  {balance.toLocaleString('pt-BR')} kcal acima
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ height: '8px', borderRadius: '99px', background: 'var(--bg-3)', overflow: 'hidden' }}>
+                              <div style={{
+                                height: '100%', borderRadius: '99px', transition: 'width 0.6s ease',
+                                width: `${Math.min(pct, 100)}%`,
+                                background: pct >= 110 ? '#ef4444' : pct >= 90 ? '#f59e0b' : '#6366f1',
+                              }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Stacked bar chart — week/month only */}
                   {showChart && (
                     <StackedCaloriesChart
