@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, Loader2, Calculator } from 'lucide-react';
+import { X, Check, Loader2, Calculator, Pencil, Lock } from 'lucide-react';
 
 const BASE = import.meta.env.BASE_URL ?? '/';
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
@@ -246,6 +246,9 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
   const [mpdSaveState, setMpdSaveState] = useState<SaveState>('idle');
   const mpdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+
+  const hasAnyGoal = !!(goals.calories || goals.protein || goals.carbs || goals.fat || goals.fiber);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -254,15 +257,20 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) {
-          setGoals({
+          const g = {
             calories: data.calories ?? null,
             protein: data.protein ?? null,
             carbs: data.carbs ?? null,
             fat: data.fat ?? null,
             fiber: data.fiber ?? null,
             mealsPerDay: data.mealsPerDay ?? 3,
-          });
-          setMealsPerDayLocal(String(data.mealsPerDay ?? 3));
+          };
+          setGoals(g);
+          setMealsPerDayLocal(String(g.mealsPerDay));
+          const anySet = !!(g.calories || g.protein || g.carbs || g.fat || g.fiber);
+          setIsEditing(!anySet);
+        } else {
+          setIsEditing(true);
         }
       })
       .finally(() => setLoading(false));
@@ -284,7 +292,6 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
     const num = parseInt(mealsPerDayLocal);
     if (isNaN(num) || num < 2 || num > 6) return;
     if (num === goals.mealsPerDay) return;
-
     setMpdSaveState('saving');
     try {
       await fetch(`${BASE}api/goals`, {
@@ -335,9 +342,25 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
           flexShrink: 0,
         }}>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Configurar metas</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-2)', marginTop: '3px', marginBottom: 0 }}>
-              Edite um valor e saia do campo para salvar automaticamente
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
+                {isEditing ? 'Configurar metas' : 'Minhas metas'}
+              </h2>
+              {!isEditing && hasAnyGoal && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  padding: '2px 8px', borderRadius: '99px',
+                  background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)',
+                }}>
+                  <Lock style={{ width: '10px', height: '10px', color: '#22c55e' }} />
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#22c55e' }}>CONFIGURADAS</span>
+                </div>
+              )}
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-2)', margin: 0 }}>
+              {isEditing
+                ? 'Edite um valor e saia do campo para salvar automaticamente'
+                : 'Suas metas nutricionais diárias'}
             </p>
           </div>
           <button
@@ -358,15 +381,93 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
               <Loader2 style={{ width: '28px', height: '28px', color: 'var(--accent)', animation: 'spin 0.8s linear infinite' }} />
             </div>
-          ) : (
+          ) : !isEditing && hasAnyGoal ? (
+            /* ── Read-only view ── */
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-              {/* Refeições por dia (global) */}
+              {/* Refeições por dia — readonly */}
               <div style={{
-                borderRadius: '16px',
-                background: 'var(--accent-glow)',
-                border: '1.5px solid var(--accent)40',
-                padding: '16px',
+                borderRadius: '16px', background: 'var(--accent-glow)',
+                border: '1.5px solid var(--accent)40', padding: '14px 16px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '22px' }}>🍽️</span>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)' }}>Refeições por dia</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '1px' }}>Divisor automático por refeição</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: '26px', fontWeight: 900, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>
+                  {goals.mealsPerDay}
+                </div>
+              </div>
+
+              {/* Macro readonly rows */}
+              {MACROS.map(cfg => {
+                const v = goals[cfg.key];
+                const mpd = Math.max(1, goals.mealsPerDay);
+                const perMeal = v ? Math.round((v / mpd) * 10) / 10 : null;
+                return (
+                  <div key={cfg.key} style={{
+                    borderRadius: '16px', background: 'var(--bg-2)',
+                    border: '1.5px solid var(--border)', padding: '14px 16px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          width: '36px', height: '36px', borderRadius: '10px',
+                          background: cfg.bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px',
+                        }}>
+                          {cfg.emoji}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)' }}>{cfg.label}</div>
+                          {perMeal && (
+                            <div style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '1px' }}>
+                              {perMeal}{cfg.unit}/refeição
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {v ? (
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '22px', fontWeight: 900, color: cfg.color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+                            {v.toLocaleString('pt-BR')}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>{cfg.unit}/dia</div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>Não configurado</div>
+                      )}
+                    </div>
+
+                    {/* Mini progress bar per macro (visual only) */}
+                    {v && (
+                      <div style={{ marginTop: '10px' }}>
+                        <div style={{ height: '4px', borderRadius: '99px', background: 'var(--bg-3)' }}>
+                          <div style={{ height: '100%', width: '100%', borderRadius: '99px', background: cfg.color, opacity: 0.6 }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-3)' }}>
+                            {Math.round(v * 7).toLocaleString('pt-BR')}{cfg.unit}/semana
+                          </span>
+                          <span style={{ fontSize: '10px', color: 'var(--text-3)' }}>
+                            {Math.round(v * 30).toLocaleString('pt-BR')}{cfg.unit}/mês
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* ── Edit mode ── */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Refeições por dia */}
+              <div style={{
+                borderRadius: '16px', background: 'var(--accent-glow)',
+                border: '1.5px solid var(--accent)40', padding: '16px',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
               }}>
                 <div>
@@ -388,9 +489,7 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
                       width: '64px', padding: '8px 10px', textAlign: 'center',
                       borderRadius: '10px',
                       border: `1.5px solid ${mpdSaveState === 'saved' ? '#22c55e' : 'var(--accent)60'}`,
-                      background: 'var(--bg-2)',
-                      color: 'var(--accent)', fontWeight: 700, fontSize: '18px',
-                      outline: 'none',
+                      background: 'var(--bg-2)', color: 'var(--accent)', fontWeight: 700, fontSize: '18px', outline: 'none',
                     }}
                   />
                   <AnimatePresence mode="wait">
@@ -427,28 +526,60 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
           )}
         </div>
 
-        {/* Footer — biometrics */}
+        {/* Footer */}
         <div style={{
-          padding: '14px 20px',
-          borderTop: '1px solid var(--border)',
-          flexShrink: 0,
+          padding: '14px 20px', borderTop: '1px solid var(--border)', flexShrink: 0,
+          display: 'flex', flexDirection: 'column', gap: '8px',
         }}>
-          <button
-            onClick={() => { onClose(); onOpenBiometrics(); }}
-            style={{
-              width: '100%', padding: '12px',
-              borderRadius: '12px',
-              border: '1.5px solid var(--border-strong)',
-              background: 'var(--bg-2)',
-              color: 'var(--text-1)',
-              fontWeight: 600, fontSize: '14px',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-            }}
-          >
-            <Calculator style={{ width: '16px', height: '16px', color: 'var(--accent)' }} />
-            Calcular pela minha biometria
-          </button>
+          {!isEditing && hasAnyGoal ? (
+            /* View mode footer: Editar button */
+            <button
+              onClick={() => setIsEditing(true)}
+              style={{
+                width: '100%', padding: '13px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+                color: '#fff', border: 'none', fontWeight: 700, fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              }}
+            >
+              <Pencil style={{ width: '15px', height: '15px' }} />
+              Editar Metas
+            </button>
+          ) : (
+            /* Edit mode footer: biometrics + done */
+            <>
+              {hasAnyGoal && (
+                <button
+                  onClick={() => setIsEditing(false)}
+                  style={{
+                    width: '100%', padding: '12px',
+                    borderRadius: '12px', border: '1.5px solid var(--border)',
+                    background: 'var(--bg-2)', color: 'var(--text-1)',
+                    fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  }}
+                >
+                  <Check style={{ width: '15px', height: '15px', color: '#22c55e' }} />
+                  Concluído
+                </button>
+              )}
+              <button
+                onClick={() => { onClose(); onOpenBiometrics(); }}
+                style={{
+                  width: '100%', padding: '12px',
+                  borderRadius: '12px', border: '1.5px solid var(--border-strong)',
+                  background: 'var(--bg-2)', color: 'var(--text-1)',
+                  fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                }}
+              >
+                <Calculator style={{ width: '16px', height: '16px', color: 'var(--accent)' }} />
+                Calcular pela minha biometria
+              </button>
+            </>
+          )}
         </div>
       </motion.div>
     </div>
