@@ -200,8 +200,11 @@ export function AppTour({ onDone }: AppTourProps) {
 
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const TOOLTIP_W = Math.min(300, vw - 32);
-  const GAP = 14;
+  const MARGIN = 8;
+  const TOOLTIP_W = Math.min(300, vw - MARGIN * 2);
+  const GAP = 12;
+  // Estimated tooltip height — enough to fit all content on mobile
+  const TOOLTIP_H_EST = 220;
 
   // Compute tooltip position
   let tooltipStyle: React.CSSProperties = {};
@@ -213,16 +216,31 @@ export function AppTour({ onDone }: AppTourProps) {
   if (hasRect && rect) {
     const centerX = rect.left + rect.width / 2;
     let tLeft = centerX - TOOLTIP_W / 2;
-    tLeft = Math.max(12, Math.min(tLeft, vw - TOOLTIP_W - 12));
+    tLeft = Math.max(MARGIN, Math.min(tLeft, vw - TOOLTIP_W - MARGIN));
     arrowLeft = Math.min(Math.max(centerX - tLeft, 20), TOOLTIP_W - 20);
 
-    if (step.tooltipSide === 'above') {
-      // anchor tooltip bottom just above the spotlight
-      tooltipStyle = { bottom: vh - rect.top + GAP, left: tLeft, width: TOOLTIP_W };
+    // Decide whether to place above or below, flipping if there's not enough space
+    const roomAbove = rect.top - GAP; // pixels available above the spotlight
+    const roomBelow = vh - rect.bottom - GAP; // pixels available below
+    const preferAbove = step.tooltipSide === 'above';
+    const placeAbove = preferAbove
+      ? (roomAbove >= TOOLTIP_H_EST || roomAbove >= roomBelow)
+      : (roomBelow < TOOLTIP_H_EST && roomAbove >= roomBelow);
+
+    if (placeAbove) {
+      // Tooltip above: anchor its bottom edge just above the spotlight
+      // Clamp so it never goes above top margin
+      const rawTop = rect.top - TOOLTIP_H_EST - GAP;
+      const clampedTop = Math.max(MARGIN, rawTop);
+      tooltipStyle = { top: clampedTop, left: tLeft, width: TOOLTIP_W };
       arrowDir = 'down';
     } else {
-      // anchor tooltip top just below the spotlight
-      tooltipStyle = { top: rect.bottom + GAP, left: tLeft, width: TOOLTIP_W };
+      // Tooltip below: anchor its top edge just below the spotlight
+      // Clamp so it never goes below bottom margin
+      const rawTop = rect.bottom + GAP;
+      const maxTop = vh - TOOLTIP_H_EST - MARGIN;
+      const clampedTop = Math.min(rawTop, maxTop);
+      tooltipStyle = { top: clampedTop, left: tLeft, width: TOOLTIP_W };
       arrowDir = 'up';
     }
   } else {
