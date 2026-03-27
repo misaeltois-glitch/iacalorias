@@ -182,8 +182,6 @@ export default function Home() {
   const showNextCelebration = useCallback((delay = 0) => {
     const next = celebrationQueue.current.shift();
     if (next) {
-      celebrationInflight.current.delete(next);
-      markCelebratedToday(next);
       if (delay > 0) {
         setTimeout(() => setCelebration({ show: true, type: next }), delay);
       } else {
@@ -191,6 +189,13 @@ export default function Home() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (celebration.show) {
+      celebrationInflight.current.delete(celebration.type);
+      markCelebratedToday(celebration.type);
+    }
+  }, [celebration.show, celebration.type]);
 
   const handleCelebrationClose = useCallback(() => {
     setCelebration(c => ({ ...c, show: false }));
