@@ -767,13 +767,13 @@ export default function Home() {
               {goalsLoaded && (
                 <div data-tour="daily-progress">
                   <DailyProgress
-                    totals={dailySummary?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, meals: 0 }}
+                    totals={todaySummary?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, meals: 0 }}
                     goals={savedGoals}
-                    alerts={dailySummary?.alerts ?? []}
-                    aiSummary={dailySummary?.aiSummary ?? null}
-                    analysesCount={dailySummary?.analysesCount ?? 0}
-                    period={period}
-                    onPeriodChange={handlePeriodChange}
+                    alerts={todaySummary?.alerts ?? []}
+                    aiSummary={todaySummary?.aiSummary ?? null}
+                    analysesCount={todaySummary?.analysesCount ?? 0}
+                    period={'day'}
+                    onPeriodChange={undefined}
                     onSetGoals={() => isPremium ? setShowGoalsPanel(true) : setShowPaywall(true)}
                     isPremium={isPremium}
                   />

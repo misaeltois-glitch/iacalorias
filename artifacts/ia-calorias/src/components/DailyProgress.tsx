@@ -27,7 +27,7 @@ interface DailyProgressProps {
   aiSummary: string | null;
   analysesCount: number;
   period: Period;
-  onPeriodChange: (p: Period) => void;
+  onPeriodChange?: (p: Period) => void;
   onSetGoals: () => void;
   isPremium: boolean;
 }
@@ -137,8 +137,8 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
           </span>
         </div>
 
-        {/* Period filter */}
-        <div style={{
+        {/* Period filter — hidden when no period change handler */}
+        {onPeriodChange && <div style={{
           display: 'flex',
           background: 'var(--bg-3)',
           borderRadius: '8px',
@@ -164,7 +164,7 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
               {PERIOD_LABELS[p]}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
 
       {/* Macro rings */}
