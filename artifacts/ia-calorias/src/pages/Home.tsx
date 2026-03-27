@@ -133,6 +133,7 @@ export default function Home() {
   const [period, setPeriod] = useState<Period>('day');
 
   const [activeTab, setActiveTab] = useState<BottomNavTab>('home');
+  const [goalsRefreshKey, setGoalsRefreshKey] = useState(0);
 
   const prevTrialRemaining = useRef<number | null>(null);
 
@@ -635,6 +636,7 @@ export default function Home() {
               <ProgressView
                 sessionId={sessionId}
                 isPremium={isPremium}
+                refreshSignal={goalsRefreshKey}
                 onUpgrade={() => { setPaywallDisableClose(false); setShowPaywall(true); }}
                 onSetGoals={() => setShowGoalsPanel(true)}
               />
@@ -951,7 +953,7 @@ export default function Home() {
         {showGoalsPanel && (
           <GoalsPanel
             isOpen={showGoalsPanel}
-            onClose={() => { setShowGoalsPanel(false); setActiveTab('home'); refreshSummary(); }}
+            onClose={() => { setShowGoalsPanel(false); refreshSummary(); setGoalsRefreshKey(k => k + 1); }}
             sessionId={sessionId}
             onOpenBiometrics={() => setShowOnboarding(true)}
           />

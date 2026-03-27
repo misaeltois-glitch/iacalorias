@@ -51,6 +51,7 @@ interface SummaryData {
 interface ProgressViewProps {
   sessionId: string;
   isPremium: boolean;
+  refreshSignal?: number;
   onUpgrade: () => void;
   onSetGoals: () => void;
 }
@@ -77,7 +78,7 @@ function SkeletonBlock({ h }: { h: number }) {
   );
 }
 
-export function ProgressView({ sessionId, isPremium, onUpgrade, onSetGoals }: ProgressViewProps) {
+export function ProgressView({ sessionId, isPremium, refreshSignal, onUpgrade, onSetGoals }: ProgressViewProps) {
   const now = new Date();
   const [period, setPeriod] = useState<Period>('day');
   const [selectedDate, setSelectedDate] = useState<string>(todayStr());
@@ -113,11 +114,11 @@ export function ProgressView({ sessionId, isPremium, onUpgrade, onSetGoals }: Pr
 
   useEffect(() => {
     fetchData(period, selectedDate);
-  }, [period, selectedDate, fetchData]);
+  }, [period, selectedDate, fetchData, refreshSignal]);
 
   useEffect(() => {
     fetchMonthData(calYear, calMonth);
-  }, [calYear, calMonth, fetchMonthData]);
+  }, [calYear, calMonth, fetchMonthData, refreshSignal]);
 
   const handlePeriod = (p: Period) => {
     setPeriod(p);
@@ -265,7 +266,10 @@ export function ProgressView({ sessionId, isPremium, onUpgrade, onSetGoals }: Pr
           {/* ─── Calorie Balance ─── */}
           <div style={{ background: 'var(--bg-2)', borderRadius: '18px', border: '1.5px solid var(--border)', overflow: 'hidden' }}>
             <div style={{ padding: '13px 16px 10px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)' }}>🔥 Balanço Calórico</span>
+              <div>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)' }}>🔥 Calorias</span>
+                <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '1px' }}>Consumido vs. meta do período</div>
+              </div>
               <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{periodLabel}</span>
             </div>
 
