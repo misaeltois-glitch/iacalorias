@@ -6,6 +6,8 @@ const AUTH_USER_KEY = 'ia-calorias-auth-user';
 export interface AuthUser {
   id: string;
   email: string;
+  name?: string | null;
+  avatarUrl?: string | null;
 }
 
 interface AuthContextValue {
@@ -17,6 +19,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<string>;
   resetPassword: (token: string, password: string) => Promise<string>;
+  updateLocalUser: (updates: Partial<AuthUser>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -47,6 +50,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(AUTH_USER_KEY);
     setToken(null);
     setUser(null);
+  }, []);
+
+  const updateLocalUser = useCallback((updates: Partial<AuthUser>) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, ...updates };
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(next));
+      return next;
+    });
   }, []);
 
   const register = useCallback(async (email: string, password: string, sessionId: string) => {
@@ -104,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: !!user,
       login, register, logout,
       forgotPassword, resetPassword,
+      updateLocalUser,
     }}>
       {children}
     </AuthContext.Provider>

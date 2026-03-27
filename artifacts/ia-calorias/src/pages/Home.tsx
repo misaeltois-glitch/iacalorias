@@ -4,6 +4,7 @@ import { Moon, Sun, PieChart, Settings, LogIn, LogOut, User, BarChart2, Crown } 
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/hooks/use-session';
 import { useAuth } from '@/hooks/use-auth';
+import { useLocation } from 'wouter';
 
 import { UploadZone } from '@/components/UploadZone';
 import { ResultCard } from '@/components/ResultCard';
@@ -105,6 +106,7 @@ export default function Home() {
   const { toast } = useToast();
   const sessionId = useSession();
   const { user, isAuthenticated, logout } = useAuth();
+  const [, navigate] = useLocation();
   const { accepted: lgpdAccepted, accept: acceptLGPD } = useLGPDConsent();
   const { showTour, maybeStartTour, endTour, resetTour } = useTour();
 
@@ -404,7 +406,7 @@ export default function Home() {
     if (tab === 'home') { setCurrentResult(null); }
     if (tab === 'workout') { setShowWorkout(true); }
     if (tab === 'analyze') { setCurrentResult(null); }
-    if (tab === 'profile') { isAuthenticated ? setShowUserMenu(v => !v) : setShowAuth(true); }
+    if (tab === 'profile') { isAuthenticated ? navigate('/profile') : navigate('/login'); }
   };
 
   const renderUsagePill = () => {
@@ -522,9 +524,13 @@ export default function Home() {
               <div ref={userMenuRef} style={{ position: 'relative' }}>
                 <button
                   onClick={() => setShowUserMenu(v => !v)}
-                  style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
+                  style={{ padding: '2px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <User size={16} />
+                  {user?.avatarUrl
+                    ? <img src={user.avatarUrl} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent)' }} />
+                    : <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #0D9F6E, #057A55)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800, color: '#fff' }}>
+                        {(user?.name || user?.email || '?').slice(0, 2).toUpperCase()}
+                      </div>}
                 </button>
                 {showUserMenu && (
                   <>
@@ -536,8 +542,8 @@ export default function Home() {
                       boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
                     }}>
                       <div style={{ padding: '8px 12px 10px', borderBottom: '1px solid var(--border)', marginBottom: '4px' }}>
-                        <div style={{ fontSize: '11px', color: 'var(--text-2)', marginBottom: '2px' }}>Conectado como</div>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)', wordBreak: 'break-all' }}>{user?.email}</div>
+                        {user?.name && <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>{user.name}</div>}
+                        <div style={{ fontSize: '12px', color: 'var(--text-2)', wordBreak: 'break-all' }}>{user?.email}</div>
                         <div style={{ marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px',
                           padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700,
                           background: subStatus?.tier === 'unlimited' ? 'rgba(139,92,246,0.12)' : subStatus?.tier === 'limited' ? 'rgba(245,158,11,0.12)' : 'var(--bg-3)',
@@ -562,6 +568,19 @@ export default function Home() {
                           Upgrade para Ilimitado
                         </button>
                       )}
+                      <button
+                        onClick={() => { setShowUserMenu(false); navigate('/profile'); }}
+                        style={{
+                          width: '100%', padding: '8px 12px',
+                          background: 'none', border: 'none', color: 'var(--text-2)',
+                          fontSize: '13px', cursor: 'pointer', borderRadius: '10px',
+                          display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left',
+                          marginBottom: '2px',
+                        }}
+                      >
+                        <User size={14} />
+                        Meu Perfil
+                      </button>
                       <button
                         onClick={() => { setShowUserMenu(false); resetTour(); }}
                         style={{
@@ -615,7 +634,7 @@ export default function Home() {
                   {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                 </button>
                 <button
-                  onClick={() => setShowAuth(true)}
+                  onClick={() => navigate('/login')}
                   style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
                 >
                   <LogIn size={16} />
@@ -759,7 +778,7 @@ export default function Home() {
                     Salve seu histórico criando uma conta gratuita
                   </span>
                   <button
-                    onClick={() => setShowAuth(true)}
+                    onClick={() => navigate('/login')}
                     style={{
                       padding: '6px 14px', borderRadius: '10px',
                       background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
@@ -909,7 +928,7 @@ export default function Home() {
                     </div>
                   </div>
                   <button
-                    onClick={() => { setShowAuth(true); }}
+                    onClick={() => { navigate('/login'); }}
                     style={{
                       width: '100%', padding: '13px',
                       borderRadius: '12px',
@@ -975,7 +994,7 @@ export default function Home() {
         onClose={() => { setShowPaywall(false); setPaywallDisableClose(false); }}
         sessionId={sessionId}
         disableClose={paywallDisableClose}
-        onShowAuth={paywallDisableClose ? () => { setShowPaywall(false); setPaywallDisableClose(false); setShowAuth(true); } : undefined}
+        onShowAuth={paywallDisableClose ? () => { setShowPaywall(false); setPaywallDisableClose(false); navigate('/login'); } : undefined}
       />
 
       <AnimatePresence>
@@ -995,12 +1014,6 @@ export default function Home() {
         onSkip={() => setShowOnboarding(false)}
       />
 
-      <AuthModal
-        isOpen={showAuth}
-        onClose={() => { setShowAuth(false); setActiveTab('home'); }}
-        onSuccess={handleAuthSuccess}
-        sessionId={sessionId}
-      />
 
       {showTour && <AppTour onDone={endTour} />}
 
