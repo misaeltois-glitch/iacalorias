@@ -410,11 +410,12 @@ export default function Home() {
 
   const handleTourEnd = useCallback(() => {
     endTour();
+    if (isAuthenticated) return;
     const mandatoryDone = localStorage.getItem(MANDATORY_ONBOARDING_KEY);
     if (!mandatoryDone) {
       setTimeout(() => setMandatoryStep('goals'), 400);
     }
-  }, [endTour]);
+  }, [endTour, isAuthenticated]);
 
   const handleMandatoryGoalsDone = useCallback(async (goals: CalculatedGoals) => {
     if (!sessionId) return;
