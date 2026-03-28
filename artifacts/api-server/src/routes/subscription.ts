@@ -115,9 +115,13 @@ router.post("/checkout", async (req: Request, res: Response) => {
 
   const priceId = plan === "limited" ? PRICE_LIMITED : PRICE_UNLIMITED;
 
-  const domain = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : "http://localhost:80";
+  // Use the Origin header from the request (the frontend's actual URL)
+  // Fallback to REPLIT_DEV_DOMAIN or localhost
+  const origin = req.headers.origin as string | undefined;
+  const domain = origin
+    ?? (process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : "http://localhost:80");
 
   try {
     let sub = await resolveSub(userId, sessionId);
