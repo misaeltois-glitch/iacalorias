@@ -205,7 +205,7 @@ export default function LoginPage() {
           )}
 
           {error && (
-            <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(239,68,68,0.09)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', fontSize: '13px', marginBottom: '16px', lineHeight: 1.5 }}>
+            <div translate="no" style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(239,68,68,0.09)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', fontSize: '13px', marginBottom: '16px', lineHeight: 1.5 }}>
               {error}
             </div>
           )}
