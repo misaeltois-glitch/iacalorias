@@ -23,6 +23,7 @@ import { ProgressView } from '@/components/ProgressView';
 import { AppTour } from '@/components/AppTour';
 import { useTour } from '@/hooks/use-tour';
 import { GoalCelebration, hasCelebratedToday, markCelebratedToday } from '@/components/GoalCelebration';
+import { OnboardingAuthPrompt } from '@/components/OnboardingAuthPrompt';
 
 import {
   useAnalyzeFood,
@@ -36,6 +37,9 @@ type Period = 'day' | 'week' | 'month';
 const BASE = import.meta.env.BASE_URL ?? '/';
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 const ONBOARDED_KEY = 'ia-calorias-onboarded';
+const MANDATORY_ONBOARDING_KEY = 'ia-calorias-mandatory-done';
+const FIRST_USE_TS_KEY = 'ia-calorias-first-use-ts';
+const FREE_PERIOD_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -124,6 +128,9 @@ export default function Home() {
 
   const [showSplash, setShowSplash] = useState(false);
   const [showCarousel, setShowCarousel] = useState(false);
+
+  type MandatoryStep = 'goals' | 'workout' | 'auth' | null;
+  const [mandatoryStep, setMandatoryStep] = useState<MandatoryStep>(null);
   const [celebration, setCelebration] = useState<{ show: boolean; type: 'calories' | 'meals' }>({ show: false, type: 'calories' });
   const celebrationQueue = useRef<Array<'calories' | 'meals'>>([]);
   const celebrationInflight = useRef<Set<'calories' | 'meals'>>(new Set());
@@ -313,6 +320,7 @@ export default function Home() {
 
   const handleAnalyze = async (file: File) => {
     if (!sessionId) return;
+    if (check24hExpiry()) return;
     if (subStatus?.tier === 'free' && subStatus.trialRemaining <= 0) {
       setPaywallDisableClose(true);
       setShowPaywall(true);
@@ -399,6 +407,49 @@ export default function Home() {
     localStorage.setItem(ONBOARDED_KEY, 'true');
     maybeStartTour(800);
   };
+
+  const handleTourEnd = useCallback(() => {
+    endTour();
+    const mandatoryDone = localStorage.getItem(MANDATORY_ONBOARDING_KEY);
+    if (!mandatoryDone) {
+      setTimeout(() => setMandatoryStep('goals'), 400);
+    }
+  }, [endTour]);
+
+  const handleMandatoryGoalsDone = useCallback(async (goals: CalculatedGoals) => {
+    if (!sessionId) return;
+    await saveGoals(sessionId, goals);
+    setShowOnboarding(false);
+    try { await refreshSummary(); } catch {}
+    setMandatoryStep('workout');
+    setShowWorkout(true);
+  }, [sessionId, refreshSummary]);
+
+  const handleMandatoryWorkoutDone = useCallback(() => {
+    setShowWorkout(false);
+    setMandatoryStep('auth');
+  }, []);
+
+  const handleMandatoryAuthDone = useCallback(() => {
+    setMandatoryStep(null);
+    localStorage.setItem(MANDATORY_ONBOARDING_KEY, 'true');
+    if (!localStorage.getItem(FIRST_USE_TS_KEY)) {
+      localStorage.setItem(FIRST_USE_TS_KEY, String(Date.now()));
+    }
+  }, []);
+
+  const check24hExpiry = useCallback((): boolean => {
+    if (isPremium || isAuthenticated) return false;
+    const ts = localStorage.getItem(FIRST_USE_TS_KEY);
+    if (!ts) return false;
+    const elapsed = Date.now() - parseInt(ts, 10);
+    if (elapsed > FREE_PERIOD_MS) {
+      setPaywallDisableClose(true);
+      setShowPaywall(true);
+      return true;
+    }
+    return false;
+  }, [isPremium, isAuthenticated]);
 
   const handleTabChange = (tab: BottomNavTab) => {
     setActiveTab(tab);
@@ -987,6 +1038,8 @@ export default function Home() {
         isPremium={isPremium}
         onUpgrade={() => { setShowWorkout(false); setPaywallDisableClose(false); setShowPaywall(true); }}
         onNutritionTargets={handleWorkoutNutrition}
+        onboardingMode={mandatoryStep === 'workout'}
+        onOnboardingComplete={handleMandatoryWorkoutDone}
       />
 
       <PaywallModal
@@ -1009,13 +1062,17 @@ export default function Home() {
       </AnimatePresence>
 
       <OnboardingModal
-        isOpen={showOnboarding}
-        onComplete={handleGoalsSave}
+        isOpen={showOnboarding || mandatoryStep === 'goals'}
+        onComplete={mandatoryStep === 'goals' ? handleMandatoryGoalsDone : handleGoalsSave}
         onSkip={() => setShowOnboarding(false)}
+        mandatory={mandatoryStep === 'goals'}
       />
 
+      {mandatoryStep === 'auth' && (
+        <OnboardingAuthPrompt onComplete={handleMandatoryAuthDone} />
+      )}
 
-      {showTour && <AppTour onDone={endTour} />}
+      {showTour && <AppTour onDone={handleTourEnd} />}
 
       <GoalCelebration
         show={celebration.show}

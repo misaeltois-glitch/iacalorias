@@ -35,6 +35,12 @@ export default function LoginPage() {
     if (isAuthenticated) navigate('/');
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get('tab');
+    if (t === 'register') setTab('register');
+  }, []);
+
   const reset = (t: Tab) => {
     setTab(t); setError(''); setSuccess('');
     setEmail(''); setPassword(''); setConfirmPassword(''); setName('');

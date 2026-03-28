@@ -6,6 +6,7 @@ interface OnboardingModalProps {
   isOpen: boolean;
   onComplete: (goals: CalculatedGoals) => void;
   onSkip: () => void;
+  mandatory?: boolean;
 }
 
 export interface CalculatedGoals {
@@ -80,7 +81,7 @@ const ACTIVITY_LEVELS = [
 
 const RESTRICTIONS = ['Vegetariano', 'Vegano', 'Sem glúten', 'Sem lactose'];
 
-export function OnboardingModal({ isOpen, onComplete, onSkip }: OnboardingModalProps) {
+export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: OnboardingModalProps) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
 
@@ -164,9 +165,11 @@ export function OnboardingModal({ isOpen, onComplete, onSkip }: OnboardingModalP
                 }} />
               ))}
             </div>
-            <button onClick={onSkip} style={{ fontSize: '13px', color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer' }}>
-              Pular
-            </button>
+            {!mandatory && (
+              <button onClick={onSkip} style={{ fontSize: '13px', color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                Pular
+              </button>
+            )}
           </div>
 
           <AnimatePresence mode="wait">

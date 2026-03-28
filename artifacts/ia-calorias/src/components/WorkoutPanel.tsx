@@ -20,6 +20,8 @@ interface WorkoutPanelProps {
   isPremium: boolean;
   onUpgrade: () => void;
   onNutritionTargets?: (targets: { calories: number; protein: number; carbs: number; fat: number; fiber: number; weight: number; height: number; age: number; sex: string; activityFactor: number }) => void;
+  onboardingMode?: boolean;
+  onOnboardingComplete?: () => void;
 }
 
 type PanelView = 'loading' | 'questionnaire' | 'plan' | 'player' | 'quick-picker' | 'ai-preview' | 'muscle-builder' | 'done';
@@ -78,7 +80,7 @@ const INJURIES_LIST = [
   { key: 'ankle', label: 'Entorse de tornozelo recorrente' },
 ];
 
-export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade, onNutritionTargets }: WorkoutPanelProps) {
+export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade, onNutritionTargets, onboardingMode, onOnboardingComplete }: WorkoutPanelProps) {
   const { user } = useAuth();
   const [view, setView] = useState<PanelView>('loading');
   const [step, setStep] = useState(1);
@@ -702,9 +704,13 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
           {/* Plan Header */}
           <div style={{ background: `linear-gradient(135deg, ${accent} 0%, #057A55 100%)`, padding: planHeaderExpanded ? '20px 20px 20px' : '16px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <button onClick={onClose} style={{ padding: '8px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', color: '#fff' }}>
-                <X size={18} />
-              </button>
+              {!onboardingMode ? (
+                <button onClick={onClose} style={{ padding: '8px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', color: '#fff' }}>
+                  <X size={18} />
+                </button>
+              ) : (
+                <div style={{ width: 34 }} />
+              )}
               <button
                 onClick={() => setPlanHeaderExpanded(v => !v)}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}
@@ -1024,6 +1030,29 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
               </div>
             )}
           </div>
+
+          {/* Onboarding mode: sticky "Avançar" button */}
+          {onboardingMode && onOnboardingComplete && (
+            <div style={{ padding: '12px 16px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-1)', flexShrink: 0 }}>
+              <button
+                onClick={onOnboardingComplete}
+                style={{
+                  width: '100%', padding: '15px',
+                  borderRadius: 14,
+                  background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+                  border: 'none', color: '#fff',
+                  fontSize: 15, fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 20px rgba(13,159,110,0.3)',
+                }}
+              >
+                Continuar com este plano →
+              </button>
+              <p style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'center', marginTop: 8 }}>
+                Você pode editar seu plano a qualquer momento
+              </p>
+            </div>
+          )}
         </div>
       )}
 
