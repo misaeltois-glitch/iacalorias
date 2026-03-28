@@ -22,12 +22,12 @@ type FeatureRow = {
 const FEATURES: FeatureRow[] = [
   { label: 'Análise de refeições por IA',     free: '3 por mês',        limited: '20 por mês',      unlimited: 'Ilimitadas',          highlight: true },
   { label: 'Proteínas, carboidratos, gordura e fibra', free: '✓', limited: true,           unlimited: true },
-  { label: 'Score de saúde da refeição',       free: false,              limited: true,              unlimited: true },
+  { label: 'Pontuação de saúde da refeição',    free: false,              limited: true,              unlimited: true },
   { label: 'Histórico de refeições',           free: false,              limited: '30 dias',         unlimited: 'Ilimitado',           highlight: true },
   { label: 'Metas diárias personalizadas',     free: false,              limited: true,              unlimited: true },
   { label: 'Painel de progresso & gráficos',   free: false,              limited: true,              unlimited: true },
   { label: 'Treino do Dia gerado por IA',      free: false,              limited: '5/mês',           unlimited: 'Ilimitado',           highlight: true },
-  { label: 'Player de treino com cronômetro',  free: false,              limited: false,             unlimited: true,                  highlight: true },
+  { label: 'Execução guiada com cronômetro',   free: false,              limited: false,             unlimited: true,                  highlight: true },
   { label: 'Plano semanal personalizado',      free: false,              limited: false,             unlimited: true },
   { label: 'Resumo da nutricionista (IA)',     free: false,              limited: false,             unlimited: true,                  highlight: true },
   { label: 'Relatório semanal inteligente',    free: false,              limited: false,             unlimited: true },
@@ -180,8 +180,8 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                       <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Tudo ilimitado, sem restrições</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1, fontFamily: "'DM Mono', monospace" }}>
-                        R$&nbsp;25<span style={{ fontSize: 18 }}>,00</span>
+                      <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1 }}>
+                        R$&nbsp;25,00
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>/mês</div>
                     </div>
@@ -191,13 +191,13 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}>
                     {[
                       { icon: '📸', text: 'Análises de refeições ILIMITADAS' },
-                      { icon: '💪', text: 'Treino do Dia com IA — ilimitado' },
-                      { icon: '▶️', text: 'Player de treino com cronômetro' },
+                      { icon: '💪', text: 'Treino do Dia Personalizado — ilimitado' },
+                      { icon: '▶️', text: 'Execução guiada com cronômetro' },
                       { icon: '🩺', text: 'Resumo da nutricionista por IA' },
-                      { icon: '📊', text: 'Analytics avançado + relatório semanal' },
-                      { icon: '📅', text: 'Plano semanal personalizado' },
+                      { icon: '📊', text: 'Relatório avançado + progresso semanal' },
+                      { icon: '📅', text: 'Plano de treino semanal' },
                       { icon: '♾️', text: 'Histórico ilimitado de refeições' },
-                      { icon: '🎯', text: 'Metas nutricionais personalizadas' },
+                      { icon: '🎯', text: 'Metas de nutrição personalizadas' },
                     ].map(f => (
                       <div key={f.text} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ fontSize: 15, flexShrink: 0 }}>{f.icon}</span>
@@ -239,8 +239,8 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Para quem está começando</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1, fontFamily: "'DM Mono', monospace" }}>
-                      R$&nbsp;17<span style={{ fontSize: 16 }}>,00</span>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1 }}>
+                      R$&nbsp;17,00
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>/mês</div>
                   </div>
@@ -250,9 +250,9 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                   {[
                     '20 análises/mês',
                     'Nutrientes completos',
-                    'Score de saúde',
+                    'Pontuação de saúde',
                     'Metas personalizadas',
-                    'Analytics básico',
+                    'Progresso básico',
                     'Histórico 30 dias',
                     '5 Treinos IA/mês',
                   ].map(f => (
