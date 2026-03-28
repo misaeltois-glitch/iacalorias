@@ -181,7 +181,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1, fontFamily: "'DM Mono', monospace" }}>
-                        R$&nbsp;49<span style={{ fontSize: 18 }}>,90</span>
+                        R$&nbsp;25<span style={{ fontSize: 18 }}>,00</span>
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>/mês</div>
                     </div>
@@ -220,7 +220,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                       transition: 'all 0.2s',
                     }}
                   >
-                    {loadingPlan === 'unlimited' ? 'Redirecionando...' : 'Assinar Ilimitado — R$49,90/mês'}
+                    {loadingPlan === 'unlimited' ? 'Redirecionando...' : 'Assinar Ilimitado — R$25,00/mês'}
                   </button>
                   <p style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'center', margin: '8px 0 0' }}>
                     Cancele quando quiser · 7 dias grátis
@@ -240,7 +240,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1, fontFamily: "'DM Mono', monospace" }}>
-                      R$&nbsp;29<span style={{ fontSize: 16 }}>,90</span>
+                      R$&nbsp;17<span style={{ fontSize: 16 }}>,00</span>
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>/mês</div>
                   </div>
@@ -339,7 +339,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     background: 'var(--bg-3)', border: '1px solid var(--border)',
                     borderRadius: 8, padding: '5px 6px', cursor: 'pointer',
                   }}>
-                    {loadingPlan === 'limited' ? '...' : 'R$29,90'}
+                    {loadingPlan === 'limited' ? '...' : 'R$17,00'}
                   </button>
                 </div>
                 <div style={{ padding: '8px 4px', borderLeft: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -348,7 +348,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     background: `linear-gradient(135deg, ${accent}, #057A55)`,
                     border: 'none', borderRadius: 8, padding: '5px 6px', cursor: 'pointer',
                   }}>
-                    {loadingPlan === 'unlimited' ? '...' : 'R$49,90'}
+                    {loadingPlan === 'unlimited' ? '...' : 'R$25,00'}
                   </button>
                 </div>
               </div>

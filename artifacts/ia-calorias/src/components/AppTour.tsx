@@ -47,7 +47,7 @@ const STEPS: TourStep[] = [
   {
     selector: '[data-tour="upgrade-banner"]',
     title: '👑 Planos Premium',
-    description: 'Desbloqueie análises ilimitadas, histórico completo, metas nutricionais personalizadas e alertas inteligentes. A partir de R$29,90/mês.',
+    description: 'Desbloqueie análises ilimitadas, histórico completo, metas nutricionais personalizadas e alertas inteligentes. A partir de R$17,00/mês.',
     tooltipSide: 'above',
     padding: 8,
   },
