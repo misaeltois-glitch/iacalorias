@@ -11,8 +11,10 @@ const router: IRouter = Router();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2025-02-24.acacia" });
 
-const PRICE_LIMITED = process.env.STRIPE_LIMITED_PRICE_ID ?? "price_1TG4kW5gtu657TZjczJxsG4A";
-const PRICE_UNLIMITED = process.env.STRIPE_UNLIMITED_PRICE_ID ?? "price_1TG4kW5gtu657TZjyp9NlkVZ";
+// R$17,00/mês — criado em 2026-03-28
+const PRICE_LIMITED = "price_1TG4kW5gtu657TZjczJxsG4A";
+// R$25,00/mês — criado em 2026-03-28
+const PRICE_UNLIMITED = "price_1TG4kW5gtu657TZjyp9NlkVZ";
 
 const FREE_TRIAL_LIMIT = 3;
 const LIMITED_PLAN_LIMIT = 20;
