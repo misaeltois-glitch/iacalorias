@@ -207,6 +207,17 @@ export default function Home() {
     else if (sessionId && !isPremium) loadGoalsDirect();
   }, [sessionId, isPremium, refreshSummary, loadGoalsDirect]);
 
+  // After login, check if user had a pending upgrade plan and open checkout
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const pending = localStorage.getItem('ia-calorias-pending-plan') as 'limited' | 'unlimited' | null;
+    if (pending) {
+      localStorage.removeItem('ia-calorias-pending-plan');
+      setPaywallDisableClose(false);
+      setShowPaywall(true);
+    }
+  }, [isAuthenticated]);
+
   useEffect(() => {
     const t = document.documentElement.getAttribute('data-theme') || 'dark';
     setTheme(t as 'light' | 'dark');

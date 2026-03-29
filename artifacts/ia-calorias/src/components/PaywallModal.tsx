@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
+import { useLocation } from 'wouter';
 import { useCreateCheckoutSession } from '@workspace/api-client-react';
+import { useAuth } from '@/hooks/use-auth';
+
+const PENDING_PLAN_KEY = 'ia-calorias-pending-plan';
 
 interface PaywallModalProps {
   isOpen: boolean;
@@ -62,9 +66,17 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
   const [loadingPlan, setLoadingPlan] = useState<'limited' | 'unlimited' | null>(null);
   const [tab, setTab] = useState<'cards' | 'compare'>('cards');
   const checkoutMutation = useCreateCheckoutSession();
+  const { isAuthenticated } = useAuth();
+  const [, navigate] = useLocation();
 
   const handleCheckout = (plan: 'limited' | 'unlimited') => {
     if (loadingPlan) return;
+    if (!isAuthenticated) {
+      localStorage.setItem(PENDING_PLAN_KEY, plan);
+      onClose();
+      navigate('/login?tab=register');
+      return;
+    }
     setLoadingPlan(plan);
     checkoutMutation.mutate({ data: { sessionId, plan } }, {
       onSuccess: (res) => { window.location.href = res.url; },
