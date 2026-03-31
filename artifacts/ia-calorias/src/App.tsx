@@ -7,6 +7,8 @@ import Home from "@/pages/Home";
 import ResetPassword from "@/pages/ResetPassword";
 import LoginPage from "@/pages/LoginPage";
 import ProfilePage from "@/pages/ProfilePage";
+import TermsPage from "@/pages/TermsPage";
+import PrivacyPage from "@/pages/PrivacyPage";
 import { AuthProvider } from "@/hooks/use-auth";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { useEffect } from "react";
@@ -29,6 +31,8 @@ function Router() {
       <Route path="/login" component={LoginPage} />
       <Route path="/profile" component={ProfilePage} />
       <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/termos" component={TermsPage} />
+      <Route path="/privacidade" component={PrivacyPage} />
       <Route component={NotFound} />
     </Switch>
   );

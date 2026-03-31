@@ -329,9 +329,9 @@ export default function LoginPage() {
 
           <p style={{ fontSize: '12px', color: 'var(--text-3)', textAlign: 'center', marginTop: '32px', lineHeight: 1.6 }}>
             Ao continuar, você concorda com os{' '}
-            <span style={{ color: ACCENT, cursor: 'pointer' }}>Termos de Uso</span>{' '}
+            <span onClick={() => navigate('/termos')} style={{ color: ACCENT, cursor: 'pointer', textDecoration: 'underline' }}>Termos de Uso</span>{' '}
             e a{' '}
-            <span style={{ color: ACCENT, cursor: 'pointer' }}>Política de Privacidade</span>.
+            <span onClick={() => navigate('/privacidade')} style={{ color: ACCENT, cursor: 'pointer', textDecoration: 'underline' }}>Política de Privacidade</span>.
           </p>
         </div>
       </div>

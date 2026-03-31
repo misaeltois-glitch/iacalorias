@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'wouter';
 
 const LGPD_KEY = 'lgpd-accepted';
 
@@ -21,6 +22,7 @@ interface LGPDConsentPopupProps {
 
 export function LGPDConsentPopup({ onAccept }: LGPDConsentPopupProps) {
   const [loading, setLoading] = useState(false);
+  const [, navigate] = useLocation();
 
   const handleAccept = () => {
     setLoading(true);
@@ -115,11 +117,11 @@ export function LGPDConsentPopup({ onAccept }: LGPDConsentPopupProps) {
           textAlign: 'center', fontSize: '11px', color: 'var(--text-2)', lineHeight: 1.5,
         }}>
           Ao continuar, você concorda com nossos{' '}
-          <span style={{ color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline' }}>
+          <span onClick={() => navigate('/termos')} style={{ color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline' }}>
             Termos de Uso
           </span>
           {' '}e{' '}
-          <span style={{ color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline' }}>
+          <span onClick={() => navigate('/privacidade')} style={{ color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline' }}>
             Política de Privacidade
           </span>
           .
