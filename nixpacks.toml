@@ -1,8 +1,8 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "nodePackages.pnpm"]
+nixPkgs = ["nodejs_20"]
 
 [phases.install]
-cmds = ["pnpm install --frozen-lockfile"]
+cmds = ["npm install -g pnpm@10 && ln -sf $(npm bin -g)/pnpm /usr/local/bin/pnpm && pnpm install --frozen-lockfile"]
 
 [phases.build]
 cmds = ["node scripts/build-railway.mjs"]
