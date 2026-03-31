@@ -1,11 +1,9 @@
 [phases.setup]
 nixPkgs = ["nodejs_20"]
+cmds = ["npm install -g pnpm@10"]
 
 [phases.install]
-cmds = [
-  "npm install -g pnpm@10",
-  "pnpm install --frozen-lockfile"
-]
+cmds = ["pnpm install --frozen-lockfile"]
 
 [phases.build]
 cmds = ["node scripts/build-railway.mjs"]
