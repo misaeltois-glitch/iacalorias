@@ -1,6 +1,9 @@
 [variables]
 COREPACK_INTEGRITY_KEYS = "0"
 
+[phases.install]
+cmds = ["pnpm install --no-frozen-lockfile"]
+
 [phases.build]
 cmds = ["node scripts/build-railway.mjs"]
 
