@@ -16,8 +16,7 @@ function run(cmd, env = {}) {
 
 console.log("=== Railway Build ===\n");
 
-// 1. Build libs that need compilation (api-spec, api-zod, api-client-react)
-run("pnpm --filter @workspace/api-spec run build --if-present");
+// 1. Build libs that need compilation (api-zod, api-client-react)
 run("pnpm --filter @workspace/api-zod run build --if-present");
 run("pnpm --filter @workspace/api-client-react run build --if-present");
 
