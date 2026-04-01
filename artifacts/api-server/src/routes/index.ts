@@ -8,6 +8,7 @@ import goalsRouter from "./goals";
 import authRouter from "./auth";
 import analyticsRouter from "./analytics";
 import workoutRouter from "./workout";
+import chatRouter from "./chat";
 
 const router: IRouter = Router();
 
@@ -21,5 +22,6 @@ router.use("/subscription", subscriptionRouter);
 router.use("/goals", goalsRouter);
 router.use("/analytics", analyticsRouter);
 router.use("/workout", workoutRouter);
+router.use("/chat", chatRouter);
 
 export default router;
