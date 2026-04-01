@@ -20,6 +20,7 @@ import { OnboardingCarousel } from '@/components/OnboardingCarousel';
 import { BottomNav, type BottomNavTab } from '@/components/BottomNav';
 import { WorkoutPanel } from '@/components/WorkoutPanel';
 import { ProgressView } from '@/components/ProgressView';
+import { WaterTracker } from '@/components/WaterTracker';
 import { AppTour } from '@/components/AppTour';
 import { useTour } from '@/hooks/use-tour';
 import { GoalCelebration, hasCelebratedToday, markCelebratedToday } from '@/components/GoalCelebration';
@@ -927,6 +928,9 @@ export default function Home() {
                   />
                 </div>
               )}
+
+              {/* Water Tracker */}
+              <WaterTracker />
 
               {/* Como funciona */}
               <div style={{ paddingTop: '24px', borderTop: '1px solid var(--border)' }}>
