@@ -107,6 +107,7 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
   "fiber": number (gramas, uma casa decimal),
   "healthScore": number (pontuação de saúde de 1 a 10, sendo 10 o mais saudável),
   "nutritionTip": "string (uma dica nutricional curta e personalizada em português sobre este prato, máximo 100 caracteres)",
+  "substitutionTip": "string (sugira 1 substituição saudável e prática para melhorar este prato, ex: 'Troque o arroz branco por integral e ganhe +3g de fibra' — máximo 110 caracteres, em português)",
   "confidence": "string (nível de confiança: 'Alta confiança', 'Média confiança', ou 'Baixa confiança')"
 }`,
         },
@@ -118,7 +119,7 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
           ],
         },
       ],
-      max_tokens: 500,
+      max_tokens: 600,
     });
 
     const raw = response.choices[0]?.message?.content?.trim() ?? "";
@@ -126,7 +127,7 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
       isFood: boolean; reason?: string;
       dishName?: string; servingSize?: string; calories?: number;
       protein?: number; carbs?: number; fat?: number; fiber?: number;
-      healthScore?: number; nutritionTip?: string; confidence?: string;
+      healthScore?: number; nutritionTip?: string; substitutionTip?: string; confidence?: string;
     };
 
     try {
@@ -164,6 +165,7 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
       fiber: parsed.fiber ?? null,
       healthScore: parsed.healthScore ? Math.round(parsed.healthScore) : null,
       nutritionTip: parsed.nutritionTip ?? null,
+      substitutionTip: parsed.substitutionTip ?? null,
       servingSize: parsed.servingSize ?? null,
       confidence: parsed.confidence ?? null,
     });
@@ -183,6 +185,7 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
       fiber: parsed.fiber ?? null,
       healthScore: parsed.healthScore ? Math.round(parsed.healthScore) : null,
       nutritionTip: parsed.nutritionTip ?? null,
+      substitutionTip: parsed.substitutionTip ?? null,
       servingSize: parsed.servingSize ?? null,
       confidence: parsed.confidence ?? null,
       imageUrl: null,
@@ -236,6 +239,7 @@ router.get("/history", async (req: Request, res: Response) => {
       fiber: a.fiber ?? null,
       healthScore: a.healthScore ?? null,
       nutritionTip: a.nutritionTip ?? null,
+      substitutionTip: a.substitutionTip ?? null,
       servingSize: a.servingSize ?? null,
       confidence: a.confidence ?? null,
       imageUrl: a.imageUrl ?? null,

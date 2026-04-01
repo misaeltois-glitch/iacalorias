@@ -14,6 +14,7 @@ export const analysesTable = pgTable("analyses", {
   fiber: real("fiber"),
   healthScore: integer("health_score"),
   nutritionTip: text("nutrition_tip"),
+  substitutionTip: text("substitution_tip"),
   servingSize: text("serving_size"),
   confidence: text("confidence"),
   imageUrl: text("image_url"),

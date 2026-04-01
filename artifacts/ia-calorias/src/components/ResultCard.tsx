@@ -220,6 +220,27 @@ export function ResultCard({ result, onReset, photoUrl }: ResultCardProps) {
         </div>
       </motion.div>
 
+      {/* Substitution Tip */}
+      {result.substitutionTip && (
+        <motion.div variants={item} style={{
+          padding: '14px 16px',
+          borderRadius: '16px',
+          background: 'rgba(245,158,11,0.07)',
+          border: '1px solid rgba(245,158,11,0.22)',
+          display: 'flex', alignItems: 'flex-start', gap: '10px',
+        }}>
+          <span style={{ fontSize: '20px', flexShrink: 0, marginTop: '1px' }}>🔄</span>
+          <div>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#D97706', letterSpacing: '0.3px', display: 'block', marginBottom: '3px' }}>
+              SUGESTÃO DE SUBSTITUIÇÃO
+            </span>
+            <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.55, margin: 0 }}>
+              {result.substitutionTip}
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Footer */}
       <motion.div variants={item} style={{
         textAlign: 'center',

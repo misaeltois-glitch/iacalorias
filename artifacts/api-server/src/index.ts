@@ -23,6 +23,10 @@ async function runMigrations() {
       ALTER TABLE subscriptions
       ADD COLUMN IF NOT EXISTS payment_type text DEFAULT 'subscription'
     `);
+    await pool.query(`
+      ALTER TABLE analyses
+      ADD COLUMN IF NOT EXISTS substitution_tip text
+    `);
     logger.info("DB migrations applied");
   } catch (err) {
     logger.warn({ err }, "DB migration failed (non-critical)");
