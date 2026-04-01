@@ -49,7 +49,7 @@ const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 const ONBOARDED_KEY = 'ia-calorias-onboarded';
 const MANDATORY_ONBOARDING_KEY = 'ia-calorias-mandatory-done';
 const FIRST_USE_TS_KEY = 'ia-calorias-first-use-ts';
-const FREE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days nutrition trial
+const FREE_PERIOD_MS = 3 * 24 * 60 * 60 * 1000; // 3 days nutrition trial
 const WORKOUT_TRIAL_START_KEY = 'ia-calorias-workout-trial-ts';
 const WORKOUT_TRIAL_MS = 3 * 24 * 60 * 60 * 1000; // 3 days workout trial
 
@@ -185,8 +185,8 @@ export default function Home() {
 
   const analyzeMutation = useAnalyzeFood();
   const isPremium = subStatus?.tier === 'limited' || subStatus?.tier === 'unlimited';
-  const trialRemaining = subStatus?.trialRemaining ?? 30;
-  const trialUsed = Math.max(0, 30 - trialRemaining);
+  const trialRemaining = subStatus?.trialRemaining ?? 3;
+  const trialUsed = Math.max(0, 3 - trialRemaining);
 
   const trialDaysRemaining = (() => {
     if (isPremium) return null;
@@ -882,7 +882,7 @@ export default function Home() {
 
               {/* Trial days bar */}
               {subStatus?.tier === 'free' && (
-                <UsageBar used={7 - (trialDaysRemaining ?? 7)} max={7} onClick={() => setShowPaywall(true)} />
+                <UsageBar used={3 - (trialDaysRemaining ?? 3)} max={3} onClick={() => setShowPaywall(true)} />
               )}
 
               {/* Camera card + upload */}
@@ -1233,7 +1233,7 @@ export default function Home() {
         isOpen={showAnalytics}
         onClose={() => { setShowAnalytics(false); setActiveTab('home'); }}
         sessionId={sessionId}
-        isPremium={isPremium}
+        isPremium={isPremium || (trialDaysRemaining !== null && trialDaysRemaining > 0)}
         onUpgrade={() => { setShowAnalytics(false); setPaywallDisableClose(false); setShowPaywall(true); }}
       />
 

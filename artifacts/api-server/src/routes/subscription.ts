@@ -22,7 +22,7 @@ const PRICE_UNLIMITED_ONETIME = process.env.STRIPE_PRICE_UNLIMITED_ONETIME ?? "p
 const PRICE_LIMITED_ANNUAL   = process.env.STRIPE_PRICE_LIMITED_ANNUAL   ?? "";
 const PRICE_UNLIMITED_ANNUAL = process.env.STRIPE_PRICE_UNLIMITED_ANNUAL ?? "";
 
-const FREE_TRIAL_LIMIT = 30;
+const FREE_TRIAL_LIMIT = 3;
 const LIMITED_PLAN_LIMIT = 20;
 
 async function resolveSub(userId?: string, sessionId?: string) {

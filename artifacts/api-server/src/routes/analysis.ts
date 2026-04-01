@@ -10,7 +10,7 @@ import { getMasterTier } from "../lib/master-emails.js";
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-const FREE_TRIAL_LIMIT = 30;
+const FREE_TRIAL_LIMIT = 3;
 const LIMITED_PLAN_LIMIT = 20;
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

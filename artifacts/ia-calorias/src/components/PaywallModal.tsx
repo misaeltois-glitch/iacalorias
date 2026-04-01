@@ -24,7 +24,7 @@ type FeatureRow = {
 };
 
 const FEATURES: FeatureRow[] = [
-  { label: 'Análise de refeições por IA',              free: '5 p/ testar',    limited: '20 por mês',   unlimited: 'Ilimitadas',   highlight: true },
+  { label: 'Análise de refeições por IA',              free: '3 p/ testar',    limited: '20 por mês',   unlimited: 'Ilimitadas',   highlight: true },
   { label: 'Calorias e proteínas por refeição',        free: true,             limited: true,           unlimited: true },
   { label: 'Carboidratos, gordura e fibra',            free: true,             limited: true,           unlimited: true },
   { label: 'Pontuação de saúde da refeição',           free: false,            limited: true,           unlimited: true },
@@ -240,7 +240,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     🎁 Você está no plano grátis
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-2)', lineHeight: 1.5 }}>
-                    7 dias de trial completo · Todas as funcionalidades liberadas
+                    3 dias de trial · 3 análises de foto · Treino incluso
                   </div>
                 </div>
                 <span style={{
@@ -325,7 +325,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     {(loadingPlan === 'unlimited' || loadingPlan === 'unlimited_annual') ? 'Redirecionando...' : billing === 'annual' ? `💳 Assinar Anual — R$${ANNUAL_UNLIMITED.toFixed(2).replace('.', ',')}` : '💳 Assinar Ilimitado — R$29,90/mês'}
                   </button>
                   <p style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'center', margin: '8px 0 0' }}>
-                    {billing === 'annual' ? 'Cobrado anualmente · Cancele quando quiser' : 'Cancele quando quiser · 7 dias grátis'}
+                    {billing === 'annual' ? 'Cobrado anualmente · Cancele quando quiser' : 'Cancele quando quiser · Sem fidelidade'}
                   </p>
                 </div>
               </div>
