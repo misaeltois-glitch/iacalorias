@@ -1020,7 +1020,7 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               style={{ width: '100%', paddingTop: '8px' }}
             >
-              <ResultCard result={currentResult} onReset={() => { setCurrentResult(null); setPhotoUrl(undefined); }} photoUrl={photoUrl} />
+              <ResultCard result={currentResult} onReset={() => { setCurrentResult(null); setPhotoUrl(undefined); }} photoUrl={photoUrl} sessionId={sessionId} />
 
               {/* Post-result save CTA — anonymous only */}
               {!isAuthenticated && (

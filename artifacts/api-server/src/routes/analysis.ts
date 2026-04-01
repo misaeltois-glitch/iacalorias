@@ -207,6 +207,36 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
   }
 });
 
+// PATCH /api/analysis/:id — edit analysis fields
+router.patch("/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user?.userId;
+  const { dishName, calories, protein, carbs, fat, fiber } = req.body;
+
+  if (!id) { res.status(400).json({ error: "bad_request", message: "id required" }); return; }
+
+  // Find the analysis and verify ownership
+  const existing = await db.query.analysesTable.findFirst({ where: eq(analysesTable.id, id) });
+  if (!existing) { res.status(404).json({ error: "not_found", message: "Analysis not found" }); return; }
+
+  const isOwner = (userId && existing.userId === userId) || (!userId && existing.sessionId === req.body.sessionId);
+  if (!isOwner) { res.status(403).json({ error: "forbidden" }); return; }
+
+  const patch: Record<string, unknown> = {};
+  if (dishName !== undefined) patch.dishName = String(dishName).trim().slice(0, 200);
+  if (calories !== undefined) patch.calories = Math.max(0, Math.round(Number(calories)));
+  if (protein !== undefined) patch.protein = Math.max(0, Number(protein));
+  if (carbs !== undefined) patch.carbs = Math.max(0, Number(carbs));
+  if (fat !== undefined) patch.fat = Math.max(0, Number(fat));
+  if (fiber !== undefined) patch.fiber = Math.max(0, Number(fiber));
+
+  if (Object.keys(patch).length === 0) { res.status(400).json({ error: "bad_request", message: "No fields to update" }); return; }
+
+  await db.update(analysesTable).set(patch).where(eq(analysesTable.id, id));
+
+  res.json({ ok: true, id, ...patch });
+});
+
 router.get("/history", async (req: Request, res: Response) => {
   const sessionId = req.query.sessionId as string;
   const userId = req.user?.userId;

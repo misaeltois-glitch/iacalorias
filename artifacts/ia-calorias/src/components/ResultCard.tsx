@@ -1,13 +1,17 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { RotateCcw, Sparkles, Share2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { RotateCcw, Sparkles, Share2, Pencil, Check, X } from 'lucide-react';
 import type { AnalysisResult } from '@workspace/api-client-react/src/generated/api.schemas';
 import { shareResult } from '@/lib/share-card';
+
+const BASE = import.meta.env.BASE_URL ?? '/';
+const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 
 interface ResultCardProps {
   result: AnalysisResult;
   onReset: () => void;
   photoUrl?: string;
+  sessionId?: string;
 }
 
 const MACROS = [
@@ -50,9 +54,47 @@ function CountUpNumber({ value, suffix = '' }: { value: number; suffix?: string 
   return <>{displayed}{suffix}</>;
 }
 
-export function ResultCard({ result, onReset, photoUrl }: ResultCardProps) {
+export function ResultCard({ result, onReset, photoUrl, sessionId }: ResultCardProps) {
   const [sharing, setSharing] = useState(false);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editValues, setEditValues] = useState({
+    dishName: result.dishName,
+    calories: result.calories,
+    protein: result.macros.protein,
+    carbs: result.macros.carbs,
+    fat: result.macros.fat,
+    fiber: result.fiber ?? 0,
+  });
+  const [liveResult, setLiveResult] = useState(result);
+
+  const handleSaveEdit = useCallback(async () => {
+    setSaving(true);
+    try {
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      const r = await fetch(`${BASE}api/analysis/${liveResult.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ ...editValues, sessionId }),
+      });
+      if (r.ok) {
+        setLiveResult(prev => ({
+          ...prev,
+          dishName: editValues.dishName,
+          calories: editValues.calories,
+          macros: { protein: editValues.protein, carbs: editValues.carbs, fat: editValues.fat },
+          fiber: editValues.fiber,
+        }));
+        setEditing(false);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }, [editValues, liveResult.id, sessionId]);
 
   const handleShare = useCallback(async () => {
     setSharing(true);
@@ -67,16 +109,16 @@ export function ResultCard({ result, onReset, photoUrl }: ResultCardProps) {
   }, [result]);
 
   const macroValues = {
-    protein: result.macros.protein,
-    carbs: result.macros.carbs,
-    fiber: result.fiber ?? 0,
-    fat: result.macros.fat,
+    protein: liveResult.macros.protein,
+    carbs: liveResult.macros.carbs,
+    fiber: liveResult.fiber ?? 0,
+    fat: liveResult.macros.fat,
   };
 
   const maxMacro = Math.max(...Object.values(macroValues), 1);
   const getPct = (v: number) => Math.min(100, (v / maxMacro) * 100);
 
-  const healthScore = result.healthScore ?? 0;
+  const healthScore = liveResult.healthScore ?? 0;
   const circumference = 2 * Math.PI * 36;
   const strokeOffset = circumference - (healthScore / 10) * circumference;
 
@@ -116,31 +158,84 @@ export function ResultCard({ result, onReset, photoUrl }: ResultCardProps) {
               PRATO IDENTIFICADO
             </span>
           </div>
-          <h2 style={{
-            fontSize: '22px', fontWeight: 800, color: 'var(--text-1)',
-            letterSpacing: '-0.4px', marginBottom: '12px', lineHeight: 1.2,
-          }}>
-            {result.dishName}
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: '12px' }}>
+            <h2 style={{
+              fontSize: '22px', fontWeight: 800, color: 'var(--text-1)',
+              letterSpacing: '-0.4px', lineHeight: 1.2, flex: 1,
+            }}>
+              {liveResult.dishName}
+            </h2>
+            <button
+              onClick={() => { setEditing(e => !e); setEditValues({ dishName: liveResult.dishName, calories: liveResult.calories, protein: liveResult.macros.protein, carbs: liveResult.macros.carbs, fat: liveResult.macros.fat, fiber: liveResult.fiber ?? 0 }); }}
+              style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: editing ? '#0D9F6E' : 'var(--text-3)', borderRadius: 8, flexShrink: 0, marginTop: 2 }}
+              title="Editar análise"
+            >
+              <Pencil size={15} />
+            </button>
+          </div>
+
+          {/* Inline edit form */}
+          <AnimatePresence>
+            {editing && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                style={{ overflow: 'hidden', marginBottom: 12 }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px', borderRadius: 14, background: 'var(--bg-3)', border: '1px solid var(--border)' }}>
+                  <input
+                    value={editValues.dishName}
+                    onChange={e => setEditValues(v => ({ ...v, dishName: e.target.value }))}
+                    placeholder="Nome do prato"
+                    style={{ padding: '8px 10px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }}
+                  />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                    {([['calories','Kcal',''],['protein','Prot','g'],['carbs','Carbs','g'],['fat','Gord','g'],['fiber','Fibras','g']] as const).map(([key, label, unit]) => (
+                      <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600 }}>{label}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={key === 'calories' ? 1 : 0.1}
+                          value={editValues[key]}
+                          onChange={e => setEditValues(v => ({ ...v, [key]: Number(e.target.value) }))}
+                          style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)', fontSize: 13, outline: 'none', fontFamily: 'inherit', width: '100%' }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '8px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                      <X size={13} /> Cancelar
+                    </button>
+                    <button onClick={handleSaveEdit} disabled={saving} style={{ flex: 2, padding: '8px', borderRadius: 10, border: 'none', background: '#0D9F6E', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, opacity: saving ? 0.6 : 1 }}>
+                      <Check size={13} /> {saving ? 'Salvando…' : 'Salvar'}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {result.servingSize && (
+              {liveResult.servingSize && (
                 <span style={{
                   padding: '4px 10px', borderRadius: '99px',
                   background: 'var(--bg-3)', border: '1px solid var(--border)',
                   fontSize: '12px', color: 'var(--text-2)',
                 }}>
-                  {result.servingSize}
+                  {liveResult.servingSize}
                 </span>
               )}
-              {result.confidence && (
+              {liveResult.confidence && (
                 <span style={{
                   padding: '4px 10px', borderRadius: '99px',
                   background: 'var(--bg-3)', border: '1px solid var(--border)',
                   fontSize: '12px', color: 'var(--text-2)',
                 }}>
-                  Confiança: {result.confidence}
+                  Confiança: {liveResult.confidence}
                 </span>
               )}
             </div>
@@ -152,7 +247,7 @@ export function ResultCard({ result, onReset, photoUrl }: ResultCardProps) {
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
               }}>
-                <CountUpNumber value={result.calories} />
+                <CountUpNumber value={liveResult.calories} />
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-2)', fontWeight: 600, letterSpacing: '0.5px' }}>
                 KCAL
@@ -231,13 +326,13 @@ export function ResultCard({ result, onReset, photoUrl }: ResultCardProps) {
             💡 DICA NUTRICIONAL
           </span>
           <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.55 }}>
-            {result.nutritionTip ?? 'Não há dicas adicionais para esta refeição.'}
+            {liveResult.nutritionTip ?? 'Não há dicas adicionais para esta refeição.'}
           </p>
         </div>
       </motion.div>
 
       {/* Substitution Tip */}
-      {result.substitutionTip && (
+      {liveResult.substitutionTip && (
         <motion.div variants={item} style={{
           padding: '14px 16px',
           borderRadius: '16px',
@@ -251,7 +346,7 @@ export function ResultCard({ result, onReset, photoUrl }: ResultCardProps) {
               SUGESTÃO DE SUBSTITUIÇÃO
             </span>
             <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.55, margin: 0 }}>
-              {result.substitutionTip}
+              {liveResult.substitutionTip}
             </p>
           </div>
         </motion.div>
