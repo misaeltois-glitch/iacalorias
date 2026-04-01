@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, Loader2, Calculator, Pencil, Lock } from 'lucide-react';
+import { X, Check, Loader2, Calculator, Pencil, Lock, Crown } from 'lucide-react';
 
 const BASE = import.meta.env.BASE_URL ?? '/';
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
@@ -15,6 +15,8 @@ interface GoalsPanelProps {
   onClose: () => void;
   sessionId: string;
   onOpenBiometrics: () => void;
+  isPremium?: boolean;
+  onUpgrade?: () => void;
 }
 
 type MacroKey = 'calories' | 'protein' | 'carbs' | 'fat' | 'fiber';
@@ -235,7 +237,7 @@ function MacroCard({ config, valuePerDay, mealsPerDay, liveMealsPerDay, viewMode
   );
 }
 
-export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: GoalsPanelProps) {
+export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics, isPremium = true, onUpgrade }: GoalsPanelProps) {
   const [goals, setGoals] = useState<Record<MacroKey, number | null> & { mealsPerDay: number }>({
     calories: null, protein: null, carbs: null, fat: null, fiber: null, mealsPerDay: 3,
   });
@@ -418,7 +420,7 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
               </div>
 
               {/* Macro readonly rows */}
-              {MACROS.map(cfg => {
+              {MACROS.filter(cfg => isPremium || cfg.key === 'calories' || cfg.key === 'protein').map(cfg => {
                 const v = goals[cfg.key];
                 const mpd = Math.max(1, goals.mealsPerDay);
                 const perMeal = v ? Math.round((v / mpd) * 10) / 10 : null;
@@ -525,18 +527,44 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics }: Goa
               </div>
 
               {/* Macro cards */}
-              {MACROS.map(cfg => (
-                <MacroCard
-                  key={cfg.key}
-                  config={cfg}
-                  valuePerDay={goals[cfg.key]}
-                  mealsPerDay={goals.mealsPerDay}
-                  liveMealsPerDay={parseInt(mealsPerDayLocal) || goals.mealsPerDay}
-                  viewMode={viewModes[cfg.key]}
-                  onViewModeChange={(mode) => setViewModes(prev => ({ ...prev, [cfg.key]: mode }))}
-                  onSave={handleSaveMacro}
-                />
-              ))}
+              {MACROS.map(cfg => {
+                const isLocked = !isPremium && (cfg.key === 'carbs' || cfg.key === 'fat' || cfg.key === 'fiber');
+                if (isLocked) {
+                  return (
+                    <div key={cfg.key} style={{
+                      borderRadius: '16px', background: 'var(--bg-2)',
+                      border: '1.5px dashed var(--border)', padding: '16px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      opacity: 0.6,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: cfg.bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                          {cfg.emoji}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)' }}>{cfg.label}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>Disponível no plano pago</div>
+                        </div>
+                      </div>
+                      <button onClick={onUpgrade} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', borderRadius: '8px', background: 'var(--accent)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: '11px', fontWeight: 700 }}>
+                        <Crown style={{ width: '11px', height: '11px' }} /> Upgrade
+                      </button>
+                    </div>
+                  );
+                }
+                return (
+                  <MacroCard
+                    key={cfg.key}
+                    config={cfg}
+                    valuePerDay={goals[cfg.key]}
+                    mealsPerDay={goals.mealsPerDay}
+                    liveMealsPerDay={parseInt(mealsPerDayLocal) || goals.mealsPerDay}
+                    viewMode={viewModes[cfg.key]}
+                    onViewModeChange={(mode) => setViewModes(prev => ({ ...prev, [cfg.key]: mode }))}
+                    onSave={handleSaveMacro}
+                  />
+                );
+              })}
             </div>
           )}
         </div>

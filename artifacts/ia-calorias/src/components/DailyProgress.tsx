@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Target, Sparkles, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import { Target, Sparkles, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Info, Lock } from 'lucide-react';
 
 type Period = 'day' | 'week' | 'month';
 
@@ -91,32 +91,9 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
   const alertColors = { tip: '#3b82f6', warning: '#f59e0b', ok: '#22c55e' };
   const alertBg = { tip: 'rgba(59,130,246,0.08)', warning: 'rgba(245,158,11,0.08)', ok: 'rgba(34,197,94,0.08)' };
 
-  if (!isPremium) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        style={{
-          padding: '20px', borderRadius: '20px',
-          background: 'var(--bg-2)', border: '1.5px dashed var(--border-strong)',
-          textAlign: 'center',
-        }}
-      >
-        <div style={{ fontSize: '32px', marginBottom: '10px' }}>🎯</div>
-        <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px' }}>Metas e progresso diário</h3>
-        <p style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '16px', lineHeight: 1.5 }}>
-          Configure suas metas de calorias, proteínas, carboidratos e gordura e acompanhe seu progresso em tempo real.
-        </p>
-        <button onClick={onSetGoals} style={{
-          padding: '10px 20px', borderRadius: '10px',
-          background: 'var(--accent)', color: '#fff',
-          fontWeight: 600, fontSize: '14px', border: 'none', cursor: 'pointer',
-        }}>
-          Ver planos →
-        </button>
-      </motion.div>
-    );
-  }
+  // Free tier: show calories + protein, lock carbs/fat/fiber
+  const visibleMacros = isPremium ? macros : macros.slice(0, 2);
+  const lockedMacros = isPremium ? [] : macros.slice(2);
 
   return (
     <motion.div
@@ -175,7 +152,18 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
       }}>
         {goals ? (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '2px' }}>
-            {macros.map(m => <MacroRingComponent key={m.label} {...m} />)}
+            {visibleMacros.map(m => <MacroRingComponent key={m.label} {...m} />)}
+            {lockedMacros.map(m => (
+              <div key={m.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0, opacity: 0.4 }}>
+                <div style={{ width: 58, height: 58, borderRadius: '50%', background: 'var(--bg-3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Lock style={{ width: 16, height: 16, color: 'var(--text-3)' }} />
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{m.label}</div>
+                  <div style={{ fontSize: '9px', color: 'var(--text-3)' }}>upgrade</div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: '12px 0' }}>

@@ -169,11 +169,11 @@ export default function Home() {
 
   const analyzeMutation = useAnalyzeFood();
   const isPremium = subStatus?.tier === 'limited' || subStatus?.tier === 'unlimited';
-  const trialRemaining = subStatus?.trialRemaining ?? 3;
-  const trialUsed = Math.max(0, 3 - trialRemaining);
+  const trialRemaining = subStatus?.trialRemaining ?? 5;
+  const trialUsed = Math.max(0, 5 - trialRemaining);
 
   const refreshSummary = useCallback(async (p?: Period) => {
-    if (!sessionId || !isPremium) return;
+    if (!sessionId) return;
     const activePeriod = p ?? period;
     const summary = await fetchDailySummary(sessionId, activePeriod);
     if (summary) {
@@ -203,9 +203,8 @@ export default function Home() {
   }, [sessionId]);
 
   useEffect(() => {
-    if (sessionId && isPremium) refreshSummary();
-    else if (sessionId && !isPremium) loadGoalsDirect();
-  }, [sessionId, isPremium, refreshSummary, loadGoalsDirect]);
+    if (sessionId) refreshSummary();
+  }, [sessionId, isPremium, refreshSummary]);
 
   // After login, check if user had a pending upgrade plan and open checkout
   useEffect(() => {
@@ -467,7 +466,7 @@ export default function Home() {
     setActiveTab(tab);
     if (tab !== 'profile') setShowUserMenu(false);
     if (tab === 'home') { setCurrentResult(null); }
-    if (tab === 'workout') { setShowWorkout(true); }
+    if (tab === 'workout') { if (!isPremium) { setPaywallDisableClose(false); setShowPaywall(true); } else { setShowWorkout(true); } }
     if (tab === 'analyze') { setCurrentResult(null); }
     if (tab === 'profile') { isAuthenticated ? navigate('/profile') : navigate('/login'); }
   };
@@ -483,7 +482,7 @@ export default function Home() {
         cursor: 'pointer',
       }}>
         <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0D9F6E', display: 'inline-block', animation: 'ping 1.5s cubic-bezier(0,0,0.2,1) infinite' }} />
-        {subStatus.trialRemaining} de 3 grátis
+        {subStatus.trialRemaining} de 5 grátis
       </button>
     );
     if (subStatus.tier === 'limited') return (
@@ -791,7 +790,7 @@ export default function Home() {
 
               {/* Anonymous usage bar */}
               {!isAuthenticated && subStatus?.tier === 'free' && (
-                <UsageBar used={trialUsed} max={3} onClick={() => setShowPaywall(true)} />
+                <UsageBar used={trialUsed} max={5} onClick={() => setShowPaywall(true)} />
               )}
 
               {/* Camera card + upload */}
@@ -923,7 +922,7 @@ export default function Home() {
                     analysesCount={todaySummary?.analysesCount ?? 0}
                     period={'day'}
                     onPeriodChange={undefined}
-                    onSetGoals={() => isPremium ? setShowGoalsPanel(true) : setShowPaywall(true)}
+                    onSetGoals={() => setShowGoalsPanel(true)}
                     isPremium={isPremium}
                   />
                 </div>
@@ -1067,9 +1066,11 @@ export default function Home() {
         {showGoalsPanel && (
           <GoalsPanel
             isOpen={showGoalsPanel}
-            onClose={() => { setShowGoalsPanel(false); if (isPremium) refreshSummary(); else loadGoalsDirect(); setGoalsRefreshKey(k => k + 1); }}
+            onClose={() => { setShowGoalsPanel(false); refreshSummary(); setGoalsRefreshKey(k => k + 1); }}
             sessionId={sessionId}
             onOpenBiometrics={() => setShowOnboarding(true)}
+            isPremium={isPremium}
+            onUpgrade={() => { setShowGoalsPanel(false); setPaywallDisableClose(false); setShowPaywall(true); }}
           />
         )}
       </AnimatePresence>

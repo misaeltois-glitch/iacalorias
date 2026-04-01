@@ -61,12 +61,13 @@ router.get("/", async (req: Request, res: Response) => {
 
   const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
   const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
-  if (tier === "free") {
-    res.status(403).json({ error: "plan_required", message: "Metas disponíveis apenas em planos pagos.", requiresUpgrade: true });
-    return;
-  }
 
   const goals = await findGoals(userId, sessionId);
+  if (tier === "free" && goals) {
+    // Free: only return calories and protein
+    res.json({ ...goals, carbs: null, fat: null, fiber: null });
+    return;
+  }
   res.json(withPerMeal(goals));
 });
 
@@ -80,25 +81,26 @@ router.post("/", async (req: Request, res: Response) => {
 
   const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
   const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
-  if (tier === "free") {
-    res.status(403).json({ error: "plan_required", message: "Metas disponíveis apenas em planos pagos.", requiresUpgrade: true });
-    return;
-  }
 
   const restrictionsStr = Array.isArray(restrictions) ? JSON.stringify(restrictions) : restrictions;
+
+  // Free: only allow calories and protein
+  const effectiveCarbs = tier === "free" ? undefined : carbs;
+  const effectiveFat = tier === "free" ? undefined : fat;
+  const effectiveFiber = tier === "free" ? undefined : fiber;
 
   const existing = await findGoals(userId, sessionId);
 
   if (existing) {
     await db.update(goalsTable)
-      .set({ calories, protein, carbs, fat, fiber, mealsPerDay: mealsPerDay ?? existing.mealsPerDay ?? 3, weight, height, age, sex, objective, activityLevel, restrictions: restrictionsStr, userId: userId ?? existing.userId, updatedAt: new Date() })
+      .set({ calories, protein, carbs: effectiveCarbs, fat: effectiveFat, fiber: effectiveFiber, mealsPerDay: mealsPerDay ?? existing.mealsPerDay ?? 3, weight, height, age, sex, objective, activityLevel, restrictions: restrictionsStr, userId: userId ?? existing.userId, updatedAt: new Date() })
       .where(eq(goalsTable.sessionId, existing.sessionId));
   } else {
     const effectiveSessionId = sessionId ?? `user-${userId}`;
     await db.insert(goalsTable).values({
       sessionId: effectiveSessionId,
       userId: userId ?? null,
-      calories, protein, carbs, fat, fiber, mealsPerDay: mealsPerDay ?? 3,
+      calories, protein, carbs: effectiveCarbs, fat: effectiveFat, fiber: effectiveFiber, mealsPerDay: mealsPerDay ?? 3,
       weight, height, age, sex, objective, activityLevel,
       restrictions: restrictionsStr,
       updatedAt: new Date(),
@@ -118,12 +120,10 @@ router.patch("/", async (req: Request, res: Response) => {
 
   const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
   const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
-  if (tier === "free") {
-    res.status(403).json({ error: "plan_required", message: "Metas disponíveis apenas em planos pagos.", requiresUpgrade: true });
-    return;
-  }
 
-  const allowed = ["calories", "protein", "carbs", "fat", "fiber", "mealsPerDay"] as const;
+  const allowed = tier === "free"
+    ? ["calories", "protein", "mealsPerDay"] as const
+    : ["calories", "protein", "carbs", "fat", "fiber", "mealsPerDay"] as const;
   const patch: Record<string, number> = {};
   for (const key of allowed) {
     if (fields[key] !== undefined && fields[key] !== null) {
@@ -168,13 +168,7 @@ router.get("/daily-summary", async (req: Request, res: Response) => {
   // Dev account bypass
   const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
 
-  if (!isDevAccount) {
-    const tier = await resolveSubTier(userId, sessionId);
-    if (tier === "free") {
-      res.status(403).json({ error: "plan_required", message: "Resumo disponível apenas em planos pagos.", requiresUpgrade: true });
-      return;
-    }
-  }
+  const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
 
   const goals = await findGoals(userId, sessionId);
 
@@ -328,12 +322,18 @@ Retorne APENAS o texto do resumo, sem títulos, sem bullets, sem markdown.`;
     }
   }
 
+  const isFree = tier === "free";
+  const filteredGoals = scaledGoals && isFree ? { ...scaledGoals, carbs: null, fat: null, fiber: null } : scaledGoals;
+  const filteredRawGoals = goals && isFree
+    ? { calories: goals.calories, protein: goals.protein, carbs: null, fat: null, fiber: null, objective: goals.objective, mealsPerDay: goals.mealsPerDay ?? 3 }
+    : goals ? { calories: goals.calories, protein: goals.protein, carbs: goals.carbs, fat: goals.fat, fiber: goals.fiber, objective: goals.objective, mealsPerDay: goals.mealsPerDay ?? 3 } : null;
+
   res.json({
     totals,
-    goals: scaledGoals,
-    rawGoals: goals ? { calories: goals.calories, protein: goals.protein, carbs: goals.carbs, fat: goals.fat, fiber: goals.fiber, objective: goals.objective, mealsPerDay: goals.mealsPerDay ?? 3 } : null,
-    alerts,
-    aiSummary,
+    goals: filteredGoals,
+    rawGoals: filteredRawGoals,
+    alerts: isFree ? alerts.filter(a => a.macro === "calories" || a.macro === "protein" || a.macro === "meals") : alerts,
+    aiSummary: isFree ? null : aiSummary,
     analysesCount: periodAnalyses.length,
     period,
     daysInPeriod,
