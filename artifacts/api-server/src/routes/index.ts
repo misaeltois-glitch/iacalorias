@@ -10,6 +10,9 @@ import analyticsRouter from "./analytics";
 import workoutRouter from "./workout";
 import chatRouter from "./chat";
 import weightRouter from "./weight";
+import weeklyReportRouter from "./weekly-report";
+import mealPlanRouter from "./meal-plan";
+import referralRouter from "./referral";
 
 const router: IRouter = Router();
 
@@ -25,5 +28,8 @@ router.use("/analytics", analyticsRouter);
 router.use("/workout", workoutRouter);
 router.use("/chat", chatRouter);
 router.use("/weight", weightRouter);
+router.use("/weekly-report", weeklyReportRouter);
+router.use("/meal-plan", mealPlanRouter);
+router.use("/referral", referralRouter);
 
 export default router;

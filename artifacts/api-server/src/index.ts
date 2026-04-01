@@ -37,6 +37,22 @@ async function runMigrations() {
         created_at timestamp NOT NULL DEFAULT now()
       )
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS referrals (
+        id text PRIMARY KEY,
+        code text NOT NULL,
+        referrer_user_id text NOT NULL,
+        referee_session_id text,
+        referee_user_id text,
+        status text NOT NULL DEFAULT 'applied',
+        created_at timestamp NOT NULL DEFAULT now(),
+        converted_at timestamp
+      )
+    `);
+    await pool.query(`
+      ALTER TABLE subscriptions
+      ADD COLUMN IF NOT EXISTS referral_bonus_days integer DEFAULT 0
+    `);
     logger.info("DB migrations applied");
   } catch (err) {
     logger.warn({ err }, "DB migration failed (non-critical)");

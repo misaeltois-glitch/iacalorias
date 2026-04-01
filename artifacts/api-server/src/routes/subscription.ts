@@ -6,6 +6,7 @@ import {
   GetSubscriptionStatusResponse,
   CreateCheckoutSessionResponse,
 } from "@workspace/api-zod";
+import { getMasterTier } from "../lib/master-emails.js";
 
 const router: IRouter = Router();
 
@@ -20,8 +21,6 @@ const PRICE_UNLIMITED_ONETIME = process.env.STRIPE_PRICE_UNLIMITED_ONETIME ?? "p
 
 const FREE_TRIAL_LIMIT = 30;
 const LIMITED_PLAN_LIMIT = 20;
-
-const DEV_EMAILS = new Set(["dev@iacalorias.com.br"]);
 
 async function resolveSub(userId?: string, sessionId?: string) {
   if (userId) {
@@ -65,11 +64,12 @@ router.get("/status", async (req: Request, res: Response) => {
     return;
   }
 
-  // Dev/QA bypass — conta de desenvolvedor sempre retorna unlimited
-  if (req.user?.email && DEV_EMAILS.has(req.user.email)) {
+  // Dev/QA bypass — conta de desenvolvedor sempre retorna o tier master
+  const masterTier = getMasterTier(req.user?.email);
+  if (masterTier) {
     res.json(GetSubscriptionStatusResponse.parse({
-      sessionId: sessionId ?? `dev-${req.user.userId}`,
-      tier: "unlimited",
+      sessionId: sessionId ?? `dev-${req.user?.userId}`,
+      tier: masterTier,
       analysisCount: 0,
       analysisLimit: null,
       trialRemaining: 0,

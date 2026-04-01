@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useLocation } from 'wouter';
+import { X } from 'lucide-react';
 
 interface OnboardingAuthPromptProps {
   onComplete: () => void;
@@ -24,11 +25,14 @@ export function OnboardingAuthPrompt({ onComplete }: OnboardingAuthPromptProps) 
   };
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1200,
-      background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(16px)',
-      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-    }}>
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1200,
+        background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(16px)',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      }}
+      onClick={e => { if (e.target === e.currentTarget) handleContinueAnonymous(); }}
+    >
       <motion.div
         initial={{ y: 60, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -41,9 +45,20 @@ export function OnboardingAuthPrompt({ onComplete }: OnboardingAuthPromptProps) 
           overflow: 'hidden',
         }}
       >
-        {/* Handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 0' }}>
+        {/* Handle + close */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 16px 0', position: 'relative' }}>
           <div style={{ width: 40, height: 4, borderRadius: 99, background: 'var(--border)' }} />
+          <button
+            onClick={handleContinueAnonymous}
+            style={{
+              position: 'absolute', right: 16,
+              width: '32px', height: '32px', borderRadius: '50%',
+              background: 'var(--bg-3)', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <X size={15} style={{ color: 'var(--text-2)' }} />
+          </button>
         </div>
 
         <div style={{ padding: '16px 24px 32px' }}>

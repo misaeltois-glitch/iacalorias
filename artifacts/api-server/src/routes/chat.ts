@@ -2,11 +2,10 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import OpenAI from "openai";
 import { db, subscriptionsTable, analysesTable, goalsTable } from "@workspace/db";
 import { eq, and, gte, lt } from "drizzle-orm";
+import { getMasterTier } from "../lib/master-emails.js";
 
 const router: IRouter = Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-const DEV_EMAILS = new Set(["dev@iacalorias.com.br"]);
 
 async function resolveSubTier(userId?: string, sessionId?: string): Promise<"free" | "limited" | "unlimited"> {
   if (userId) {
@@ -45,8 +44,9 @@ router.post("/", async (req: Request, res: Response) => {
   // Limit history to last 20 messages to avoid token bloat
   const trimmedMessages = messages.slice(-20);
 
-  const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
-  const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
+  const masterTier = getMasterTier(userEmail ?? req.user?.email);
+  const isDevAccount = !!masterTier;
+  const tier = masterTier ?? await resolveSubTier(userId, sessionId);
 
   // Build today's context
   const now = new Date();

@@ -29,6 +29,10 @@ import { StreakBadge } from '@/components/StreakBadge';
 import { NutritionistChat } from '@/components/NutritionistChat';
 import { WeightTracker } from '@/components/WeightTracker';
 import { OnboardingAuthPrompt } from '@/components/OnboardingAuthPrompt';
+import { MealPlanModal } from '@/components/MealPlanModal';
+import { ReferralCard, applyPendingReferral, REFERRAL_CODE_KEY } from '@/components/ReferralCard';
+import { MealReminders } from '@/components/MealReminders';
+import { useMealReminders } from '@/hooks/use-meal-reminders';
 
 import {
   useAnalyzeFood,
@@ -118,6 +122,7 @@ export default function Home() {
   const [, navigate] = useLocation();
   const { accepted: lgpdAccepted, accept: acceptLGPD } = useLGPDConsent();
   const { showTour, maybeStartTour, endTour, resetTour } = useTour();
+  useMealReminders();
 
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [currentResult, setCurrentResult] = useState<AnalysisResult | null>(null);
@@ -139,6 +144,7 @@ export default function Home() {
   const [celebration, setCelebration] = useState<{ show: boolean; type: 'calories' | 'meals' }>({ show: false, type: 'calories' });
   const [streakMilestone, setStreakMilestone] = useState<number | null>(null);
   const [showChat, setShowChat] = useState(false);
+  const [showMealPlan, setShowMealPlan] = useState(false);
   const celebrationQueue = useRef<Array<'calories' | 'meals'>>([]);
   const celebrationInflight = useRef<Set<'calories' | 'meals'>>(new Set());
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -246,6 +252,16 @@ export default function Home() {
       toast({ title: "Assinatura confirmada!", description: "Seu plano foi ativado. Aproveite!" });
       window.history.replaceState({}, document.title, window.location.pathname);
       refetchStatus();
+    }
+    const refCode = params.get('ref');
+    if (refCode && /^IAC[A-Z0-9]{6,8}$/.test(refCode)) {
+      localStorage.setItem(REFERRAL_CODE_KEY, refCode);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Start trial timer on very first app open — regardless of onboarding path
+    if (!localStorage.getItem(FIRST_USE_TS_KEY)) {
+      localStorage.setItem(FIRST_USE_TS_KEY, String(Date.now()));
     }
 
     const alreadyOnboarded = localStorage.getItem(ONBOARDED_KEY);
@@ -383,6 +399,7 @@ export default function Home() {
     refetchStatus();
     refreshSummary();
     toast({ title: "Bem-vindo!", description: "Login realizado com sucesso." });
+    if (sessionId) applyPendingReferral(sessionId);
   };
 
   const handleLogout = async () => {
@@ -431,17 +448,25 @@ export default function Home() {
 
   const handleTourEnd = useCallback(() => {
     endTour();
-    if (isAuthenticated) return;
     const mandatoryDone = localStorage.getItem(MANDATORY_ONBOARDING_KEY);
-    if (!mandatoryDone) {
-      setTimeout(() => setMandatoryStep('goals'), 400);
+    if (mandatoryDone) return; // Already completed — nothing to do
+    if (isAuthenticated) {
+      // Authenticated user — skip goals flow, just mark as done
+      localStorage.setItem(MANDATORY_ONBOARDING_KEY, 'true');
+      return;
     }
+    setTimeout(() => setMandatoryStep('goals'), 400);
   }, [endTour, isAuthenticated]);
 
   const handleMandatoryGoalsDone = useCallback(async (goals: CalculatedGoals) => {
     if (!sessionId) return;
     await saveGoals(sessionId, goals);
     setShowOnboarding(false);
+    // Mark mandatory flow as done immediately — goals are saved, user can reload freely
+    localStorage.setItem(MANDATORY_ONBOARDING_KEY, 'true');
+    if (!localStorage.getItem(FIRST_USE_TS_KEY)) {
+      localStorage.setItem(FIRST_USE_TS_KEY, String(Date.now()));
+    }
     try { await refreshSummary(); } catch {}
     setMandatoryStep('workout');
     setShowWorkout(true);
@@ -949,8 +974,14 @@ export default function Home() {
               {/* Water Tracker */}
               <WaterTracker />
 
+              {/* Meal Reminders */}
+              <MealReminders />
+
               {/* Weight Tracker */}
               <WeightTracker sessionId={sessionId} />
+
+              {/* Referral Card — authenticated users only */}
+              {isAuthenticated && <ReferralCard />}
 
               {/* Nutritionist Chat CTA */}
               <button
@@ -987,6 +1018,49 @@ export default function Home() {
                   fontSize: '11px', fontWeight: 700, color: '#0D9F6E', flexShrink: 0,
                 }}>
                   {isPremium ? 'Ilimitado' : 'No trial'}
+                </div>
+              </button>
+
+              {/* Meal Plan CTA */}
+              <button
+                onClick={() => {
+                  if (!isPremium) { setPaywallDisableClose(false); setShowPaywall(true); return; }
+                  setShowMealPlan(true);
+                }}
+                style={{
+                  width: '100%', padding: '14px 18px', borderRadius: '18px',
+                  background: 'var(--bg-2)', border: '1px solid var(--border)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-3)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-2)')}
+              >
+                <div style={{
+                  width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+                  background: 'linear-gradient(135deg, #F59E0B, #EF4444)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '22px',
+                  boxShadow: '0 2px 10px rgba(245,158,11,0.25)',
+                }}>
+                  🥗
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '3px' }}>
+                    Cardápio semanal com IA
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                    7 dias de refeições baseadas nas suas metas
+                  </div>
+                </div>
+                <div style={{
+                  padding: '4px 10px', borderRadius: '99px',
+                  background: isPremium ? 'rgba(245,158,11,0.1)' : 'rgba(139,92,246,0.1)',
+                  border: `1px solid ${isPremium ? 'rgba(245,158,11,0.2)' : 'rgba(139,92,246,0.2)'}`,
+                  fontSize: '11px', fontWeight: 700,
+                  color: isPremium ? '#F59E0B' : '#8B5CF6', flexShrink: 0,
+                }}>
+                  {isPremium ? 'Gerar' : '👑 Premium'}
                 </div>
               </button>
 
@@ -1106,7 +1180,12 @@ export default function Home() {
 
       <WorkoutPanel
         isOpen={showWorkout}
-        onClose={() => { setShowWorkout(false); setActiveTab('home'); }}
+        onClose={() => {
+          setShowWorkout(false);
+          setActiveTab('home');
+          // If closed mid-mandatory-flow, advance to auth prompt instead of getting stuck
+          if (mandatoryStep === 'workout') handleMandatoryWorkoutDone();
+        }}
         sessionId={sessionId}
         isPremium={isPremium}
         onUpgrade={() => { setShowWorkout(false); setPaywallDisableClose(false); setShowPaywall(true); }}
@@ -1140,7 +1219,17 @@ export default function Home() {
       <OnboardingModal
         isOpen={showOnboarding || mandatoryStep === 'goals'}
         onComplete={mandatoryStep === 'goals' ? handleMandatoryGoalsDone : handleGoalsSave}
-        onSkip={() => setShowOnboarding(false)}
+        onSkip={() => {
+          setShowOnboarding(false);
+          if (mandatoryStep === 'goals') {
+            // User chose to skip — mark as done so it never shows again
+            setMandatoryStep(null);
+            localStorage.setItem(MANDATORY_ONBOARDING_KEY, 'true');
+            if (!localStorage.getItem(FIRST_USE_TS_KEY)) {
+              localStorage.setItem(FIRST_USE_TS_KEY, String(Date.now()));
+            }
+          }
+        }}
         mandatory={mandatoryStep === 'goals'}
       />
 
@@ -1170,6 +1259,16 @@ export default function Home() {
           sessionId={sessionId}
           isPremium={isPremium}
           onUpgrade={() => { setShowChat(false); setPaywallDisableClose(false); setShowPaywall(true); }}
+        />
+      )}
+
+      {sessionId && (
+        <MealPlanModal
+          isOpen={showMealPlan}
+          onClose={() => setShowMealPlan(false)}
+          sessionId={sessionId}
+          isPremium={isPremium}
+          onUpgrade={() => { setShowMealPlan(false); setPaywallDisableClose(false); setShowPaywall(true); }}
         />
       )}
 

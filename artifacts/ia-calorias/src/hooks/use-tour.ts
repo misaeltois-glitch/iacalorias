@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 
 const VISIT_COUNT_KEY = 'ia-calorias-tour-visits';
-const MAX_TOUR_VISITS = 3;
+const MAX_TOUR_VISITS = 2;
 
 function getVisitCount(): number {
   return parseInt(localStorage.getItem(VISIT_COUNT_KEY) ?? '0', 10);

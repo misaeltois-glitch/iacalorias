@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, ChevronLeft, Target, Loader2, Check } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Target, Loader2, Check, X } from 'lucide-react';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -98,7 +98,7 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
   const STEPS = ['Objetivo', 'Biometria', 'Atividade', 'Restrições', 'Suas metas', 'Confirmar'];
 
   const canNext = [
-    !!objective,
+    true, // objective is optional — user can skip
     !!(weight && height && age && sex),
     !!activityLevel,
     true,
@@ -136,15 +136,32 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1100,
-      background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
-    }}>
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1100,
+        background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onSkip(); }}
+    >
       <div style={{
         width: '100%', maxWidth: '520px', background: 'var(--bg-surface)',
         borderRadius: '24px', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.5)',
+        position: 'relative',
       }}>
+        {/* Close button */}
+        <button
+          onClick={onSkip}
+          style={{
+            position: 'absolute', top: '12px', right: '12px', zIndex: 10,
+            width: '32px', height: '32px', borderRadius: '50%',
+            background: 'var(--bg-3)', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <X size={15} style={{ color: 'var(--text-2)' }} />
+        </button>
+
         {/* Progress bar */}
         <div style={{ height: '3px', background: 'var(--bg-3)' }}>
           <div style={{
@@ -165,11 +182,9 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
                 }} />
               ))}
             </div>
-            {!mandatory && (
-              <button onClick={onSkip} style={{ fontSize: '13px', color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                Pular
-              </button>
-            )}
+            <span style={{ fontSize: '12px', color: 'var(--text-3)' }}>
+              {step + 1} de {STEPS.length}
+            </span>
           </div>
 
           <AnimatePresence mode="wait">
@@ -209,6 +224,16 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
                         {objective === o.id && <Check style={{ width: '18px', height: '18px', color: 'var(--accent)', marginLeft: 'auto', flexShrink: 0 }} />}
                       </button>
                     ))}
+                    <button
+                      onClick={() => setStep(1)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        fontSize: '13px', color: 'var(--text-3)', padding: '6px 0',
+                        textDecoration: 'underline', textUnderlineOffset: '3px',
+                      }}
+                    >
+                      Pular esta etapa
+                    </button>
                   </div>
                 </div>
               )}

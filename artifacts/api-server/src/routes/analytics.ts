@@ -1,10 +1,9 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, subscriptionsTable, analysesTable, goalsTable } from "@workspace/db";
 import { eq, and, gte, lt, desc, or, inArray, isNull } from "drizzle-orm";
+import { getMasterTier } from "../lib/master-emails.js";
 
 const router: IRouter = Router();
-
-const DEV_EMAILS = new Set(["dev@iacalorias.com.br"]);
 
 async function resolveSubTier(userId?: string, sessionId?: string): Promise<"free" | "limited" | "unlimited"> {
   if (userId) {
@@ -55,8 +54,8 @@ router.get("/summary", async (req: Request, res: Response) => {
   }
 
   // Dev account bypass
-  const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
-  const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
+  const masterTier = getMasterTier(userEmail);
+  const tier = masterTier ?? await resolveSubTier(userId, sessionId);
   const isPremium = tier !== "free";
 
   const goals = await findGoals(userId, sessionId);

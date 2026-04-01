@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, Loader2, Calculator, Pencil, Lock, Crown } from 'lucide-react';
+import { X, Check, Loader2, Calculator, Pencil, Lock, Crown, Mail } from 'lucide-react';
 
 const BASE = import.meta.env.BASE_URL ?? '/';
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
@@ -250,6 +250,7 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics, isPre
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [fromWorkout, setFromWorkout] = useState(false);
+  const [reportState, setReportState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
   const hasAnyGoal = !!(goals.calories || goals.protein || goals.carbs || goals.fat || goals.fiber);
 
@@ -574,6 +575,48 @@ export function GoalsPanel({ isOpen, onClose, sessionId, onOpenBiometrics, isPre
           padding: '14px 20px', borderTop: '1px solid var(--border)', flexShrink: 0,
           display: 'flex', flexDirection: 'column', gap: '8px',
         }}>
+          {isPremium && (
+            <button
+              onClick={async () => {
+                if (reportState === 'sending' || reportState === 'sent') return;
+                setReportState('sending');
+                try {
+                  const token = localStorage.getItem('ia-calorias-auth-token');
+                  const r = await fetch(`${BASE}api/weekly-report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                    body: JSON.stringify({ sessionId }),
+                  });
+                  if (!r.ok) throw new Error('failed');
+                  setReportState('sent');
+                  setTimeout(() => setReportState('idle'), 5000);
+                } catch {
+                  setReportState('error');
+                  setTimeout(() => setReportState('idle'), 3000);
+                }
+              }}
+              style={{
+                width: '100%', padding: '12px',
+                borderRadius: '12px',
+                border: '1.5px solid var(--border)',
+                background: reportState === 'sent' ? 'rgba(34,197,94,0.1)' : reportState === 'error' ? 'rgba(239,68,68,0.1)' : 'var(--bg-2)',
+                color: reportState === 'sent' ? '#22c55e' : reportState === 'error' ? '#ef4444' : 'var(--text-1)',
+                fontWeight: 600, fontSize: '14px', cursor: reportState === 'sending' ? 'wait' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                transition: 'all 0.2s',
+              }}
+            >
+              {reportState === 'sending' ? (
+                <><Loader2 style={{ width: '15px', height: '15px', animation: 'spin 0.8s linear infinite' }} /> Enviando...</>
+              ) : reportState === 'sent' ? (
+                <><Check style={{ width: '15px', height: '15px' }} /> Relatório enviado!</>
+              ) : reportState === 'error' ? (
+                <>Erro ao enviar — tente novamente</>
+              ) : (
+                <><Mail style={{ width: '15px', height: '15px', color: 'var(--accent)' }} /> Receber relatório semanal por email</>
+              )}
+            </button>
+          )}
           {!isEditing && hasAnyGoal ? (
             /* View mode footer: Editar button */
             <button

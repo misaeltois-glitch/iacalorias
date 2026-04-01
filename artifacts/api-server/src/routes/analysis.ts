@@ -5,13 +5,13 @@ import { eq, or, and, isNotNull } from "drizzle-orm";
 import OpenAI from "openai";
 import { randomUUID } from "crypto";
 import { AnalyzeFoodResponse, GetAnalysisHistoryResponse } from "@workspace/api-zod";
+import { getMasterTier } from "../lib/master-emails.js";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const FREE_TRIAL_LIMIT = 30;
 const LIMITED_PLAN_LIMIT = 20;
-const DEV_EMAILS = new Set(["dev@iacalorias.com.br"]);
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -69,8 +69,9 @@ router.post("/", upload.single("image"), async (req: Request, res: Response) => 
     return;
   }
 
-  const isDevAccount = !!(req.user?.email && DEV_EMAILS.has(req.user.email));
-  const tier = isDevAccount ? "unlimited" : (sub.tier as "free" | "limited" | "unlimited");
+  const masterTier = getMasterTier(userEmail ?? req.user?.email);
+  const isDevAccount = !!masterTier;
+  const tier = masterTier ?? (sub.tier as "free" | "limited" | "unlimited");
 
   if (!isDevAccount && tier === "free" && sub.analysisCount >= FREE_TRIAL_LIMIT) {
     res.status(402).json({ error: "payment_required", message: "Suas análises gratuitas acabaram.", requiresUpgrade: true, trialUsed: sub.analysisCount, trialLimit: FREE_TRIAL_LIMIT });

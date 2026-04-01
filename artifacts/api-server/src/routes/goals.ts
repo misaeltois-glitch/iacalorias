@@ -2,8 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, subscriptionsTable, analysesTable, goalsTable } from "@workspace/db";
 import { eq, gte, and, lt, or, inArray, isNull } from "drizzle-orm";
 import OpenAI from "openai";
-
-const DEV_EMAILS = new Set(["dev@iacalorias.com.br"]);
+import { getMasterTier } from "../lib/master-emails.js";
 
 const router: IRouter = Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -59,8 +58,9 @@ router.get("/", async (req: Request, res: Response) => {
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
-  const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
-  const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
+  const masterTier = getMasterTier(userEmail ?? req.user?.email);
+  const isDevAccount = !!masterTier;
+  const tier = masterTier ?? await resolveSubTier(userId, sessionId);
 
   const goals = await findGoals(userId, sessionId);
   if (tier === "free" && goals) {
@@ -79,8 +79,9 @@ router.post("/", async (req: Request, res: Response) => {
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
-  const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
-  const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
+  const masterTier = getMasterTier(userEmail ?? req.user?.email);
+  const isDevAccount = !!masterTier;
+  const tier = masterTier ?? await resolveSubTier(userId, sessionId);
 
   const restrictionsStr = Array.isArray(restrictions) ? JSON.stringify(restrictions) : restrictions;
 
@@ -118,8 +119,9 @@ router.patch("/", async (req: Request, res: Response) => {
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
-  const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
-  const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
+  const masterTier = getMasterTier(userEmail ?? req.user?.email);
+  const isDevAccount = !!masterTier;
+  const tier = masterTier ?? await resolveSubTier(userId, sessionId);
 
   const allowed = tier === "free"
     ? ["calories", "protein", "mealsPerDay"] as const
@@ -166,9 +168,9 @@ router.get("/daily-summary", async (req: Request, res: Response) => {
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
   // Dev account bypass
-  const isDevAccount = !!(userEmail && DEV_EMAILS.has(userEmail));
-
-  const tier = isDevAccount ? "unlimited" : await resolveSubTier(userId, sessionId);
+  const masterTier = getMasterTier(userEmail ?? req.user?.email);
+  const isDevAccount = !!masterTier;
+  const tier = masterTier ?? await resolveSubTier(userId, sessionId);
 
   const goals = await findGoals(userId, sessionId);
 
