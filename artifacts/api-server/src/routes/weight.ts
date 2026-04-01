@@ -27,18 +27,22 @@ router.get("/", async (req: Request, res: Response) => {
     });
   }
 
-  // Get goal weight from goals table
+  // Get weight info from goals table
   let goalWeight: number | null = null;
+  let onboardingWeight: number | null = null;
   try {
     const goals = userId
       ? await db.query.goalsTable.findFirst({ where: eq(goalsTable.userId, userId), orderBy: (t, { desc: d }) => [d(t.updatedAt)] })
       : sessionId ? await db.query.goalsTable.findFirst({ where: eq(goalsTable.sessionId, sessionId!) }) : null;
-    goalWeight = goals?.weight ?? null;
+    // goals.weight is the current body weight entered during onboarding
+    onboardingWeight = goals?.weight ?? null;
+    goalWeight = null; // reserved for future "target weight" field
   } catch {}
 
   res.json({
     logs: logs.map(l => ({ id: l.id, weightKg: l.weightKg, logDate: l.logDate, createdAt: l.createdAt })).reverse(),
     goalWeight,
+    onboardingWeight,
   });
 });
 

@@ -33,8 +33,13 @@ export function WeightTracker({ sessionId }: WeightTrackerProps) {
       const r = await fetch(`${BASE}api/weight?sessionId=${sessionId}`, { headers: authHeaders() });
       if (!r.ok) return;
       const data = await r.json();
-      setLogs(data.logs ?? []);
+      const loadedLogs: WeightLog[] = data.logs ?? [];
+      setLogs(loadedLogs);
       setGoalWeight(data.goalWeight ?? null);
+      // Pre-fill input with onboarding weight if no logs exist yet
+      if (loadedLogs.length === 0 && data.onboardingWeight) {
+        setInputWeight(String(data.onboardingWeight));
+      }
     } catch {}
   }, [sessionId]);
 
@@ -158,6 +163,11 @@ export function WeightTracker({ sessionId }: WeightTrackerProps) {
           )}
 
           {/* Input row */}
+          {logs.length === 0 && inputWeight && (
+            <p style={{ fontSize: '11px', color: 'var(--text-3)', margin: '0 0 6px', textAlign: 'center' }}>
+              ✏️ Peso do seu cadastro pré-preenchido — confirme ou ajuste
+            </p>
+          )}
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <input
               type="number"
@@ -170,7 +180,8 @@ export function WeightTracker({ sessionId }: WeightTrackerProps) {
               placeholder="Ex: 73.5"
               style={{
                 flex: 1, padding: '10px 12px', borderRadius: '12px',
-                border: '1px solid var(--border)', background: 'var(--bg-3)',
+                border: `1px solid ${logs.length === 0 && inputWeight ? 'rgba(59,130,246,0.4)' : 'var(--border)'}`,
+                background: 'var(--bg-3)',
                 color: 'var(--text-1)', fontSize: '14px', outline: 'none', fontFamily: 'inherit',
               }}
             />
