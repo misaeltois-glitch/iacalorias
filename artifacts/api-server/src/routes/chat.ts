@@ -44,7 +44,7 @@ router.post("/", async (req: Request, res: Response) => {
   // Limit history to last 20 messages to avoid token bloat
   const trimmedMessages = messages.slice(-20);
 
-  const masterTier = getMasterTier(userEmail ?? req.user?.email);
+  const masterTier = getMasterTier(req.user?.email);
   const isDevAccount = !!masterTier;
   const tier = masterTier ?? await resolveSubTier(userId, sessionId);
 

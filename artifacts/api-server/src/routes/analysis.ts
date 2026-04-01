@@ -69,7 +69,7 @@ router.post("/", upload.single("image"), async (req: Request, res: Response) => 
     return;
   }
 
-  const masterTier = getMasterTier(userEmail ?? req.user?.email);
+  const masterTier = getMasterTier(req.user?.email);
   const isDevAccount = !!masterTier;
   const tier = masterTier ?? (sub.tier as "free" | "limited" | "unlimited");
 

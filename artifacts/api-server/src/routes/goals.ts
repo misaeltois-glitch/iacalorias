@@ -58,7 +58,7 @@ router.get("/", async (req: Request, res: Response) => {
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
-  const masterTier = getMasterTier(userEmail ?? req.user?.email);
+  const masterTier = getMasterTier(req.user?.email);
   const isDevAccount = !!masterTier;
   const tier = masterTier ?? await resolveSubTier(userId, sessionId);
 
@@ -79,7 +79,7 @@ router.post("/", async (req: Request, res: Response) => {
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
-  const masterTier = getMasterTier(userEmail ?? req.user?.email);
+  const masterTier = getMasterTier(req.user?.email);
   const isDevAccount = !!masterTier;
   const tier = masterTier ?? await resolveSubTier(userId, sessionId);
 
@@ -119,7 +119,7 @@ router.patch("/", async (req: Request, res: Response) => {
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
-  const masterTier = getMasterTier(userEmail ?? req.user?.email);
+  const masterTier = getMasterTier(req.user?.email);
   const isDevAccount = !!masterTier;
   const tier = masterTier ?? await resolveSubTier(userId, sessionId);
 
@@ -168,7 +168,7 @@ router.get("/daily-summary", async (req: Request, res: Response) => {
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
   // Dev account bypass
-  const masterTier = getMasterTier(userEmail ?? req.user?.email);
+  const masterTier = getMasterTier(req.user?.email);
   const isDevAccount = !!masterTier;
   const tier = masterTier ?? await resolveSubTier(userId, sessionId);
 

@@ -50,7 +50,7 @@ router.post("/", async (req: Request, res: Response) => {
     return;
   }
 
-  const masterTier = getMasterTier(userEmail ?? req.user?.email);
+  const masterTier = getMasterTier(req.user?.email);
   const isDevAccount = !!masterTier;
   const tier = masterTier ?? await resolveSubTier(userId, sessionId);
   if (tier === "free") {
