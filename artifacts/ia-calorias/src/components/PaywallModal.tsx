@@ -4,6 +4,7 @@ import { useCreateCheckoutSession } from '@workspace/api-client-react';
 import { useAuth } from '@/hooks/use-auth';
 
 const PENDING_PLAN_KEY = 'ia-calorias-pending-plan';
+const PENDING_PAYMENT_TYPE_KEY = 'ia-calorias-pending-payment-type';
 
 interface PaywallModalProps {
   isOpen: boolean;
@@ -62,26 +63,34 @@ function FeatureCell({ val, isUnlimited }: { val: string | boolean | false; isUn
   );
 }
 
+type LoadingKey = 'limited' | 'unlimited' | 'limited_pix' | 'unlimited_pix';
+
 export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowAuth }: PaywallModalProps) {
-  const [loadingPlan, setLoadingPlan] = useState<'limited' | 'unlimited' | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState<LoadingKey | null>(null);
   const [tab, setTab] = useState<'cards' | 'compare'>('cards');
   const checkoutMutation = useCreateCheckoutSession();
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
 
-  const handleCheckout = (plan: 'limited' | 'unlimited') => {
+  const handleCheckout = (plan: 'limited' | 'unlimited', paymentType: 'subscription' | 'one_time' = 'subscription') => {
     if (loadingPlan) return;
+    const key: LoadingKey = paymentType === 'one_time' ? `${plan}_pix` as LoadingKey : plan;
     if (!isAuthenticated) {
       localStorage.setItem(PENDING_PLAN_KEY, plan);
+      localStorage.setItem(PENDING_PAYMENT_TYPE_KEY, paymentType);
       onClose();
       navigate('/login?tab=register');
       return;
     }
-    setLoadingPlan(plan);
-    checkoutMutation.mutate({ data: { sessionId, plan } }, {
-      onSuccess: (res) => { window.location.href = res.url; },
-      onError: () => { setLoadingPlan(null); },
-    });
+    setLoadingPlan(key);
+    fetch('/api/subscription/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('ia-calorias-auth-token') ?? ''}` },
+      body: JSON.stringify({ sessionId, plan, paymentType }),
+    })
+      .then(r => r.json())
+      .then(data => { if (data.url) window.location.href = data.url; else setLoadingPlan(null); })
+      .catch(() => setLoadingPlan(null));
   };
 
   if (!isOpen) return null;
@@ -193,7 +202,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1 }}>
-                        R$&nbsp;25,00
+                        R$&nbsp;29,90
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>/mês</div>
                     </div>
@@ -219,7 +228,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                   </div>
 
                   <button
-                    onClick={() => handleCheckout('unlimited')}
+                    onClick={() => handleCheckout('unlimited', 'subscription')}
                     disabled={!!loadingPlan}
                     style={{
                       width: '100%', padding: '14px', borderRadius: 13,
@@ -232,10 +241,25 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                       transition: 'all 0.2s',
                     }}
                   >
-                    {loadingPlan === 'unlimited' ? 'Redirecionando...' : 'Assinar Ilimitado — R$25,00/mês'}
+                    {loadingPlan === 'unlimited' ? 'Redirecionando...' : '💳 Assinar Ilimitado — R$29,90/mês'}
+                  </button>
+                  <button
+                    onClick={() => handleCheckout('unlimited', 'one_time')}
+                    disabled={!!loadingPlan}
+                    style={{
+                      width: '100%', padding: '11px', borderRadius: 12,
+                      background: 'transparent', color: accent,
+                      border: `1.5px solid ${accent}`,
+                      fontSize: 13, fontWeight: 700,
+                      cursor: loadingPlan ? 'not-allowed' : 'pointer',
+                      opacity: loadingPlan && loadingPlan !== 'unlimited_pix' ? 0.5 : 1,
+                      marginTop: 8, transition: 'all 0.2s',
+                    }}
+                  >
+                    {loadingPlan === 'unlimited_pix' ? 'Redirecionando...' : '🏦 Pagar R$34,90 com PIX — 30 dias, sem compromisso'}
                   </button>
                   <p style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'center', margin: '8px 0 0' }}>
-                    Cancele quando quiser · 7 dias grátis
+                    Assinatura: cancele quando quiser · 7 dias grátis
                   </p>
                 </div>
               </div>
@@ -252,7 +276,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1 }}>
-                      R$&nbsp;17,00
+                      R$&nbsp;19,90
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>/mês</div>
                   </div>
@@ -277,7 +301,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                 </div>
 
                 <button
-                  onClick={() => handleCheckout('limited')}
+                  onClick={() => handleCheckout('limited', 'subscription')}
                   disabled={!!loadingPlan}
                   style={{
                     width: '100%', padding: '12px', borderRadius: 12,
@@ -289,7 +313,22 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     transition: 'all 0.2s',
                   }}
                 >
-                  {loadingPlan === 'limited' ? 'Redirecionando...' : 'Começar com Limitado'}
+                  {loadingPlan === 'limited' ? 'Redirecionando...' : '💳 Começar com Limitado — R$19,90/mês'}
+                </button>
+                <button
+                  onClick={() => handleCheckout('limited', 'one_time')}
+                  disabled={!!loadingPlan}
+                  style={{
+                    width: '100%', padding: '10px', borderRadius: 11,
+                    background: 'transparent', color: 'var(--text-2)',
+                    border: '1.5px solid var(--border)',
+                    fontSize: 12, fontWeight: 600,
+                    cursor: loadingPlan ? 'not-allowed' : 'pointer',
+                    opacity: loadingPlan && loadingPlan !== 'limited_pix' ? 0.5 : 1,
+                    marginTop: 7, transition: 'all 0.2s',
+                  }}
+                >
+                  {loadingPlan === 'limited_pix' ? 'Redirecionando...' : '🏦 Pagar R$24,90 com PIX — 30 dias, sem compromisso'}
                 </button>
               </div>
             </div>
@@ -351,7 +390,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     background: 'var(--bg-3)', border: '1px solid var(--border)',
                     borderRadius: 8, padding: '5px 6px', cursor: 'pointer',
                   }}>
-                    {loadingPlan === 'limited' ? '...' : 'R$17,00'}
+                    {loadingPlan === 'limited' ? '...' : 'R$19,90'}
                   </button>
                 </div>
                 <div style={{ padding: '8px 4px', borderLeft: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -360,7 +399,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     background: `linear-gradient(135deg, ${accent}, #057A55)`,
                     border: 'none', borderRadius: 8, padding: '5px 6px', cursor: 'pointer',
                   }}>
-                    {loadingPlan === 'unlimited' ? '...' : 'R$25,00'}
+                    {loadingPlan === 'unlimited' ? '...' : 'R$29,90'}
                   </button>
                 </div>
               </div>
@@ -388,7 +427,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
             {[
               { icon: '🔒', label: 'Pagamento seguro' },
               { icon: '↩️', label: 'Cancele quando quiser' },
-              { icon: '🇧🇷', label: 'Stripe · Pix em breve' },
+              { icon: '🏦', label: 'PIX disponível' },
             ].map(t => (
               <div key={t.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                 <span style={{ fontSize: 16 }}>{t.icon}</span>

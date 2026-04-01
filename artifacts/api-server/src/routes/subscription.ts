@@ -11,10 +11,12 @@ const router: IRouter = Router();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2025-02-24.acacia" });
 
-// R$17,00/mês — criado em 2026-03-28
-const PRICE_LIMITED = "price_1TG4kW5gtu657TZjczJxsG4A";
-// R$25,00/mês — criado em 2026-03-28
-const PRICE_UNLIMITED = "price_1TG4kW5gtu657TZjyp9NlkVZ";
+// Assinatura recorrente (cartão)
+const PRICE_LIMITED    = process.env.STRIPE_PRICE_LIMITED    ?? "price_1TG4kW5gtu657TZjczJxsG4A";
+const PRICE_UNLIMITED  = process.env.STRIPE_PRICE_UNLIMITED  ?? "price_1TG4kW5gtu657TZjyp9NlkVZ";
+// Pagamento avulso PIX (30 dias, sem compromisso)
+const PRICE_LIMITED_ONETIME   = process.env.STRIPE_PRICE_LIMITED_ONETIME   ?? "";
+const PRICE_UNLIMITED_ONETIME = process.env.STRIPE_PRICE_UNLIMITED_ONETIME ?? "";
 
 const FREE_TRIAL_LIMIT = 3;
 const LIMITED_PLAN_LIMIT = 20;
@@ -42,6 +44,15 @@ async function resolveSub(userId?: string, sessionId?: string) {
     await db.update(subscriptionsTable).set({ userId }).where(eq(subscriptionsTable.sessionId, effectiveSessionId));
     sub = { ...sub, userId };
   }
+
+  // Expirar acesso avulso (one_time) quando currentPeriodEnd tiver passado
+  if (sub && sub.paymentType === "one_time" && sub.currentPeriodEnd && sub.currentPeriodEnd < new Date()) {
+    await db.update(subscriptionsTable)
+      .set({ tier: "free", paymentType: "subscription", currentPeriodEnd: null, updatedAt: new Date() })
+      .where(eq(subscriptionsTable.sessionId, sub.sessionId));
+    sub = { ...sub, tier: "free", paymentType: "subscription", currentPeriodEnd: null };
+  }
+
   return sub!;
 }
 
@@ -105,7 +116,7 @@ router.get("/status", async (req: Request, res: Response) => {
 });
 
 router.post("/checkout", async (req: Request, res: Response) => {
-  const { sessionId, plan } = req.body;
+  const { sessionId, plan, paymentType = "subscription" } = req.body;
   const userId = req.user?.userId;
 
   if (!sessionId || !plan) {
@@ -113,15 +124,21 @@ router.post("/checkout", async (req: Request, res: Response) => {
     return;
   }
 
-  const priceId = plan === "limited" ? PRICE_LIMITED : PRICE_UNLIMITED;
+  const isOneTime = paymentType === "one_time";
 
-  // Use the Origin header from the request (the frontend's actual URL)
-  // Fallback to REPLIT_DEV_DOMAIN or localhost
+  let priceId: string;
+  if (isOneTime) {
+    priceId = plan === "limited" ? PRICE_LIMITED_ONETIME : PRICE_UNLIMITED_ONETIME;
+    if (!priceId) {
+      res.status(400).json({ error: "bad_request", message: "PIX one-time price not configured" });
+      return;
+    }
+  } else {
+    priceId = plan === "limited" ? PRICE_LIMITED : PRICE_UNLIMITED;
+  }
+
   const origin = req.headers.origin as string | undefined;
-  const domain = origin
-    ?? (process.env.REPLIT_DEV_DOMAIN
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : "http://localhost:80");
+  const domain = origin ?? "http://localhost:80";
 
   try {
     let sub = await resolveSub(userId, sessionId);
@@ -142,12 +159,12 @@ router.post("/checkout", async (req: Request, res: Response) => {
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      mode: "subscription",
-      payment_method_types: ["card"],
+      mode: isOneTime ? "payment" : "subscription",
+      payment_method_types: isOneTime ? ["pix"] : ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${domain}/?checkout_success=true&session_id=${sessionId}`,
       cancel_url: `${domain}/?checkout_cancelled=true`,
-      metadata: { sessionId, plan, ...(userId ? { userId } : {}) },
+      metadata: { sessionId, plan, paymentType, ...(userId ? { userId } : {}) },
     });
 
     const result = CreateCheckoutSessionResponse.parse({ url: session.url });
@@ -176,21 +193,30 @@ router.post("/webhook", async (req: Request, res: Response) => {
       const session = event.data.object as Stripe.Checkout.Session;
       const sessionId = session.metadata?.sessionId;
       const plan = session.metadata?.plan as "limited" | "unlimited";
+      const paymentType = (session.metadata?.paymentType ?? "subscription") as "subscription" | "one_time";
 
       if (sessionId && plan) {
-        const stripeSubscriptionId = typeof session.subscription === "string"
-          ? session.subscription
-          : session.subscription?.id ?? null;
+        if (paymentType === "one_time") {
+          // Acesso avulso PIX: 30 dias a partir de agora, sem stripeSubscriptionId
+          const currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+          await db.update(subscriptionsTable)
+            .set({ tier: plan, analysisCount: 0, paymentType: "one_time", currentPeriodEnd, updatedAt: new Date() })
+            .where(eq(subscriptionsTable.sessionId, sessionId));
+        } else {
+          const stripeSubscriptionId = typeof session.subscription === "string"
+            ? session.subscription
+            : session.subscription?.id ?? null;
 
-        let currentPeriodEnd: Date | null = null;
-        if (stripeSubscriptionId) {
-          const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-          currentPeriodEnd = new Date(stripeSub.current_period_end * 1000);
+          let currentPeriodEnd: Date | null = null;
+          if (stripeSubscriptionId) {
+            const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+            currentPeriodEnd = new Date(stripeSub.current_period_end * 1000);
+          }
+
+          await db.update(subscriptionsTable)
+            .set({ tier: plan, analysisCount: 0, paymentType: "subscription", stripeSubscriptionId: stripeSubscriptionId ?? undefined, currentPeriodEnd: currentPeriodEnd ?? undefined, updatedAt: new Date() })
+            .where(eq(subscriptionsTable.sessionId, sessionId));
         }
-
-        await db.update(subscriptionsTable)
-          .set({ tier: plan, analysisCount: 0, stripeSubscriptionId: stripeSubscriptionId ?? undefined, currentPeriodEnd: currentPeriodEnd ?? undefined, updatedAt: new Date() })
-          .where(eq(subscriptionsTable.sessionId, sessionId));
       }
     }
 

@@ -12,4 +12,4 @@ RUN node scripts/build-railway.mjs
 
 EXPOSE 3000
 
-CMD ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]
+CMD ["sh", "-c", "pnpm --filter @workspace/db run push-force && node --enable-source-maps artifacts/api-server/dist/index.mjs"]

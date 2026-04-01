@@ -11,6 +11,7 @@ export const subscriptionsTable = pgTable("subscriptions", {
   analysisCount: integer("analysis_count").notNull().default(0),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
+  paymentType: text("payment_type").default("subscription"),
   currentPeriodEnd: timestamp("current_period_end"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
