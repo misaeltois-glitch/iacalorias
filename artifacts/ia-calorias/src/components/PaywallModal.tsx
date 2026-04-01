@@ -64,17 +64,23 @@ function FeatureCell({ val, isUnlimited }: { val: string | boolean; isUnlimited?
   );
 }
 
-type LoadingKey = 'limited' | 'unlimited' | 'limited_pix' | 'unlimited_pix';
+type LoadingKey = 'limited' | 'unlimited' | 'limited_pix' | 'unlimited_pix' | 'limited_annual' | 'unlimited_annual';
+type BillingCycle = 'monthly' | 'annual';
+
+// Preços anuais (aprox. 50% de desconto vs 12x mensal)
+const ANNUAL_UNLIMITED = 179.90;
+const ANNUAL_LIMITED = 119.90;
 
 export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowAuth }: PaywallModalProps) {
   const [loadingPlan, setLoadingPlan] = useState<LoadingKey | null>(null);
   const [tab, setTab] = useState<'cards' | 'compare'>('cards');
+  const [billing, setBilling] = useState<BillingCycle>('monthly');
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
 
-  const handleCheckout = (plan: 'limited' | 'unlimited', paymentType: 'subscription' | 'one_time' = 'subscription') => {
+  const handleCheckout = (plan: 'limited' | 'unlimited', paymentType: 'subscription' | 'one_time' | 'annual' = 'subscription') => {
     if (loadingPlan) return;
-    const key: LoadingKey = paymentType === 'one_time' ? `${plan}_pix` as LoadingKey : plan;
+    const key: LoadingKey = paymentType === 'one_time' ? `${plan}_pix` as LoadingKey : paymentType === 'annual' ? `${plan}_annual` as LoadingKey : plan;
     if (!isAuthenticated) {
       localStorage.setItem(PENDING_PLAN_KEY, plan);
       localStorage.setItem(PENDING_PAYMENT_TYPE_KEY, paymentType);
@@ -169,6 +175,39 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
             </p>
           </div>
 
+          {/* Billing cycle toggle */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 6, marginBottom: 16,
+          }}>
+            <button
+              onClick={() => setBilling('monthly')}
+              style={{
+                padding: '6px 16px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                background: billing === 'monthly' ? accent : 'var(--bg-2)',
+                color: billing === 'monthly' ? '#fff' : 'var(--text-2)',
+                transition: 'all 0.15s',
+              }}
+            >Mensal</button>
+            <button
+              onClick={() => setBilling('annual')}
+              style={{
+                padding: '6px 16px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                background: billing === 'annual' ? accent : 'var(--bg-2)',
+                color: billing === 'annual' ? '#fff' : 'var(--text-2)',
+                transition: 'all 0.15s',
+                position: 'relative',
+              }}
+            >
+              Anual
+              <span style={{
+                position: 'absolute', top: -8, right: -8,
+                background: '#F59E0B', color: '#000', fontSize: 9, fontWeight: 800,
+                padding: '1px 5px', borderRadius: 99, letterSpacing: '0.3px', whiteSpace: 'nowrap',
+              }}>-50%</span>
+            </button>
+          </div>
+
           {/* Tab switcher */}
           <div style={{ display: 'flex', gap: 4, background: 'var(--bg-2)', borderRadius: 12, padding: 4, marginBottom: 18 }}>
             {(['cards', 'compare'] as const).map(t => (
@@ -231,10 +270,22 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                       <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Tudo ilimitado, sem restrições</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1 }}>
-                        R$&nbsp;29,90
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>/mês</div>
+                      {billing === 'annual' ? (
+                        <>
+                          <div style={{ fontSize: 11, color: 'var(--text-3)', textDecoration: 'line-through', marginBottom: 1 }}>R$ 358,80/ano</div>
+                          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1 }}>
+                            R$&nbsp;{ANNUAL_UNLIMITED.toFixed(2).replace('.', ',')}
+                          </div>
+                          <div style={{ fontSize: 11, color: accent, marginTop: 2, fontWeight: 700 }}>≈ R$14,99/mês</div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1 }}>
+                            R$&nbsp;29,90
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>/mês</div>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -258,7 +309,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                   </div>
 
                   <button
-                    onClick={() => handleCheckout('unlimited', 'subscription')}
+                    onClick={() => handleCheckout('unlimited', billing === 'annual' ? 'annual' : 'subscription')}
                     disabled={!!loadingPlan}
                     style={{
                       width: '100%', padding: '14px', borderRadius: 13,
@@ -266,15 +317,15 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                       color: '#fff', border: 'none',
                       fontSize: 15, fontWeight: 800, letterSpacing: '-0.2px',
                       cursor: loadingPlan ? 'not-allowed' : 'pointer',
-                      opacity: loadingPlan && loadingPlan !== 'unlimited' ? 0.5 : 1,
+                      opacity: loadingPlan && loadingPlan !== 'unlimited' && loadingPlan !== 'unlimited_annual' ? 0.5 : 1,
                       boxShadow: loadingPlan ? 'none' : '0 4px 20px rgba(13,159,110,0.35)',
                       transition: 'all 0.2s',
                     }}
                   >
-                    {loadingPlan === 'unlimited' ? 'Redirecionando...' : '💳 Assinar Ilimitado — R$29,90/mês'}
+                    {(loadingPlan === 'unlimited' || loadingPlan === 'unlimited_annual') ? 'Redirecionando...' : billing === 'annual' ? `💳 Assinar Anual — R$${ANNUAL_UNLIMITED.toFixed(2).replace('.', ',')}` : '💳 Assinar Ilimitado — R$29,90/mês'}
                   </button>
                   <p style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'center', margin: '8px 0 0' }}>
-                    Cancele quando quiser · 7 dias grátis
+                    {billing === 'annual' ? 'Cobrado anualmente · Cancele quando quiser' : 'Cancele quando quiser · 7 dias grátis'}
                   </p>
                 </div>
               </div>
@@ -290,10 +341,22 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Para quem está começando</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1 }}>
-                      R$&nbsp;19,90
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>/mês</div>
+                    {billing === 'annual' ? (
+                      <>
+                        <div style={{ fontSize: 10, color: 'var(--text-3)', textDecoration: 'line-through', marginBottom: 1 }}>R$ 238,80/ano</div>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1 }}>
+                          R$&nbsp;{ANNUAL_LIMITED.toFixed(2).replace('.', ',')}
+                        </div>
+                        <div style={{ fontSize: 10, color: accent, marginTop: 2, fontWeight: 700 }}>≈ R$9,99/mês</div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1 }}>
+                          R$&nbsp;19,90
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>/mês</div>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -316,7 +379,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                 </div>
 
                 <button
-                  onClick={() => handleCheckout('limited', 'subscription')}
+                  onClick={() => handleCheckout('limited', billing === 'annual' ? 'annual' : 'subscription')}
                   disabled={!!loadingPlan}
                   style={{
                     width: '100%', padding: '12px', borderRadius: 12,
@@ -324,11 +387,11 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     border: '1.5px solid var(--border-strong)',
                     fontSize: 14, fontWeight: 600,
                     cursor: loadingPlan ? 'not-allowed' : 'pointer',
-                    opacity: loadingPlan && loadingPlan !== 'limited' ? 0.5 : 1,
+                    opacity: loadingPlan && loadingPlan !== 'limited' && loadingPlan !== 'limited_annual' ? 0.5 : 1,
                     transition: 'all 0.2s',
                   }}
                 >
-                  {loadingPlan === 'limited' ? 'Redirecionando...' : '💳 Começar com Limitado — R$19,90/mês'}
+                  {(loadingPlan === 'limited' || loadingPlan === 'limited_annual') ? 'Redirecionando...' : billing === 'annual' ? `💳 Começar com Limitado — R$${ANNUAL_LIMITED.toFixed(2).replace('.', ',')}` : '💳 Começar com Limitado — R$19,90/mês'}
                 </button>
               </div>
             </div>

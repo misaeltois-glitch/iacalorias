@@ -12,12 +12,15 @@ const router: IRouter = Router();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2025-02-24.acacia" });
 
-// Assinatura recorrente (cartão)
+// Assinatura recorrente mensal (cartão)
 const PRICE_LIMITED    = process.env.STRIPE_PRICE_LIMITED    ?? "price_1TEXlk8HTXQYSfx54nEVizsM";
 const PRICE_UNLIMITED  = process.env.STRIPE_PRICE_UNLIMITED  ?? "price_1TErLW8HTXQYSfx5D2cV2bsR";
 // Pagamento avulso PIX (30 dias, sem compromisso)
 const PRICE_LIMITED_ONETIME   = process.env.STRIPE_PRICE_LIMITED_ONETIME   ?? "price_1THFHH8HTXQYSfx5sP7OuD6i";
 const PRICE_UNLIMITED_ONETIME = process.env.STRIPE_PRICE_UNLIMITED_ONETIME ?? "price_1THFIB8HTXQYSfx5r4pPEcTP";
+// Assinatura anual (cartão)
+const PRICE_LIMITED_ANNUAL   = process.env.STRIPE_PRICE_LIMITED_ANNUAL   ?? "";
+const PRICE_UNLIMITED_ANNUAL = process.env.STRIPE_PRICE_UNLIMITED_ANNUAL ?? "";
 
 const FREE_TRIAL_LIMIT = 30;
 const LIMITED_PLAN_LIMIT = 20;
@@ -125,12 +128,19 @@ router.post("/checkout", async (req: Request, res: Response) => {
   }
 
   const isOneTime = paymentType === "one_time";
+  const isAnnual = paymentType === "annual";
 
   let priceId: string;
   if (isOneTime) {
     priceId = plan === "limited" ? PRICE_LIMITED_ONETIME : PRICE_UNLIMITED_ONETIME;
     if (!priceId) {
       res.status(400).json({ error: "bad_request", message: "PIX one-time price not configured" });
+      return;
+    }
+  } else if (isAnnual) {
+    priceId = plan === "limited" ? PRICE_LIMITED_ANNUAL : PRICE_UNLIMITED_ANNUAL;
+    if (!priceId) {
+      res.status(400).json({ error: "bad_request", message: "Annual price not configured yet" });
       return;
     }
   } else {
