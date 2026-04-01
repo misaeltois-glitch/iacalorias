@@ -174,16 +174,22 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
         loadSavedCustomSessions();
         setView('plan');
       } else {
-        const b = biometricsRef.current;
-        if (b) {
-          setProfile(prev => ({
-            ...prev,
-            ...(b.age ? { age: b.age } : {}),
-            ...(b.weight ? { weight: b.weight } : {}),
-            ...(b.height ? { height: b.height } : {}),
-            ...(b.sex ? { sex: b.sex } : {}),
-          }));
-        }
+        // Fetch biometrics from nutrition goals directly
+        try {
+          const gr = await fetch(`${BASE}api/goals?sessionId=${sessionId}`, { headers: authHeaders() });
+          if (gr.ok) {
+            const g = await gr.json();
+            if (g) {
+              setProfile(prev => ({
+                ...prev,
+                ...(g.age ? { age: g.age } : {}),
+                ...(g.weight ? { weight: g.weight } : {}),
+                ...(g.height ? { height: g.height } : {}),
+                ...(g.sex ? { sex: g.sex } : {}),
+              }));
+            }
+          }
+        } catch {}
         setView('questionnaire');
         setStep(1);
       }
