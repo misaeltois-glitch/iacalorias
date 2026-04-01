@@ -115,19 +115,10 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
   const restRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const workoutStartRef = useRef<Date | null>(null);
   const fromAiRef = useRef(false);
+  const biometricsRef = useRef(biometrics);
+  useEffect(() => { biometricsRef.current = biometrics; }, [biometrics]);
   const [completedSession, setCompletedSession] = useState<{ sessionName: string; durationMinutes: number; exerciseCount: number; estimatedBurn: number } | null>(null);
 
-  // Sync biometrics from goals when they load after initial render
-  useEffect(() => {
-    if (!biometrics) return;
-    setProfile(prev => ({
-      ...prev,
-      age: prev.age === 25 && biometrics.age ? biometrics.age : prev.age,
-      weight: prev.weight === 75 && biometrics.weight ? biometrics.weight : prev.weight,
-      height: prev.height === 170 && biometrics.height ? biometrics.height : prev.height,
-      sex: !prev.sex && biometrics.sex ? biometrics.sex : prev.sex,
-    }));
-  }, [biometrics]);
 
   // muscle-builder state
   const [mbPhase, setMbPhase] = useState<MbPhase>('groups');
@@ -183,6 +174,16 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
         loadSavedCustomSessions();
         setView('plan');
       } else {
+        const b = biometricsRef.current;
+        if (b) {
+          setProfile(prev => ({
+            ...prev,
+            ...(b.age ? { age: b.age } : {}),
+            ...(b.weight ? { weight: b.weight } : {}),
+            ...(b.height ? { height: b.height } : {}),
+            ...(b.sex ? { sex: b.sex } : {}),
+          }));
+        }
         setView('questionnaire');
         setStep(1);
       }
