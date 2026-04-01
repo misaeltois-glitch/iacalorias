@@ -205,6 +205,8 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
         width: '100%', maxWidth: '520px', background: 'var(--bg-surface)',
         borderRadius: '24px', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.5)',
         position: 'relative',
+        display: 'flex', flexDirection: 'column',
+        maxHeight: '92dvh',
       }}>
         {/* Close button */}
         <button
@@ -220,14 +222,15 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
         </button>
 
         {/* Progress bar */}
-        <div style={{ height: '3px', background: 'var(--bg-3)' }}>
+        <div style={{ height: '3px', background: 'var(--bg-3)', flexShrink: 0 }}>
           <div style={{
             height: '100%', width: `${((step + 1) / STEPS.length) * 100}%`,
             background: 'var(--accent)', transition: 'width 0.4s ease',
           }} />
         </div>
 
-        <div style={{ padding: '28px 28px 24px' }}>
+        {/* Scrollable content */}
+        <div style={{ padding: '28px 28px 8px', overflowY: 'auto', flex: 1 }}>
           {/* Step indicator */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <div style={{ display: 'flex', gap: '6px' }}>
@@ -595,9 +598,16 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
 
             </motion.div>
           </AnimatePresence>
+        </div>
 
-          {/* Navigation */}
-          <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+        {/* Navigation buttons — fixed at bottom, outside scroll */}
+        <div style={{
+          display: 'flex', gap: '10px',
+          padding: '16px 28px 24px',
+          borderTop: '1px solid var(--border)',
+          flexShrink: 0,
+          background: 'var(--bg-surface)',
+        }}>
             {step > 0 && (
               <button onClick={() => setStep(s => s - 1)} style={{
                 padding: '13px 18px', borderRadius: '12px',
@@ -626,7 +636,6 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
                   <>Continuar <ChevronRight style={{ width: '16px', height: '16px' }} /></>
                 )}
             </button>
-          </div>
         </div>
       </div>
     </div>
