@@ -225,14 +225,14 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
                       </button>
                     ))}
                     <button
-                      onClick={() => setStep(1)}
+                      onClick={onSkip}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',
                         fontSize: '13px', color: 'var(--text-3)', padding: '6px 0',
                         textDecoration: 'underline', textUnderlineOffset: '3px',
                       }}
                     >
-                      Pular esta etapa
+                      Pular configuração
                     </button>
                   </div>
                 </div>
