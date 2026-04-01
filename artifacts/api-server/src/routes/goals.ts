@@ -328,6 +328,41 @@ Retorne APENAS o texto do resumo, sem títulos, sem bullets, sem markdown.`;
     ? { calories: goals.calories, protein: goals.protein, carbs: null, fat: null, fiber: null, objective: goals.objective, mealsPerDay: goals.mealsPerDay ?? 3 }
     : goals ? { calories: goals.calories, protein: goals.protein, carbs: goals.carbs, fat: goals.fat, fiber: goals.fiber, objective: goals.objective, mealsPerDay: goals.mealsPerDay ?? 3 } : null;
 
+  // Streak: consecutive days (going back from today) with at least 1 analysis
+  let streak = 0;
+  if (period === "day") {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+    let allForStreak: { createdAt: Date }[] = [];
+    if (userId) {
+      allForStreak = await db.query.analysesTable.findMany({
+        where: and(eq(analysesTable.userId, userId), gte(analysesTable.createdAt, ninetyDaysAgo)),
+        columns: { createdAt: true },
+      });
+    } else if (sessionId) {
+      allForStreak = await db.query.analysesTable.findMany({
+        where: and(eq(analysesTable.sessionId, sessionId), gte(analysesTable.createdAt, ninetyDaysAgo)),
+        columns: { createdAt: true },
+      });
+    }
+
+    const daysWithMeals = new Set(allForStreak.map(a => a.createdAt.toISOString().slice(0, 10)));
+    const checkDate = new Date();
+    let safetyLimit = 0;
+    while (safetyLimit++ < 365) {
+      const key = checkDate.toISOString().slice(0, 10);
+      if (daysWithMeals.has(key)) {
+        streak++;
+        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+      } else if (key === todayStr) {
+        checkDate.setUTCDate(checkDate.getUTCDate() - 1); // today with no meals yet — don't break streak
+      } else {
+        break;
+      }
+    }
+  }
+
   res.json({
     totals,
     goals: filteredGoals,
@@ -338,6 +373,7 @@ Retorne APENAS o texto do resumo, sem títulos, sem bullets, sem markdown.`;
     period,
     daysInPeriod,
     lastMealAt: periodAnalyses.length > 0 ? periodAnalyses[periodAnalyses.length - 1].createdAt : null,
+    streak,
   });
 });
 

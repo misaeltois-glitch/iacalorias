@@ -24,6 +24,8 @@ import { WaterTracker } from '@/components/WaterTracker';
 import { AppTour } from '@/components/AppTour';
 import { useTour } from '@/hooks/use-tour';
 import { GoalCelebration, hasCelebratedToday, markCelebratedToday } from '@/components/GoalCelebration';
+import { StreakCelebration, shouldCelebrateStreak } from '@/components/StreakCelebration';
+import { StreakBadge } from '@/components/StreakBadge';
 import { OnboardingAuthPrompt } from '@/components/OnboardingAuthPrompt';
 
 import {
@@ -133,6 +135,7 @@ export default function Home() {
   type MandatoryStep = 'goals' | 'workout' | 'auth' | null;
   const [mandatoryStep, setMandatoryStep] = useState<MandatoryStep>(null);
   const [celebration, setCelebration] = useState<{ show: boolean; type: 'calories' | 'meals' }>({ show: false, type: 'calories' });
+  const [streakMilestone, setStreakMilestone] = useState<number | null>(null);
   const celebrationQueue = useRef<Array<'calories' | 'meals'>>([]);
   const celebrationInflight = useRef<Set<'calories' | 'meals'>>(new Set());
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -183,9 +186,15 @@ export default function Home() {
     }
     if (activePeriod !== 'day') {
       const daySummary = await fetchDailySummary(sessionId, 'day');
-      if (daySummary) setTodaySummary(daySummary);
+      if (daySummary) {
+        setTodaySummary(daySummary);
+        const milestone = shouldCelebrateStreak(daySummary.streak ?? 0);
+        if (milestone) setStreakMilestone(milestone);
+      }
     } else {
       setTodaySummary(summary);
+      const milestone = shouldCelebrateStreak(summary?.streak ?? 0);
+      if (milestone) setStreakMilestone(milestone);
     }
     setGoalsLoaded(true);
   }, [sessionId, isPremium, period]);
@@ -776,6 +785,10 @@ export default function Home() {
                       : `${3 - trialUsed} análise${(3 - trialUsed) !== 1 ? 's' : ''} gratuita${(3 - trialUsed) !== 1 ? 's' : ''} disponível`}
                   </p>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {(todaySummary?.streak ?? 0) > 0 && (
+                  <StreakBadge streak={todaySummary?.streak ?? 0} />
+                )}
                 {isPremium && subStatus?.tier === 'unlimited' && (
                   <div style={{
                     padding: '5px 12px', borderRadius: '99px',
@@ -787,6 +800,7 @@ export default function Home() {
                     Premium
                   </div>
                 )}
+              </div>
               </div>
 
               {/* Anonymous usage bar */}
@@ -1097,6 +1111,13 @@ export default function Home() {
         goalType={celebration.type}
         onClose={handleCelebrationClose}
       />
+
+      {streakMilestone && (
+        <StreakCelebration
+          milestone={streakMilestone}
+          onClose={() => setStreakMilestone(null)}
+        />
+      )}
 
       <style>{`
         @keyframes ping {
