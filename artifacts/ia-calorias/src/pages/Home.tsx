@@ -49,7 +49,9 @@ const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 const ONBOARDED_KEY = 'ia-calorias-onboarded';
 const MANDATORY_ONBOARDING_KEY = 'ia-calorias-mandatory-done';
 const FIRST_USE_TS_KEY = 'ia-calorias-first-use-ts';
-const FREE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days trial
+const FREE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days nutrition trial
+const WORKOUT_TRIAL_START_KEY = 'ia-calorias-workout-trial-ts';
+const WORKOUT_TRIAL_MS = 3 * 24 * 60 * 60 * 1000; // 3 days workout trial
 
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -193,6 +195,16 @@ export default function Home() {
     const elapsed = Date.now() - parseInt(ts, 10);
     return Math.max(0, Math.ceil((FREE_PERIOD_MS - elapsed) / (24 * 60 * 60 * 1000)));
   })();
+
+  const workoutTrialDaysRemaining = (() => {
+    if (isPremium) return null;
+    const ts = localStorage.getItem(WORKOUT_TRIAL_START_KEY);
+    if (!ts) return 3; // not started yet
+    const elapsed = Date.now() - parseInt(ts, 10);
+    return Math.max(0, Math.ceil((WORKOUT_TRIAL_MS - elapsed) / (24 * 60 * 60 * 1000)));
+  })();
+
+  const isWorkoutFreeAccessActive = isPremium || (workoutTrialDaysRemaining !== null && workoutTrialDaysRemaining > 0);
 
   const refreshSummary = useCallback(async (p?: Period) => {
     if (!sessionId) return;
@@ -463,14 +475,43 @@ export default function Home() {
     if (!sessionId) return;
     await saveGoals(sessionId, goals);
     setShowOnboarding(false);
-    // Mark mandatory flow as done immediately — goals are saved, user can reload freely
     localStorage.setItem(MANDATORY_ONBOARDING_KEY, 'true');
     if (!localStorage.getItem(FIRST_USE_TS_KEY)) {
       localStorage.setItem(FIRST_USE_TS_KEY, String(Date.now()));
     }
+    // Start workout trial from onboarding completion
+    if (!localStorage.getItem(WORKOUT_TRIAL_START_KEY)) {
+      localStorage.setItem(WORKOUT_TRIAL_START_KEY, String(Date.now()));
+    }
+    // Save workout profile if collected in onboarding
+    if (goals.workoutGoal && goals.workoutLevel && sessionId) {
+      try {
+        await fetch(`${BASE}api/workout/profile`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({
+            sessionId,
+            goal: goals.workoutGoal,
+            level: goals.workoutLevel,
+            gym: goals.workoutGym ?? 'full_gym',
+            trainingDays: goals.workoutTrainingDays ?? ['mon', 'wed', 'fri'],
+            sex: goals.sex,
+            age: goals.age,
+            weight: goals.weight,
+            height: goals.height,
+            sessionDuration: 60,
+            hasInjuries: false,
+            injuries: [],
+            equipment: [],
+            cardio: 'none',
+            warmup: 'basic',
+            techniques: [],
+          }),
+        });
+      } catch {}
+    }
     try { await refreshSummary(); } catch {}
-    setMandatoryStep('workout');
-    setShowWorkout(true);
+    setMandatoryStep('auth');
   }, [sessionId, refreshSummary]);
 
   const handleMandatoryWorkoutDone = useCallback(() => {
@@ -503,7 +544,18 @@ export default function Home() {
     setActiveTab(tab);
     if (tab !== 'profile') setShowUserMenu(false);
     if (tab === 'home') { setCurrentResult(null); }
-    if (tab === 'workout') { if (!isPremium) { setPaywallDisableClose(false); setShowPaywall(true); } else { setShowWorkout(true); } }
+    if (tab === 'workout') {
+      if (isWorkoutFreeAccessActive) {
+        // Start trial on first open if not started from onboarding
+        if (!localStorage.getItem(WORKOUT_TRIAL_START_KEY)) {
+          localStorage.setItem(WORKOUT_TRIAL_START_KEY, String(Date.now()));
+        }
+        setShowWorkout(true);
+      } else {
+        setPaywallDisableClose(false);
+        setShowPaywall(true);
+      }
+    }
     if (tab === 'analyze') { setCurrentResult(null); }
     if (tab === 'profile') { isAuthenticated ? navigate('/profile') : navigate('/login'); }
   };
@@ -1190,7 +1242,6 @@ export default function Home() {
         onClose={() => {
           setShowWorkout(false);
           setActiveTab('home');
-          // If closed mid-mandatory-flow, advance to auth prompt instead of getting stuck
           if (mandatoryStep === 'workout') handleMandatoryWorkoutDone();
         }}
         sessionId={sessionId}
@@ -1200,6 +1251,7 @@ export default function Home() {
         onboardingMode={mandatoryStep === 'workout'}
         onOnboardingComplete={handleMandatoryWorkoutDone}
         biometrics={savedGoals ? { age: savedGoals.age, weight: savedGoals.weight, height: savedGoals.height, sex: savedGoals.sex } : undefined}
+        workoutTrialDaysRemaining={workoutTrialDaysRemaining}
       />
 
       <PaywallModal

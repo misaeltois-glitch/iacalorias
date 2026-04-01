@@ -23,6 +23,7 @@ interface WorkoutPanelProps {
   onboardingMode?: boolean;
   onOnboardingComplete?: () => void;
   biometrics?: { age?: number; weight?: number; height?: number; sex?: string };
+  workoutTrialDaysRemaining?: number | null;
 }
 
 type PanelView = 'loading' | 'questionnaire' | 'plan' | 'player' | 'quick-picker' | 'ai-preview' | 'muscle-builder' | 'done';
@@ -81,7 +82,7 @@ const INJURIES_LIST = [
   { key: 'ankle', label: 'Entorse de tornozelo recorrente' },
 ];
 
-export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade, onNutritionTargets, onboardingMode, onOnboardingComplete, biometrics }: WorkoutPanelProps) {
+export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade, onNutritionTargets, onboardingMode, onOnboardingComplete, biometrics, workoutTrialDaysRemaining }: WorkoutPanelProps) {
   const { user } = useAuth();
   const [view, setView] = useState<PanelView>('loading');
   const [step, setStep] = useState(1);
@@ -722,6 +723,27 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
       {/* ── PLAN VIEW ── */}
       {view === 'plan' && plan && (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+          {/* Workout trial badge for free users */}
+          {!isPremium && workoutTrialDaysRemaining !== null && workoutTrialDaysRemaining !== undefined && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              padding: '8px 16px',
+              background: workoutTrialDaysRemaining <= 1 ? 'rgba(239,68,68,0.12)' : 'rgba(249,115,22,0.1)',
+              borderBottom: `1px solid ${workoutTrialDaysRemaining <= 1 ? 'rgba(239,68,68,0.2)' : 'rgba(249,115,22,0.15)'}`,
+            }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: workoutTrialDaysRemaining <= 1 ? '#EF4444' : '#F97316' }}>
+                🏋️ {workoutTrialDaysRemaining > 0
+                  ? `Treino grátis: ${workoutTrialDaysRemaining} dia${workoutTrialDaysRemaining !== 1 ? 's' : ''} restante${workoutTrialDaysRemaining !== 1 ? 's' : ''}`
+                  : 'Trial de treino expirado'}
+              </span>
+              {workoutTrialDaysRemaining <= 0 && (
+                <button onClick={onUpgrade} style={{
+                  fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '99px',
+                  background: '#EF4444', color: '#fff', border: 'none', cursor: 'pointer',
+                }}>Fazer upgrade</button>
+              )}
+            </div>
+          )}
           {/* Plan Header */}
           <div style={{ background: `linear-gradient(135deg, ${accent} 0%, #057A55 100%)`, padding: planHeaderExpanded ? '20px 20px 20px' : '16px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

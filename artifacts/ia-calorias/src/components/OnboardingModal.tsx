@@ -22,6 +22,11 @@ export interface CalculatedGoals {
   objective: string;
   activityLevel: number;
   restrictions: string[];
+  // Workout fields (collected in onboarding step)
+  workoutGoal?: string;
+  workoutLevel?: string;
+  workoutGym?: string;
+  workoutTrainingDays?: string[];
 }
 
 // ── Mifflin-St Jeor + Harris-Benedict activity factor ──────────────────────
@@ -81,6 +86,38 @@ const ACTIVITY_LEVELS = [
 
 const RESTRICTIONS = ['Vegetariano', 'Vegano', 'Sem glúten', 'Sem lactose'];
 
+// Workout config
+const WORKOUT_GOAL_OPTIONS = [
+  { id: 'fat_loss',    label: 'Perder gordura',  emoji: '🔥', nutritionIds: ['fat_loss'] },
+  { id: 'hypertrophy', label: 'Ganhar músculo',   emoji: '💪', nutritionIds: ['muscle_gain'] },
+  { id: 'wellness',    label: 'Bem-estar',         emoji: '🌱', nutritionIds: ['maintenance', 'health', ''] },
+];
+const WORKOUT_LEVEL_OPTIONS = [
+  { id: 'beginner',     label: 'Iniciante',    desc: '0–1 ano de treino',      activityLevels: [1, 2] },
+  { id: 'intermediate', label: 'Intermediário', desc: '1–3 anos de treino',     activityLevels: [3, 4] },
+  { id: 'advanced',     label: 'Avançado',     desc: '3+ anos de treino',       activityLevels: [5] },
+];
+const WORKOUT_GYM_OPTIONS = [
+  { id: 'full_gym',   label: 'Academia completa', emoji: '🏋️' },
+  { id: 'home_gym',   label: 'Treino em casa c/ equipamentos', emoji: '🏠' },
+  { id: 'bodyweight', label: 'Peso corporal (sem equipamentos)', emoji: '🤸' },
+];
+const WEEK_DAYS = [
+  { key: 'mon', label: 'S' }, { key: 'tue', label: 'T' }, { key: 'wed', label: 'Q' },
+  { key: 'thu', label: 'Q' }, { key: 'fri', label: 'S' }, { key: 'sat', label: 'S' }, { key: 'sun', label: 'D' },
+];
+
+function mapObjectiveToWorkoutGoal(objective: string): string {
+  if (objective === 'muscle_gain') return 'hypertrophy';
+  if (objective === 'fat_loss') return 'fat_loss';
+  return 'wellness';
+}
+function mapActivityToLevel(level: number): string {
+  if (level >= 5) return 'advanced';
+  if (level >= 3) return 'intermediate';
+  return 'beginner';
+}
+
 export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: OnboardingModalProps) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -95,14 +132,21 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
   const [calculated, setCalculated] = useState<ReturnType<typeof calcGoals> | null>(null);
   const [manualGoals, setManualGoals] = useState<{calories:number;protein:number;carbs:number;fat:number;fiber:number} | null>(null);
 
-  const STEPS = ['Objetivo', 'Biometria', 'Atividade', 'Restrições', 'Suas metas', 'Confirmar'];
+  // Workout step state
+  const [workoutGoal, setWorkoutGoal] = useState('');
+  const [workoutLevel, setWorkoutLevel] = useState('');
+  const [workoutGym, setWorkoutGym] = useState('full_gym');
+  const [workoutDays, setWorkoutDays] = useState<string[]>(['mon', 'wed', 'fri']);
+
+  const STEPS = ['Objetivo', 'Biometria', 'Atividade', 'Restrições', 'Suas metas', 'Treino', 'Confirmar'];
 
   const canNext = [
-    true, // objective is optional — user can skip
+    true, // objective is optional
     !!(weight && height && age && sex),
     !!activityLevel,
     true,
     true,
+    workoutDays.length > 0,
     true,
   ];
 
@@ -115,7 +159,16 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
       setCalculated(g);
       setManualGoals(g);
     }
+    // When entering workout step, pre-fill from nutrition data
+    if (step === 4) {
+      if (!workoutGoal) setWorkoutGoal(mapObjectiveToWorkoutGoal(objective));
+      if (!workoutLevel) setWorkoutLevel(mapActivityToLevel(activityLevel));
+    }
     if (step < STEPS.length - 1) setStep(s => s + 1);
+  };
+
+  const toggleWorkoutDay = (key: string) => {
+    setWorkoutDays(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key]);
   };
 
   const handleConfirm = async () => {
@@ -125,6 +178,10 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
       ...manualGoals,
       weight: parseFloat(weight), height: parseFloat(height),
       age: parseInt(age), sex, objective, activityLevel, restrictions,
+      workoutGoal: workoutGoal || mapObjectiveToWorkoutGoal(objective),
+      workoutLevel: workoutLevel || mapActivityToLevel(activityLevel),
+      workoutGym,
+      workoutTrainingDays: workoutDays,
     });
   };
 
@@ -202,7 +259,7 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
                   <div style={{ marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                       <Target style={{ width: '18px', height: '18px', color: 'var(--accent)' }} />
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Etapa 1 de 6</span>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Etapa 1 de 7</span>
                     </div>
                     <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px' }}>Qual é seu objetivo?</h2>
                     <p style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.5 }}>Suas metas de calorias e nutrientes serão ajustadas para esse objetivo.</p>
@@ -242,7 +299,7 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
               {step === 1 && (
                 <div>
                   <div style={{ marginBottom: '20px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Etapa 2 de 6</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Etapa 2 de 7</span>
                     <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-1)', margin: '6px 0' }}>Seus dados biométricos</h2>
                     <p style={{ fontSize: '14px', color: 'var(--text-2)' }}>Usamos a fórmula Mifflin-St Jeor para calcular seu gasto energético.</p>
                   </div>
@@ -286,7 +343,7 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
               {step === 2 && (
                 <div>
                   <div style={{ marginBottom: '20px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Etapa 3 de 6</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Etapa 3 de 7</span>
                     <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-1)', margin: '6px 0' }}>Nível de atividade</h2>
                     <p style={{ fontSize: '14px', color: 'var(--text-2)' }}>Selecione o que melhor descreve sua rotina semanal.</p>
                   </div>
@@ -319,7 +376,7 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
               {step === 3 && (
                 <div>
                   <div style={{ marginBottom: '20px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Etapa 4 de 6</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Etapa 4 de 7</span>
                     <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-1)', margin: '6px 0' }}>Restrições alimentares</h2>
                     <p style={{ fontSize: '14px', color: 'var(--text-2)' }}>Selecione todas que se aplicam, ou deixe em branco.</p>
                   </div>
@@ -354,7 +411,7 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
               {step === 4 && goals && (
                 <div>
                   <div style={{ marginBottom: '20px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Etapa 5 de 6</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Etapa 5 de 7</span>
                     <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-1)', margin: '6px 0' }}>Suas metas calculadas</h2>
                     <p style={{ fontSize: '14px', color: 'var(--text-2)' }}>Baseadas em evidências clínicas. Ajuste se quiser.</p>
                   </div>
@@ -388,15 +445,114 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
                 </div>
               )}
 
-              {/* Step 5: Confirmar */}
-              {step === 5 && goals && (
+              {/* Step 5: Treino */}
+              {step === 5 && (
+                <div>
+                  <div style={{ marginBottom: '16px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Etapa 6 de 7</span>
+                    <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-1)', margin: '6px 0 4px' }}>Seu plano de treino</h2>
+                    {/* Trial badge */}
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      padding: '4px 12px', borderRadius: '99px',
+                      background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.25)',
+                      fontSize: '12px', fontWeight: 700, color: '#F97316', marginBottom: '4px',
+                    }}>
+                      🏋️ 3 dias grátis · depois disponível no plano pago
+                    </div>
+                  </div>
+
+                  {/* Goal */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Objetivo de treino</div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {WORKOUT_GOAL_OPTIONS.map(o => (
+                        <button key={o.id} onClick={() => setWorkoutGoal(o.id)} style={{
+                          flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
+                          border: `2px solid ${workoutGoal === o.id ? 'var(--accent)' : 'var(--border-strong)'}`,
+                          background: workoutGoal === o.id ? 'var(--accent-glow)' : 'var(--bg-2)',
+                          cursor: 'pointer', textAlign: 'center',
+                        } as React.CSSProperties}>
+                          <div style={{ fontSize: '20px', marginBottom: '4px' }}>{o.emoji}</div>
+                          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-1)', lineHeight: 1.2 }}>{o.label}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Level */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Nível de experiência</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {WORKOUT_LEVEL_OPTIONS.map(l => (
+                        <button key={l.id} onClick={() => setWorkoutLevel(l.id)} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '10px 14px', borderRadius: '10px', border: 'none',
+                          border: `2px solid ${workoutLevel === l.id ? 'var(--accent)' : 'var(--border-strong)'}`,
+                          background: workoutLevel === l.id ? 'var(--accent-glow)' : 'var(--bg-2)',
+                          cursor: 'pointer',
+                        } as React.CSSProperties}>
+                          <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)' }}>{l.label}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '1px' }}>{l.desc}</div>
+                          </div>
+                          {workoutLevel === l.id && <Check style={{ width: '16px', height: '16px', color: 'var(--accent)', flexShrink: 0 }} />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Gym */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Onde vai treinar</div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {WORKOUT_GYM_OPTIONS.map(g => (
+                        <button key={g.id} onClick={() => setWorkoutGym(g.id)} style={{
+                          flex: 1, minWidth: '80px', padding: '8px 6px', borderRadius: '10px', border: 'none',
+                          border: `2px solid ${workoutGym === g.id ? 'var(--accent)' : 'var(--border-strong)'}`,
+                          background: workoutGym === g.id ? 'var(--accent-glow)' : 'var(--bg-2)',
+                          cursor: 'pointer', textAlign: 'center',
+                        } as React.CSSProperties}>
+                          <div style={{ fontSize: '18px', marginBottom: '2px' }}>{g.emoji}</div>
+                          <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-1)', lineHeight: 1.2 }}>{g.label}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Training days */}
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Dias de treino</div>
+                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'space-between' }}>
+                      {WEEK_DAYS.map(d => (
+                        <button key={d.key} onClick={() => toggleWorkoutDay(d.key)} style={{
+                          flex: 1, aspectRatio: '1', borderRadius: '10px', border: 'none',
+                          border: `2px solid ${workoutDays.includes(d.key) ? 'var(--accent)' : 'var(--border-strong)'}`,
+                          background: workoutDays.includes(d.key) ? 'var(--accent)' : 'var(--bg-2)',
+                          color: workoutDays.includes(d.key) ? '#fff' : 'var(--text-2)',
+                          fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                        } as React.CSSProperties}>
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '6px', textAlign: 'center' }}>
+                      {workoutDays.length} dia{workoutDays.length !== 1 ? 's' : ''}/semana selecionado{workoutDays.length !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 6: Confirmar */}
+              {step === 6 && goals && (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '52px', marginBottom: '12px' }}>🎯</div>
                   <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '8px' }}>Tudo pronto!</h2>
-                  <p style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.6, marginBottom: '24px' }}>
-                    Suas metas diárias estão calibradas para <strong style={{ color: 'var(--text-1)' }}>{OBJECTIVES.find(o => o.id === objective)?.label}</strong>. A cada análise feita, seu progresso do dia será atualizado.
+                  <p style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.6, marginBottom: '16px' }}>
+                    Suas metas diárias estão calibradas para <strong style={{ color: 'var(--text-1)' }}>{OBJECTIVES.find(o => o.id === objective)?.label}</strong>.
                   </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '24px' }}>
+                  {/* Nutrition summary */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
                     {[
                       { label: 'Calorias', value: `${goals.calories} kcal`, color: '#f97316' },
                       { label: 'Proteína', value: `${goals.protein}g`, color: '#22c55e' },
@@ -404,14 +560,35 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
                       { label: 'Gorduras', value: `${goals.fat}g`, color: '#ef4444' },
                       { label: 'Fibras', value: `${goals.fiber}g`, color: '#06b6d4' },
                     ].map(({ label, value, color }) => (
-                      <div key={label} style={{ padding: '12px', borderRadius: '12px', background: 'var(--bg-2)', border: '1.5px solid var(--border)' }}>
-                        <div style={{ fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px' }}>{label}</div>
-                        <div style={{ fontWeight: 700, color, fontSize: '18px' }}>{value}</div>
+                      <div key={label} style={{ padding: '10px', borderRadius: '12px', background: 'var(--bg-2)', border: '1.5px solid var(--border)' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-2)', marginBottom: '3px' }}>{label}</div>
+                        <div style={{ fontWeight: 700, color, fontSize: '16px' }}>{value}</div>
                       </div>
                     ))}
                   </div>
-                  <p style={{ fontSize: '12px', color: 'var(--text-3)', lineHeight: 1.5 }}>
-                    ⚕️ Metas calculadas por algoritmo clínico (Mifflin-St Jeor + DRI). Para condições médicas específicas, consulte um nutricionista.
+                  {/* Workout summary */}
+                  <div style={{
+                    padding: '12px 16px', borderRadius: '14px',
+                    background: 'rgba(249,115,22,0.08)', border: '1.5px solid rgba(249,115,22,0.2)',
+                    textAlign: 'left', marginBottom: '14px',
+                  }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#F97316', marginBottom: '6px' }}>🏋️ Plano de treino</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.6 }}>
+                      <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>
+                        {WORKOUT_GOAL_OPTIONS.find(g => g.id === (workoutGoal || mapObjectiveToWorkoutGoal(objective)))?.label}
+                      </span>
+                      {' · '}
+                      <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>
+                        {WORKOUT_LEVEL_OPTIONS.find(l => l.id === (workoutLevel || mapActivityToLevel(activityLevel)))?.label}
+                      </span>
+                      {' · '}{workoutDays.length} dias/semana
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#F97316', marginTop: '6px', fontWeight: 600 }}>
+                      ⏳ Acesso gratuito por 3 dias · depois no plano pago
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '11px', color: 'var(--text-3)', lineHeight: 1.5 }}>
+                    ⚕️ Metas calculadas por algoritmo clínico (Mifflin-St Jeor + DRI).
                   </p>
                 </div>
               )}
