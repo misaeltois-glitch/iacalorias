@@ -43,7 +43,7 @@ const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 const ONBOARDED_KEY = 'ia-calorias-onboarded';
 const MANDATORY_ONBOARDING_KEY = 'ia-calorias-mandatory-done';
 const FIRST_USE_TS_KEY = 'ia-calorias-first-use-ts';
-const FREE_PERIOD_MS = 24 * 60 * 60 * 1000; // 24 hours
+const FREE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days trial
 
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -85,10 +85,10 @@ function UsageBar({ used, max, onClick }: { used: number; max: number; onClick: 
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: '12px', color: 'var(--text-2)', fontWeight: 500 }}>
-          Análises gratuitas
+          Trial gratuito
         </span>
         <span style={{ fontSize: '12px', fontWeight: 700, color }}>
-          {used}/{max} usadas
+          {max - used} dia{(max - used) !== 1 ? 's' : ''} restante{(max - used) !== 1 ? 's' : ''}
         </span>
       </div>
       <div style={{ width: '100%', height: '5px', borderRadius: '99px', background: 'var(--bg-3)' }}>
@@ -99,11 +99,11 @@ function UsageBar({ used, max, onClick }: { used: number; max: number; onClick: 
       </div>
       {used >= max ? (
         <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: 600 }}>
-          ⚠️ Limite atingido — Faça upgrade para continuar
+          ⚠️ Trial expirado — Faça upgrade para continuar
         </span>
       ) : used === max - 1 ? (
         <span style={{ fontSize: '11px', color: '#F59E0B', fontWeight: 600 }}>
-          ⏳ Só 1 análise gratuita restante!
+          ⏳ Último dia de trial gratuito!
         </span>
       ) : null}
     </button>
@@ -175,8 +175,16 @@ export default function Home() {
 
   const analyzeMutation = useAnalyzeFood();
   const isPremium = subStatus?.tier === 'limited' || subStatus?.tier === 'unlimited';
-  const trialRemaining = subStatus?.trialRemaining ?? 5;
-  const trialUsed = Math.max(0, 5 - trialRemaining);
+  const trialRemaining = subStatus?.trialRemaining ?? 30;
+  const trialUsed = Math.max(0, 30 - trialRemaining);
+
+  const trialDaysRemaining = (() => {
+    if (isPremium) return null;
+    const ts = localStorage.getItem(FIRST_USE_TS_KEY);
+    if (!ts) return 7;
+    const elapsed = Date.now() - parseInt(ts, 10);
+    return Math.max(0, Math.ceil((FREE_PERIOD_MS - elapsed) / (24 * 60 * 60 * 1000)));
+  })();
 
   const refreshSummary = useCallback(async (p?: Period) => {
     if (!sessionId) return;
@@ -298,16 +306,6 @@ export default function Home() {
 
 
   useEffect(() => {
-    if (subStatus?.tier === 'free' && prevTrialRemaining.current !== null) {
-      const prev = prevTrialRemaining.current;
-      const curr = subStatus.trialRemaining;
-      if (curr < prev) {
-        const used = 3 - curr;
-        if (curr === 2) toast({ title: `${used} de 3 análises gratuitas usadas`, description: 'Restam 2 análises.' });
-        if (curr === 1) toast({ title: `${used} de 3 análises gratuitas usadas`, description: 'Última análise gratuita restante!' });
-        if (curr === 0) toast({ title: 'Análises gratuitas esgotadas', description: 'Faça upgrade para continuar.' });
-      }
-    }
     if (subStatus?.trialRemaining !== undefined) {
       prevTrialRemaining.current = subStatus.trialRemaining;
     }
@@ -462,7 +460,7 @@ export default function Home() {
   }, []);
 
   const check24hExpiry = useCallback((): boolean => {
-    if (isPremium || isAuthenticated) return false;
+    if (isPremium) return false;
     const ts = localStorage.getItem(FIRST_USE_TS_KEY);
     if (!ts) return false;
     const elapsed = Date.now() - parseInt(ts, 10);
@@ -494,7 +492,7 @@ export default function Home() {
         cursor: 'pointer',
       }}>
         <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0D9F6E', display: 'inline-block', animation: 'ping 1.5s cubic-bezier(0,0,0.2,1) infinite' }} />
-        {subStatus.trialRemaining} de 5 grátis
+        🎁 {trialDaysRemaining ?? 0} dia{trialDaysRemaining !== 1 ? 's' : ''} grátis
       </button>
     );
     if (subStatus.tier === 'limited') return (
@@ -784,7 +782,9 @@ export default function Home() {
                   <p style={{ fontSize: '13px', color: 'var(--text-2)', marginTop: '2px' }}>
                     {isPremium
                       ? 'Registre sua próxima refeição'
-                      : `${3 - trialUsed} análise${(3 - trialUsed) !== 1 ? 's' : ''} gratuita${(3 - trialUsed) !== 1 ? 's' : ''} disponível`}
+                      : trialDaysRemaining === 0
+                        ? 'Seu trial expirou — faça upgrade para continuar'
+                        : `${trialDaysRemaining} dia${trialDaysRemaining !== 1 ? 's' : ''} de trial gratuito restante${trialDaysRemaining !== 1 ? 's' : ''}`}
                   </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -805,9 +805,9 @@ export default function Home() {
               </div>
               </div>
 
-              {/* Anonymous usage bar */}
-              {!isAuthenticated && subStatus?.tier === 'free' && (
-                <UsageBar used={trialUsed} max={5} onClick={() => setShowPaywall(true)} />
+              {/* Trial days bar */}
+              {subStatus?.tier === 'free' && (
+                <UsageBar used={7 - (trialDaysRemaining ?? 7)} max={7} onClick={() => setShowPaywall(true)} />
               )}
 
               {/* Camera card + upload */}
@@ -840,7 +840,7 @@ export default function Home() {
                     onAnalyze={handleAnalyze}
                     onFileSelected={handleFileSelected}
                     isAnalyzing={analyzeMutation.isPending}
-                    usageLabel={!isAuthenticated && subStatus?.tier === 'free' ? `(${3 - trialUsed} de 3 grátis)` : undefined}
+                    usageLabel={undefined}
                   />
                 </div>
               </div>
@@ -982,7 +982,7 @@ export default function Home() {
                   background: 'rgba(13,159,110,0.1)', border: '1px solid rgba(13,159,110,0.2)',
                   fontSize: '11px', fontWeight: 700, color: '#0D9F6E', flexShrink: 0,
                 }}>
-                  {isPremium ? 'Ilimitado' : '3 grátis/dia'}
+                  {isPremium ? 'Ilimitado' : 'No trial'}
                 </div>
               </button>
 

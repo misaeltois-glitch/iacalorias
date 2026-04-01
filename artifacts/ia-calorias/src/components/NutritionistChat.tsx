@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Lock } from 'lucide-react';
+import { X, Send } from 'lucide-react';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -18,19 +18,6 @@ interface NutritionistChatProps {
 
 const BASE = import.meta.env.BASE_URL ?? '/';
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
-const FREE_DAILY_LIMIT = 3;
-const FREE_LIMIT_KEY_PREFIX = 'ia-calorias-chat-free-';
-
-function todayKey() {
-  const d = new Date();
-  return `${FREE_LIMIT_KEY_PREFIX}${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-function getFreeUsed(): number {
-  return parseInt(localStorage.getItem(todayKey()) ?? '0', 10);
-}
-function incFreeUsed() {
-  localStorage.setItem(todayKey(), String(getFreeUsed() + 1));
-}
 
 const WELCOME: Message = {
   role: 'assistant',
@@ -69,7 +56,6 @@ export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgr
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [freeUsed, setFreeUsed] = useState(getFreeUsed);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -85,8 +71,7 @@ export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgr
     }
   }, [isOpen]);
 
-  const canSend = isPremium || freeUsed < FREE_DAILY_LIMIT;
-  const remaining = FREE_DAILY_LIMIT - freeUsed;
+  const canSend = true;
 
   const send = useCallback(async (text: string) => {
     const trimmed = text.trim();
@@ -98,11 +83,6 @@ export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgr
     setMessages(nextMessages);
     setInput('');
     setLoading(true);
-
-    if (!isPremium) {
-      incFreeUsed();
-      setFreeUsed(getFreeUsed());
-    }
 
     try {
       const r = await fetch(`${BASE}api/chat`, {
@@ -188,11 +168,6 @@ export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgr
                   <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>Online · responde em segundos</span>
                 </div>
               </div>
-              {!isPremium && (
-                <div style={{ fontSize: '11px', color: remaining <= 1 ? '#EF4444' : 'var(--text-3)', fontWeight: 600, textAlign: 'right', flexShrink: 0 }}>
-                  {remaining}/{FREE_DAILY_LIMIT} grátis
-                </div>
-              )}
               <button
                 onClick={onClose}
                 style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', borderRadius: '8px' }}
@@ -272,31 +247,6 @@ export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgr
               </div>
             )}
 
-            {/* Upgrade prompt when free limit hit */}
-            {!isPremium && !canSend && (
-              <div style={{
-                margin: '0 16px 8px',
-                padding: '12px 16px', borderRadius: '14px',
-                background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
-                display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0,
-              }}>
-                <Lock size={14} style={{ color: '#F59E0B', flexShrink: 0 }} />
-                <span style={{ fontSize: '13px', color: 'var(--text-2)', flex: 1 }}>
-                  Limite diário gratuito atingido. Faça upgrade para conversar ilimitadamente.
-                </span>
-                <button
-                  onClick={onUpgrade}
-                  style={{
-                    padding: '6px 14px', borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #F59E0B, #0D9F6E)',
-                    color: '#fff', border: 'none', fontSize: '12px', fontWeight: 700,
-                    cursor: 'pointer', flexShrink: 0,
-                  }}
-                >
-                  Upgrade
-                </button>
-              </div>
-            )}
 
             {/* Input */}
             <div style={{

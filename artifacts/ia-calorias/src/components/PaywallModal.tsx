@@ -201,7 +201,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     🎁 Você está no plano grátis
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-2)', lineHeight: 1.5 }}>
-                    5 análises · Metas de cal + proteína · Últimas 5 refeições
+                    7 dias de trial completo · Todas as funcionalidades liberadas
                   </div>
                 </div>
                 <span style={{
@@ -345,7 +345,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
               }}>
                 <div style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.4px' }}>FUNÇÃO</div>
                 {[
-                  { label: 'Grátis', sub: '5 análises' },
+                  { label: 'Grátis', sub: '7 dias trial' },
                   { label: 'Limitado', sub: 'R$19,90' },
                   { label: 'Ilimitado', sub: 'R$29,90' },
                 ].map(({ label, sub }, i) => (
