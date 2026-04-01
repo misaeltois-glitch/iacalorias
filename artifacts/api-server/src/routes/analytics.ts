@@ -117,7 +117,7 @@ router.get("/summary", async (req: Request, res: Response) => {
         lt(analysesTable.createdAt, periodEnd),
       ),
       orderBy: [desc(analysesTable.createdAt)],
-      limit: isPremium ? 200 : 10,
+      limit: isPremium ? 200 : 50,
     });
   } else {
     analyses = await db.query.analysesTable.findMany({
@@ -127,7 +127,7 @@ router.get("/summary", async (req: Request, res: Response) => {
         lt(analysesTable.createdAt, periodEnd),
       ),
       orderBy: [desc(analysesTable.createdAt)],
-      limit: isPremium ? 200 : 10,
+      limit: isPremium ? 200 : 50,
     });
   }
 
@@ -188,7 +188,7 @@ router.get("/summary", async (req: Request, res: Response) => {
   // Over-goal days also count (the goal is to eat *at least* this amount, not stay under).
   // Adjust this threshold if the product definition of "dentro da meta" changes.
   let streak = 0;
-  if (goals?.calories && isPremium) {
+  if (goals?.calories) {
     const streakTarget = goals.calories * 0.8;
     const todayStr = toLocalDateStr(new Date());
 
@@ -245,7 +245,7 @@ router.get("/summary", async (req: Request, res: Response) => {
   // Pagination for meals list
   const pageSize = Math.min(Math.max(1, parseInt((req.query.pageSize as string) ?? "20")), 50);
   const page = Math.max(1, parseInt((req.query.page as string) ?? "1"));
-  const freeMealsLimit = 5;
+  const freeMealsLimit = isPremium ? pageSize : 10;
   const totalMeals = analyses.length;
   const effectiveTotal = isPremium ? totalMeals : Math.min(totalMeals, freeMealsLimit);
   const offset = isPremium ? (page - 1) * pageSize : 0;

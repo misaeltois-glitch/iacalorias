@@ -63,11 +63,6 @@ router.get("/", async (req: Request, res: Response) => {
   const tier = masterTier ?? await resolveSubTier(userId, sessionId);
 
   const goals = await findGoals(userId, sessionId);
-  if (tier === "free" && goals) {
-    // Free: only return calories and protein
-    res.json({ ...goals, carbs: null, fat: null, fiber: null });
-    return;
-  }
   res.json(withPerMeal(goals));
 });
 
@@ -85,10 +80,9 @@ router.post("/", async (req: Request, res: Response) => {
 
   const restrictionsStr = Array.isArray(restrictions) ? JSON.stringify(restrictions) : restrictions;
 
-  // Free: only allow calories and protein
-  const effectiveCarbs = tier === "free" ? undefined : carbs;
-  const effectiveFat = tier === "free" ? undefined : fat;
-  const effectiveFiber = tier === "free" ? undefined : fiber;
+  const effectiveCarbs = carbs;
+  const effectiveFat = fat;
+  const effectiveFiber = fiber;
 
   const existing = await findGoals(userId, sessionId);
 
@@ -123,9 +117,7 @@ router.patch("/", async (req: Request, res: Response) => {
   const isDevAccount = !!masterTier;
   const tier = masterTier ?? await resolveSubTier(userId, sessionId);
 
-  const allowed = tier === "free"
-    ? ["calories", "protein", "mealsPerDay"] as const
-    : ["calories", "protein", "carbs", "fat", "fiber", "mealsPerDay"] as const;
+  const allowed = ["calories", "protein", "carbs", "fat", "fiber", "mealsPerDay"] as const;
   const patch: Record<string, number> = {};
   for (const key of allowed) {
     if (fields[key] !== undefined && fields[key] !== null) {
@@ -324,11 +316,8 @@ Retorne APENAS o texto do resumo, sem títulos, sem bullets, sem markdown.`;
     }
   }
 
-  const isFree = tier === "free";
-  const filteredGoals = scaledGoals && isFree ? { ...scaledGoals, carbs: null, fat: null, fiber: null } : scaledGoals;
-  const filteredRawGoals = goals && isFree
-    ? { calories: goals.calories, protein: goals.protein, carbs: null, fat: null, fiber: null, objective: goals.objective, mealsPerDay: goals.mealsPerDay ?? 3 }
-    : goals ? { calories: goals.calories, protein: goals.protein, carbs: goals.carbs, fat: goals.fat, fiber: goals.fiber, objective: goals.objective, mealsPerDay: goals.mealsPerDay ?? 3 } : null;
+  const filteredGoals = scaledGoals;
+  const filteredRawGoals = goals ? { calories: goals.calories, protein: goals.protein, carbs: goals.carbs, fat: goals.fat, fiber: goals.fiber, objective: goals.objective, mealsPerDay: goals.mealsPerDay ?? 3 } : null;
 
   // Streak: consecutive days (going back from today) with at least 1 analysis
   let streak = 0;
@@ -369,8 +358,8 @@ Retorne APENAS o texto do resumo, sem títulos, sem bullets, sem markdown.`;
     totals,
     goals: filteredGoals,
     rawGoals: filteredRawGoals,
-    alerts: isFree ? alerts.filter(a => a.macro === "calories" || a.macro === "protein" || a.macro === "meals") : alerts,
-    aiSummary: isFree ? null : aiSummary,
+    alerts,
+    aiSummary,
     analysesCount: periodAnalyses.length,
     period,
     daysInPeriod,

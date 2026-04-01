@@ -610,14 +610,12 @@ export default function Home() {
               <BarChart2 size={16} />
             </button>
 
-            {isPremium && (
-              <button
-                onClick={() => setShowGoalsPanel(true)}
-                style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
-              >
-                <Settings size={16} />
-              </button>
-            )}
+            <button
+              onClick={() => setShowGoalsPanel(true)}
+              style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
+            >
+              <Settings size={16} />
+            </button>
 
             {isAuthenticated ? (
               <div ref={userMenuRef} style={{ position: 'relative' }}>
@@ -771,14 +769,12 @@ export default function Home() {
                     Seu histórico nutricional
                   </p>
                 </div>
-                {isPremium && (
-                  <button
-                    onClick={() => setShowGoalsPanel(true)}
-                    style={{ padding: '8px 14px', borderRadius: '10px', background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    <Settings size={13} /> Metas
-                  </button>
-                )}
+                <button
+                  onClick={() => setShowGoalsPanel(true)}
+                  style={{ padding: '8px 14px', borderRadius: '10px', background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Settings size={13} /> Metas
+                </button>
               </div>
               <ProgressView
                 sessionId={sessionId}
@@ -1152,7 +1148,7 @@ export default function Home() {
                 </motion.div>
               )}
 
-              {goalsLoaded && isPremium && (
+              {goalsLoaded && (
                 <div style={{ marginTop: '20px' }}>
                   <DailyProgress
                     totals={dailySummary?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, meals: 0 }}
