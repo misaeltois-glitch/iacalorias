@@ -1,5 +1,6 @@
 packages:
-  - artifacts/*
+  - artifacts/api-server
+  - artifacts/ia-calorias
   - lib/*
   - lib/integrations/*
   - scripts
