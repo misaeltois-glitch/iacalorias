@@ -91,9 +91,9 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
   const alertColors = { tip: '#3b82f6', warning: '#f59e0b', ok: '#22c55e' };
   const alertBg = { tip: 'rgba(59,130,246,0.08)', warning: 'rgba(245,158,11,0.08)', ok: 'rgba(34,197,94,0.08)' };
 
-  // Free tier: show calories + protein, lock carbs/fat/fiber
-  const visibleMacros = isPremium ? macros : macros.slice(0, 2);
-  const lockedMacros = isPremium ? [] : macros.slice(2);
+  // All macros visible for all tiers
+  const visibleMacros = macros;
+  const lockedMacros: typeof macros = [];
 
   return (
     <motion.div

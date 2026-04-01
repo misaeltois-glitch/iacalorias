@@ -26,11 +26,11 @@ type FeatureRow = {
 const FEATURES: FeatureRow[] = [
   { label: 'Análise de refeições por IA',              free: '5 p/ testar',    limited: '20 por mês',   unlimited: 'Ilimitadas',   highlight: true },
   { label: 'Calorias e proteínas por refeição',        free: true,             limited: true,           unlimited: true },
-  { label: 'Carboidratos, gordura e fibra',            free: false,            limited: true,           unlimited: true },
+  { label: 'Carboidratos, gordura e fibra',            free: true,             limited: true,           unlimited: true },
   { label: 'Pontuação de saúde da refeição',           free: false,            limited: true,           unlimited: true },
   { label: 'Histórico de refeições',                  free: 'Últimas 5',      limited: '30 dias',      unlimited: 'Ilimitado',    highlight: true },
   { label: 'Meta de calorias e proteína',              free: true,             limited: true,           unlimited: true },
-  { label: 'Metas de carbs, gordura e fibra',          free: false,            limited: true,           unlimited: true },
+  { label: 'Metas de carbs, gordura e fibra',          free: true,             limited: true,           unlimited: true },
   { label: 'Painel de progresso diário',               free: 'Parcial',        limited: true,           unlimited: true },
   { label: 'Treino do Dia gerado por IA',              free: false,            limited: '5/mês',        unlimited: 'Ilimitado',    highlight: true },
   { label: 'Execução guiada com cronômetro',           free: false,            limited: false,          unlimited: true,           highlight: true },
