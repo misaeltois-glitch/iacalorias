@@ -52,8 +52,8 @@ router.post("/", upload.single("image"), async (req: Request, res: Response) => 
     return;
   }
 
-  if (req.file.size > 4 * 1024 * 1024) {
-    res.status(400).json({ error: "file_too_large", message: "A imagem deve ter no máximo 4 MB." });
+  if (req.file.size > 10 * 1024 * 1024) {
+    res.status(400).json({ error: "file_too_large", message: "A imagem deve ter no máximo 10 MB." });
     return;
   }
 

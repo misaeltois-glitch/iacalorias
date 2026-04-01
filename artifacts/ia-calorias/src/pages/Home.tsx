@@ -346,7 +346,7 @@ export default function Home() {
     const code = body?.error;
     const msgs: Record<string, { title: string; description: string }> = {
       not_food: { title: "Nenhum alimento detectado", description: body?.message || "Envie uma foto de um prato ou refeição." },
-      file_too_large: { title: "Imagem muito grande", description: "Máximo 4 MB. Reduza o tamanho e tente novamente." },
+      file_too_large: { title: "Imagem muito grande", description: "Máximo 10 MB. Reduza o tamanho e tente novamente." },
       invalid_file_type: { title: "Formato inválido", description: "Envie uma imagem JPG, PNG ou WEBP." },
       invalid_image: { title: "Imagem inválida", description: "Arquivo pode estar corrompido. Tente outra foto." },
       incomplete_analysis: { title: "Foto pouco nítida", description: body?.message || "Tire uma foto mais clara e bem iluminada." },

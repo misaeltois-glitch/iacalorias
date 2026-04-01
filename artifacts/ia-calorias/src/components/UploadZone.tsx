@@ -174,7 +174,7 @@ export function UploadZone({ onAnalyze, onFileSelected, isAnalyzing, usageLabel 
                   Clique ou arraste uma foto
                 </h3>
                 <p style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '20px' }}>
-                  JPG, PNG, WEBP · Máx. 4 MB · ou Cole (Ctrl+V)
+                  JPG, PNG, WEBP · Máx. 10 MB · ou Cole (Ctrl+V)
                 </p>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <label style={{
