@@ -30,6 +30,7 @@ import { NutritionistChat } from '@/components/NutritionistChat';
 import { WeightTracker } from '@/components/WeightTracker';
 import { OnboardingAuthPrompt } from '@/components/OnboardingAuthPrompt';
 import { MealPlanModal } from '@/components/MealPlanModal';
+import { ProfileSetupBanner } from '@/components/ProfileSetupBanner';
 import { ReferralCard, applyPendingReferral, REFERRAL_CODE_KEY } from '@/components/ReferralCard';
 import { MealReminders } from '@/components/MealReminders';
 import { useMealReminders } from '@/hooks/use-meal-reminders';
@@ -870,6 +871,16 @@ export default function Home() {
                   />
                 </div>
               </div>
+
+              {/* Profile setup banner */}
+              {goalsLoaded && (!isAuthenticated || !savedGoals?.calories) && (
+                <ProfileSetupBanner
+                  isAuthenticated={isAuthenticated}
+                  hasGoals={!!(savedGoals?.calories)}
+                  onLogin={() => navigate('/login')}
+                  onSetupGoals={() => setShowOnboarding(true)}
+                />
+              )}
 
               {/* CTA for non-authenticated */}
               {!isAuthenticated && (
