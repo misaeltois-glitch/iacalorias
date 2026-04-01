@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useLocation } from 'wouter';
-import { useCreateCheckoutSession } from '@workspace/api-client-react';
 import { useAuth } from '@/hooks/use-auth';
 
 const PENDING_PLAN_KEY = 'ia-calorias-pending-plan';
@@ -25,18 +24,20 @@ type FeatureRow = {
 };
 
 const FEATURES: FeatureRow[] = [
-  { label: 'Análise de refeições por IA',     free: '5 por mês',        limited: '20 por mês',      unlimited: 'Ilimitadas',          highlight: true },
-  { label: 'Proteínas, carboidratos, gordura e fibra', free: '✓', limited: true,           unlimited: true },
-  { label: 'Pontuação de saúde da refeição',    free: false,              limited: true,              unlimited: true },
-  { label: 'Histórico de refeições',           free: 'Últimas 5',        limited: '30 dias',         unlimited: 'Ilimitado',           highlight: true },
-  { label: 'Metas diárias personalizadas',     free: 'Cal + Proteína',   limited: true,              unlimited: true },
-  { label: 'Painel de progresso & gráficos',   free: 'Parcial',          limited: true,              unlimited: true },
-  { label: 'Treino do Dia gerado por IA',      free: false,              limited: '5/mês',           unlimited: 'Ilimitado',           highlight: true },
-  { label: 'Execução guiada com cronômetro',   free: false,              limited: false,             unlimited: true,                  highlight: true },
-  { label: 'Plano semanal personalizado',      free: false,              limited: false,             unlimited: true },
-  { label: 'Resumo da nutricionista (IA)',     free: false,              limited: false,             unlimited: true,                  highlight: true },
-  { label: 'Relatório semanal inteligente',    free: false,              limited: false,             unlimited: true },
-  { label: 'Suporte prioritário',              free: false,              limited: false,             unlimited: true },
+  { label: 'Análise de refeições por IA',              free: '5 p/ testar',    limited: '20 por mês',   unlimited: 'Ilimitadas',   highlight: true },
+  { label: 'Calorias e proteínas por refeição',        free: true,             limited: true,           unlimited: true },
+  { label: 'Carboidratos, gordura e fibra',            free: false,            limited: true,           unlimited: true },
+  { label: 'Pontuação de saúde da refeição',           free: false,            limited: true,           unlimited: true },
+  { label: 'Histórico de refeições',                  free: 'Últimas 5',      limited: '30 dias',      unlimited: 'Ilimitado',    highlight: true },
+  { label: 'Meta de calorias e proteína',              free: true,             limited: true,           unlimited: true },
+  { label: 'Metas de carbs, gordura e fibra',          free: false,            limited: true,           unlimited: true },
+  { label: 'Painel de progresso diário',               free: 'Parcial',        limited: true,           unlimited: true },
+  { label: 'Treino do Dia gerado por IA',              free: false,            limited: '5/mês',        unlimited: 'Ilimitado',    highlight: true },
+  { label: 'Execução guiada com cronômetro',           free: false,            limited: false,          unlimited: true,           highlight: true },
+  { label: 'Plano semanal personalizado',              free: false,            limited: false,          unlimited: true },
+  { label: 'Resumo da nutricionista (IA)',             free: false,            limited: false,          unlimited: true,           highlight: true },
+  { label: 'Relatório semanal inteligente',            free: false,            limited: false,          unlimited: true },
+  { label: 'Suporte prioritário',                      free: false,            limited: false,          unlimited: true },
 ];
 
 function FeatureCell({ val, isUnlimited }: { val: string | boolean | false; isUnlimited?: boolean }) {
@@ -68,7 +69,6 @@ type LoadingKey = 'limited' | 'unlimited' | 'limited_pix' | 'unlimited_pix';
 export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowAuth }: PaywallModalProps) {
   const [loadingPlan, setLoadingPlan] = useState<LoadingKey | null>(null);
   const [tab, setTab] = useState<'cards' | 'compare'>('cards');
-  const checkoutMutation = useCreateCheckoutSession();
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
 
@@ -179,6 +179,26 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
           {/* ── CARDS VIEW ── */}
           {tab === 'cards' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+              {/* GRÁTIS — trial banner */}
+              <div style={{
+                borderRadius: 14, padding: '12px 16px',
+                background: 'var(--bg-2)', border: '1px dashed var(--border-strong)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+              }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 3 }}>
+                    🎁 Você está no plano grátis
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-2)', lineHeight: 1.5 }}>
+                    5 análises · Metas de cal + proteína · Últimas 5 refeições
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 99,
+                  background: 'rgba(13,159,110,0.1)', color: accent, whiteSpace: 'nowrap', flexShrink: 0,
+                }}>Ativo</span>
+              </div>
 
               {/* ILIMITADO — destaque */}
               <div style={{
@@ -344,13 +364,19 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                 borderBottom: '1px solid var(--border)',
               }}>
                 <div style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.4px' }}>FUNÇÃO</div>
-                {['Grátis', 'Limitado', 'Ilimitado'].map((h, i) => (
-                  <div key={h} style={{
-                    padding: '10px 4px', textAlign: 'center',
-                    fontSize: 10, fontWeight: 800, letterSpacing: '0.3px',
-                    color: i === 2 ? accent : 'var(--text-2)',
+                {[
+                  { label: 'Grátis', sub: '5 análises' },
+                  { label: 'Limitado', sub: 'R$19,90' },
+                  { label: 'Ilimitado', sub: 'R$29,90' },
+                ].map(({ label, sub }, i) => (
+                  <div key={label} style={{
+                    padding: '8px 4px', textAlign: 'center',
                     borderLeft: '1px solid var(--border)',
-                  }}>{h}</div>
+                    background: i === 2 ? 'rgba(13,159,110,0.05)' : 'transparent',
+                  }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.3px', color: i === 2 ? accent : 'var(--text-2)' }}>{label}</div>
+                    <div style={{ fontSize: 9, color: 'var(--text-3)', marginTop: 1 }}>{sub}</div>
+                  </div>
                 ))}
               </div>
 
