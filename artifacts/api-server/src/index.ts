@@ -27,6 +27,16 @@ async function runMigrations() {
       ALTER TABLE analyses
       ADD COLUMN IF NOT EXISTS substitution_tip text
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS weight_logs (
+        id text PRIMARY KEY,
+        session_id text NOT NULL,
+        user_id text,
+        weight_kg real NOT NULL,
+        log_date date NOT NULL,
+        created_at timestamp NOT NULL DEFAULT now()
+      )
+    `);
     logger.info("DB migrations applied");
   } catch (err) {
     logger.warn({ err }, "DB migration failed (non-critical)");

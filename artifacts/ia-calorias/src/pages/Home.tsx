@@ -27,6 +27,7 @@ import { GoalCelebration, hasCelebratedToday, markCelebratedToday } from '@/comp
 import { StreakCelebration, shouldCelebrateStreak } from '@/components/StreakCelebration';
 import { StreakBadge } from '@/components/StreakBadge';
 import { NutritionistChat } from '@/components/NutritionistChat';
+import { WeightTracker } from '@/components/WeightTracker';
 import { OnboardingAuthPrompt } from '@/components/OnboardingAuthPrompt';
 
 import {
@@ -947,6 +948,9 @@ export default function Home() {
 
               {/* Water Tracker */}
               <WaterTracker />
+
+              {/* Weight Tracker */}
+              <WeightTracker sessionId={sessionId} />
 
               {/* Nutritionist Chat CTA */}
               <button
