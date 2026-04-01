@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { db, usersTable, analysesTable } from "@workspace/db";
+import { db, pool, usersTable, analysesTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 
 const rawPort = process.env["PORT"];
@@ -15,6 +15,18 @@ const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
+
+async function runMigrations() {
+  try {
+    await pool.query(`
+      ALTER TABLE subscriptions
+      ADD COLUMN IF NOT EXISTS payment_type text DEFAULT 'subscription'
+    `);
+    logger.info("DB migrations applied");
+  } catch (err) {
+    logger.warn({ err }, "DB migration failed (non-critical)");
+  }
 }
 
 async function cleanupDevAccount() {
@@ -44,5 +56,6 @@ app.listen(port, async (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  await runMigrations();
   await cleanupDevAccount();
 });
