@@ -1052,6 +1052,7 @@ export default function Home() {
         onNutritionTargets={handleWorkoutNutrition}
         onboardingMode={mandatoryStep === 'workout'}
         onOnboardingComplete={handleMandatoryWorkoutDone}
+        biometrics={savedGoals ? { age: savedGoals.age, weight: savedGoals.weight, height: savedGoals.height, sex: savedGoals.sex } : undefined}
       />
 
       <PaywallModal

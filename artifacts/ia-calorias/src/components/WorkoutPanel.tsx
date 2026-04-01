@@ -22,6 +22,7 @@ interface WorkoutPanelProps {
   onNutritionTargets?: (targets: { calories: number; protein: number; carbs: number; fat: number; fiber: number; weight: number; height: number; age: number; sex: string; activityFactor: number }) => void;
   onboardingMode?: boolean;
   onOnboardingComplete?: () => void;
+  biometrics?: { age?: number; weight?: number; height?: number; sex?: string };
 }
 
 type PanelView = 'loading' | 'questionnaire' | 'plan' | 'player' | 'quick-picker' | 'ai-preview' | 'muscle-builder' | 'done';
@@ -80,7 +81,7 @@ const INJURIES_LIST = [
   { key: 'ankle', label: 'Entorse de tornozelo recorrente' },
 ];
 
-export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade, onNutritionTargets, onboardingMode, onOnboardingComplete }: WorkoutPanelProps) {
+export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade, onNutritionTargets, onboardingMode, onOnboardingComplete, biometrics }: WorkoutPanelProps) {
   const { user } = useAuth();
   const [view, setView] = useState<PanelView>('loading');
   const [step, setStep] = useState(1);
@@ -94,9 +95,10 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
     techniques: [],
     cardio: 'none',
     warmup: 'basic',
-    age: 25,
-    weight: 75,
-    height: 170,
+    age: biometrics?.age ?? 25,
+    weight: biometrics?.weight ?? 75,
+    height: biometrics?.height ?? 170,
+    sex: biometrics?.sex ?? undefined,
   });
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
   const [selectedDayKey, setSelectedDayKey] = useState(getTodayKey());
@@ -114,6 +116,18 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
   const workoutStartRef = useRef<Date | null>(null);
   const fromAiRef = useRef(false);
   const [completedSession, setCompletedSession] = useState<{ sessionName: string; durationMinutes: number; exerciseCount: number; estimatedBurn: number } | null>(null);
+
+  // Sync biometrics from goals when they load after initial render
+  useEffect(() => {
+    if (!biometrics) return;
+    setProfile(prev => ({
+      ...prev,
+      age: prev.age === 25 && biometrics.age ? biometrics.age : prev.age,
+      weight: prev.weight === 75 && biometrics.weight ? biometrics.weight : prev.weight,
+      height: prev.height === 170 && biometrics.height ? biometrics.height : prev.height,
+      sex: !prev.sex && biometrics.sex ? biometrics.sex : prev.sex,
+    }));
+  }, [biometrics]);
 
   // muscle-builder state
   const [mbPhase, setMbPhase] = useState<MbPhase>('groups');
@@ -155,7 +169,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
       if (r.ok) {
         const data = await r.json();
         const loaded: WorkoutProfile = {
-          goal: data.goal, sex: data.sex, age: data.age, weight: data.weight, height: data.height,
+          goal: data.goal, sex: data.sex ?? biometrics?.sex, age: data.age ?? biometrics?.age, weight: data.weight ?? biometrics?.weight, height: data.height ?? biometrics?.height,
           bodyFat: data.bodyFat, level: data.level, trainingDays: data.trainingDays ?? [],
           sessionDuration: data.sessionDuration, preferredTime: data.preferredTime,
           gym: data.gym, equipment: data.equipment ?? [], hasInjuries: data.hasInjuries,
