@@ -89,8 +89,18 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
       body: JSON.stringify({ sessionId, plan, paymentType }),
     })
       .then(r => r.json())
-      .then(data => { if (data.url) window.location.href = data.url; else setLoadingPlan(null); })
-      .catch(() => setLoadingPlan(null));
+      .then(data => {
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          setLoadingPlan(null);
+          alert(data.message ?? 'Erro ao iniciar pagamento. Tente novamente.');
+        }
+      })
+      .catch(() => {
+        setLoadingPlan(null);
+        alert('Erro ao conectar. Verifique sua conexão e tente novamente.');
+      });
   };
 
   if (!isOpen) return null;

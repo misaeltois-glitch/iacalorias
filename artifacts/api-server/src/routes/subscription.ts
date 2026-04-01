@@ -169,9 +169,10 @@ router.post("/checkout", async (req: Request, res: Response) => {
 
     const result = CreateCheckoutSessionResponse.parse({ url: session.url });
     res.json(result);
-  } catch (err) {
-    req.log.error({ err }, "Error creating checkout session");
-    res.status(500).json({ error: "internal_error", message: "Failed to create checkout" });
+  } catch (err: any) {
+    const stripeMessage = err?.raw?.message ?? err?.message ?? "Failed to create checkout";
+    req.log.error({ err, stripeMessage }, "Error creating checkout session");
+    res.status(500).json({ error: "internal_error", message: stripeMessage });
   }
 });
 
