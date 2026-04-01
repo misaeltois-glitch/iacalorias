@@ -15,8 +15,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2025-02
 const PRICE_LIMITED    = process.env.STRIPE_PRICE_LIMITED    ?? "price_1TG4kW5gtu657TZjczJxsG4A";
 const PRICE_UNLIMITED  = process.env.STRIPE_PRICE_UNLIMITED  ?? "price_1TG4kW5gtu657TZjyp9NlkVZ";
 // Pagamento avulso PIX (30 dias, sem compromisso)
-const PRICE_LIMITED_ONETIME   = process.env.STRIPE_PRICE_LIMITED_ONETIME   ?? "";
-const PRICE_UNLIMITED_ONETIME = process.env.STRIPE_PRICE_UNLIMITED_ONETIME ?? "";
+const PRICE_LIMITED_ONETIME   = process.env.STRIPE_PRICE_LIMITED_ONETIME   ?? "price_1THFHH8HTXQYSfx5sP7OuD6i";
+const PRICE_UNLIMITED_ONETIME = process.env.STRIPE_PRICE_UNLIMITED_ONETIME ?? "price_1THFIB8HTXQYSfx5r4pPEcTP";
 
 const FREE_TRIAL_LIMIT = 3;
 const LIMITED_PLAN_LIMIT = 20;

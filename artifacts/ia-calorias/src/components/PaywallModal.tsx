@@ -256,7 +256,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                       marginTop: 8, transition: 'all 0.2s',
                     }}
                   >
-                    {loadingPlan === 'unlimited_pix' ? 'Redirecionando...' : '🏦 Pagar R$34,90 com PIX — 30 dias, sem compromisso'}
+                    {loadingPlan === 'unlimited_pix' ? 'Redirecionando...' : '🏦 Pagar R$24,90 com PIX — 30 dias, sem compromisso'}
                   </button>
                   <p style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'center', margin: '8px 0 0' }}>
                     Assinatura: cancele quando quiser · 7 dias grátis
@@ -328,7 +328,7 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
                     marginTop: 7, transition: 'all 0.2s',
                   }}
                 >
-                  {loadingPlan === 'limited_pix' ? 'Redirecionando...' : '🏦 Pagar R$24,90 com PIX — 30 dias, sem compromisso'}
+                  {loadingPlan === 'limited_pix' ? 'Redirecionando...' : '🏦 Pagar R$17,90 com PIX — 30 dias, sem compromisso'}
                 </button>
               </div>
             </div>
