@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { RotateCcw, Sparkles } from 'lucide-react';
+import { RotateCcw, Sparkles, Share2 } from 'lucide-react';
 import type { AnalysisResult } from '@workspace/api-client-react/src/generated/api.schemas';
+import { shareResult } from '@/lib/share-card';
 
 interface ResultCardProps {
   result: AnalysisResult;
@@ -50,6 +51,21 @@ function CountUpNumber({ value, suffix = '' }: { value: number; suffix?: string 
 }
 
 export function ResultCard({ result, onReset, photoUrl }: ResultCardProps) {
+  const [sharing, setSharing] = useState(false);
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
+
+  const handleShare = useCallback(async () => {
+    setSharing(true);
+    setShareMsg(null);
+    const outcome = await shareResult(result);
+    setSharing(false);
+    if (outcome === 'downloaded') setShareMsg('Imagem salva! Compartilhe no Instagram Stories 🌿');
+    if (outcome === 'error') setShareMsg('Não foi possível compartilhar. Tente novamente.');
+    if (outcome === 'shared' || outcome === 'downloaded') {
+      setTimeout(() => setShareMsg(null), 4000);
+    }
+  }, [result]);
+
   const macroValues = {
     protein: result.macros.protein,
     carbs: result.macros.carbs,
@@ -248,6 +264,40 @@ export function ResultCard({ result, onReset, photoUrl }: ResultCardProps) {
         paddingBottom: '4px',
       }}>
         Analisado por IA · Precisão estimada: ~85%
+      </motion.div>
+
+      {/* Share Button */}
+      <motion.div variants={item} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <button
+          onClick={handleShare}
+          disabled={sharing}
+          style={{
+            width: '100%', padding: '15px',
+            borderRadius: '16px',
+            background: sharing
+              ? 'var(--bg-3)'
+              : 'linear-gradient(135deg, rgba(13,159,110,0.15), rgba(59,130,246,0.12))',
+            border: '1px solid rgba(13,159,110,0.35)',
+            color: '#0D9F6E', fontSize: '15px', fontWeight: 700,
+            cursor: sharing ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            transition: 'background 0.15s, opacity 0.15s',
+            opacity: sharing ? 0.6 : 1,
+          }}
+        >
+          <Share2 size={16} />
+          {sharing ? 'Gerando imagem…' : 'Compartilhar análise'}
+        </button>
+        {shareMsg && (
+          <motion.p
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            style={{ fontSize: '12px', color: '#0D9F6E', textAlign: 'center', margin: 0 }}
+          >
+            {shareMsg}
+          </motion.p>
+        )}
       </motion.div>
 
       {/* Reset Button */}
