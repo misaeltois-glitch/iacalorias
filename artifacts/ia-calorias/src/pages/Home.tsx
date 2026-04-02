@@ -581,18 +581,7 @@ export default function Home() {
 
   const renderUsagePill = () => {
     if (!subStatus) return null;
-    if (subStatus.tier === 'free') return (
-      <button onClick={() => setShowPaywall(true)} style={{
-        display: 'flex', alignItems: 'center', gap: '6px',
-        padding: '5px 12px', borderRadius: '99px',
-        background: 'rgba(13,159,110,0.1)', color: '#0D9F6E',
-        fontSize: '12px', fontWeight: 700, border: '1px solid rgba(13,159,110,0.2)',
-        cursor: 'pointer',
-      }}>
-        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0D9F6E', display: 'inline-block', animation: 'ping 1.5s cubic-bezier(0,0,0.2,1) infinite' }} />
-        🎁 {trialDaysRemaining ?? 0} dia{trialDaysRemaining !== 1 ? 's' : ''} grátis
-      </button>
-    );
+    if (subStatus.tier === 'free') return null;
     if (subStatus.tier === 'limited') return (
       <div style={{
         display: 'flex', alignItems: 'center', gap: '6px',
