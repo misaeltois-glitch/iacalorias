@@ -187,6 +187,7 @@ export default function Home() {
   const [todaySummary, setTodaySummary] = useState<any>(null);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
   const [period, setPeriod] = useState<Period>('day');
+  const [hasWorkoutPlan, setHasWorkoutPlan] = useState(false);
 
   const [activeTab, setActiveTab] = useState<BottomNavTab>('home');
   const [goalsRefreshKey, setGoalsRefreshKey] = useState(0);
@@ -262,6 +263,13 @@ export default function Home() {
   useEffect(() => {
     if (sessionId) refreshSummary();
   }, [sessionId, isPremium, refreshSummary]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    fetch(`${BASE}api/workout/profile?sessionId=${sessionId}`, { headers: authHeaders() })
+      .then(r => setHasWorkoutPlan(r.ok))
+      .catch(() => {});
+  }, [sessionId]);
 
   // After login, check if user had a pending upgrade plan and open checkout
   useEffect(() => {
@@ -535,6 +543,7 @@ export default function Home() {
 
   const handleMandatoryWorkoutDone = useCallback(() => {
     setShowWorkout(false);
+    setHasWorkoutPlan(true);
     setMandatoryStep('auth');
   }, []);
 
@@ -937,12 +946,14 @@ export default function Home() {
               </div>
 
               {/* Profile setup banner */}
-              {goalsLoaded && (!isAuthenticated || !savedGoals?.calories) && (
+              {goalsLoaded && (!isAuthenticated || !savedGoals?.calories || !hasWorkoutPlan) && (
                 <ProfileSetupBanner
                   isAuthenticated={isAuthenticated}
                   hasGoals={!!(savedGoals?.calories)}
+                  hasWorkoutPlan={hasWorkoutPlan}
                   onLogin={() => navigate('/login')}
                   onSetupGoals={() => setShowOnboarding(true)}
+                  onSetupWorkout={() => setShowWorkout(true)}
                 />
               )}
 
@@ -1258,6 +1269,7 @@ export default function Home() {
         onClose={() => {
           setShowWorkout(false);
           setActiveTab('home');
+          setHasWorkoutPlan(true);
           if (mandatoryStep === 'workout') handleMandatoryWorkoutDone();
         }}
         sessionId={sessionId}

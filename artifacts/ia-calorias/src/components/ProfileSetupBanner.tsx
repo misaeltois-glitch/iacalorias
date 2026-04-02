@@ -14,29 +14,40 @@ interface SetupItem {
 interface ProfileSetupBannerProps {
   isAuthenticated: boolean;
   hasGoals: boolean;
+  hasWorkoutPlan: boolean;
   onLogin: () => void;
   onSetupGoals: () => void;
+  onSetupWorkout: () => void;
 }
 
-export function ProfileSetupBanner({ isAuthenticated, hasGoals, onLogin, onSetupGoals }: ProfileSetupBannerProps) {
+export function ProfileSetupBanner({ isAuthenticated, hasGoals, hasWorkoutPlan, onLogin, onSetupGoals, onSetupWorkout }: ProfileSetupBannerProps) {
   const items: SetupItem[] = [
     {
       key: 'auth',
       icon: '👤',
-      label: 'Crie sua conta',
-      sublabel: 'Salve seu histórico e acesse de qualquer dispositivo',
+      label: 'Perfil pessoal',
+      sublabel: 'Crie sua conta e salve seu histórico em qualquer dispositivo',
       done: isAuthenticated,
       onAction: onLogin,
       actionLabel: 'Criar conta',
     },
     {
       key: 'goals',
-      icon: '🎯',
-      label: 'Configure suas metas',
+      icon: '🥗',
+      label: 'Plano nutricional',
       sublabel: 'Calorias e macros personalizados para o seu objetivo',
       done: hasGoals,
       onAction: onSetupGoals,
       actionLabel: 'Configurar',
+    },
+    {
+      key: 'workout',
+      icon: '🏋️',
+      label: 'Plano de treino',
+      sublabel: 'Treinos gerados por IA conforme seu perfil e objetivo',
+      done: hasWorkoutPlan,
+      onAction: onSetupWorkout,
+      actionLabel: 'Criar plano',
     },
   ];
 

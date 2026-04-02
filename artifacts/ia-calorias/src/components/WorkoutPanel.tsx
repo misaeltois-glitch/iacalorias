@@ -103,6 +103,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
   });
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
   const [selectedDayKey, setSelectedDayKey] = useState(getTodayKey());
+  const [lockedDayPopup, setLockedDayPopup] = useState<{ dayKey: string; sessionName: string } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null);
   const [quickMuscles, setQuickMuscles] = useState<Set<string>>(new Set());
@@ -928,23 +929,14 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
           </div>
 
           {/* Week Calendar */}
-          <div style={{ padding: '16px 16px 0', overflowX: 'auto' }}>
-            <div style={{ display: 'flex', gap: '6px', minWidth: 'max-content' }}>
-              {DAYS.map(({ key, label }) => {
-                const s = plan.sessions.find(x => x.dayKey === key);
-                const isToday = key === getTodayKey();
-                const isSelected = key === selectedDayKey;
-                const isRest = s?.isRestDay;
-                return (
-                  <button key={key} onClick={() => setSelectedDayKey(key)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '8px 10px', borderRadius: '14px', border: `2px solid ${isSelected ? accent : 'transparent'}`, background: isSelected ? 'rgba(13,159,110,0.1)' : isToday ? 'var(--bg-2)' : 'transparent', cursor: 'pointer', minWidth: '44px' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 700, color: isSelected ? accent : 'var(--text-3)' }}>{label}</span>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isRest ? 'var(--bg-3)' : isToday ? '#F59E0B' : accent }} />
-                    <span style={{ fontSize: '9px', color: isSelected ? accent : 'var(--text-3)', fontWeight: 500 }}>{isRest ? 'DSC' : s?.sessionName?.split(' ')[0]}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <WeekCalendar
+            plan={plan}
+            selectedDayKey={selectedDayKey}
+            isPremium={isPremium}
+            accent={accent}
+            onSelect={setSelectedDayKey}
+            onLockedClick={setLockedDayPopup}
+          />
 
           {/* Session Detail */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 100px' }}>
@@ -1097,6 +1089,15 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
             </div>
           )}
         </div>
+      )}
+
+      {/* Locked day popup */}
+      {lockedDayPopup && (
+        <LockedDayModal
+          sessionName={lockedDayPopup.sessionName}
+          onUpgrade={() => { setLockedDayPopup(null); onUpgrade(); }}
+          onClose={() => setLockedDayPopup(null)}
+        />
       )}
 
       {/* ── QUICK PICKER ── */}
@@ -1662,6 +1663,105 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
 }
 
 // ── SUB-COMPONENTS ──
+
+const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+function WeekCalendar({ plan, selectedDayKey, isPremium, accent, onSelect, onLockedClick }: {
+  plan: WorkoutPlan;
+  selectedDayKey: string;
+  isPremium: boolean;
+  accent: string;
+  onSelect: (key: string) => void;
+  onLockedClick: (info: { dayKey: string; sessionName: string }) => void;
+}) {
+  const todayKey = getTodayKey();
+  const todayIdx = DAY_ORDER.indexOf(todayKey);
+  return (
+    <div style={{ padding: '16px 16px 0', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: '6px', minWidth: 'max-content' }}>
+        {DAYS.map(({ key, label }) => {
+          const s = plan.sessions.find((x: WorkoutSession) => x.dayKey === key);
+          const isToday = key === todayKey;
+          const isSelected = key === selectedDayKey;
+          const isRest = s?.isRestDay;
+          const dayIdx = DAY_ORDER.indexOf(key);
+          const isLocked = !isPremium && !isRest && dayIdx < todayIdx;
+          return (
+            <button
+              key={key}
+              onClick={() => isLocked ? onLockedClick({ dayKey: key, sessionName: s?.sessionName ?? label }) : onSelect(key)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+                padding: '8px 10px', borderRadius: '14px',
+                border: `2px solid ${isSelected ? accent : 'transparent'}`,
+                background: isSelected ? 'rgba(13,159,110,0.1)' : isToday ? 'var(--bg-2)' : 'transparent',
+                cursor: 'pointer', minWidth: '44px', opacity: isLocked ? 0.55 : 1,
+              }}
+            >
+              <span style={{ fontSize: '10px', fontWeight: 700, color: isSelected ? accent : 'var(--text-3)' }}>{label}</span>
+              {isLocked
+                ? <span style={{ fontSize: '11px', lineHeight: 1 }}>🔒</span>
+                : <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isRest ? 'var(--bg-3)' : isToday ? '#F59E0B' : accent }} />
+              }
+              <span style={{ fontSize: '9px', color: isSelected ? accent : 'var(--text-3)', fontWeight: 500 }}>{isRest ? 'DSC' : s?.sessionName?.split(' ')[0]}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LockedDayModal({ sessionName, onUpgrade, onClose }: { sessionName: string; onUpgrade: () => void; onClose: () => void }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+    }} onClick={onClose}>
+      <div
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: '480px',
+          background: 'var(--bg)', borderRadius: '24px 24px 0 0',
+          padding: '28px 24px 40px', display: 'flex', flexDirection: 'column', gap: '16px',
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔒</div>
+          <div style={{ fontSize: '17px', fontWeight: 800, color: 'var(--text-1)', marginBottom: '8px' }}>
+            Treino bloqueado
+          </div>
+          <p style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.6, margin: 0 }}>
+            O treino <strong style={{ color: 'var(--text-1)' }}>{sessionName}</strong> deste dia já passou.<br />
+            Com o plano gratuito, só é possível ver e executar o treino do dia atual.<br /><br />
+            Faça upgrade para acessar todos os dias da semana e o histórico completo de treinos.
+          </p>
+        </div>
+        <button
+          onClick={onUpgrade}
+          style={{
+            width: '100%', padding: '14px', borderRadius: '14px',
+            background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+            color: '#fff', border: 'none', fontWeight: 700, fontSize: '15px', cursor: 'pointer',
+          }}
+        >
+          Desbloquear todos os dias →
+        </button>
+        <button
+          onClick={onClose}
+          style={{
+            width: '100%', padding: '12px', borderRadius: '14px',
+            background: 'var(--bg-2)', border: '1px solid var(--border)',
+            color: 'var(--text-2)', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          Fechar
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function StepHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
