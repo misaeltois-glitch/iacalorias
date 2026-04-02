@@ -52,12 +52,17 @@ function TypingDots() {
   );
 }
 
+const FREE_CHAT_LIMIT = 3;
+
 export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgrade }: NutritionistChatProps) {
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const userMessageCount = messages.filter(m => m.role === 'user').length;
+  const chatLimitReached = !isPremium && userMessageCount >= FREE_CHAT_LIMIT;
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -71,12 +76,11 @@ export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgr
     }
   }, [isOpen]);
 
-  const canSend = true;
+  const canSend = !chatLimitReached;
 
   const send = useCallback(async (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed || loading) return;
-    if (!canSend) return;
+    if (!trimmed || loading || chatLimitReached) return;
 
     const userMsg: Message = { role: 'user', content: trimmed, ts: Date.now() };
     const nextMessages = [...messages, userMsg];
@@ -252,17 +256,48 @@ export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgr
             <div style={{
               padding: '8px 16px 16px',
               borderTop: '1px solid var(--border)',
-              display: 'flex', gap: '10px', alignItems: 'flex-end',
               flexShrink: 0,
               paddingBottom: 'calc(16px + env(safe-area-inset-bottom))',
             }}>
+              {chatLimitReached ? (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
+                  padding: '14px 16px', borderRadius: '16px',
+                  background: 'rgba(13,159,110,0.07)', border: '1px solid rgba(13,159,110,0.2)',
+                  textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.5 }}>
+                    Você usou suas <strong style={{ color: 'var(--text-1)' }}>3 perguntas gratuitas</strong> para a Sofia.<br />
+                    Faça upgrade para continuar conversando.
+                  </div>
+                  <button
+                    onClick={onUpgrade}
+                    style={{
+                      padding: '10px 24px', borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+                      color: '#fff', border: 'none', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                    }}
+                  >
+                    Fazer upgrade →
+                  </button>
+                </div>
+              ) : (
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+              {!isPremium && (
+                <div style={{
+                  position: 'absolute', top: -22, left: 0, right: 0,
+                  textAlign: 'center', fontSize: '11px', color: 'var(--text-3)',
+                }}>
+                  {FREE_CHAT_LIMIT - userMessageCount} pergunta{FREE_CHAT_LIMIT - userMessageCount !== 1 ? 's' : ''} restante{FREE_CHAT_LIMIT - userMessageCount !== 1 ? 's' : ''}
+                </div>
+              )}
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                disabled={loading || !canSend}
-                placeholder={canSend ? 'Pergunte algo sobre sua alimentação…' : 'Limite diário atingido'}
+                disabled={loading}
+                placeholder="Pergunte algo sobre sua alimentação…"
                 rows={1}
                 style={{
                   flex: 1, resize: 'none', overflow: 'hidden',
@@ -270,7 +305,6 @@ export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgr
                   background: 'var(--bg-2)', border: '1px solid var(--border)',
                   color: 'var(--text-1)', fontSize: '14px', lineHeight: 1.5,
                   outline: 'none', fontFamily: 'inherit',
-                  opacity: canSend ? 1 : 0.5,
                 }}
                 onInput={e => {
                   const t = e.currentTarget;
@@ -296,6 +330,8 @@ export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgr
               >
                 <Send size={18} />
               </button>
+              </div>
+              )}
             </div>
           </motion.div>
         </motion.div>
