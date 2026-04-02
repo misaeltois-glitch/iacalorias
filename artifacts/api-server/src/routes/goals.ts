@@ -156,6 +156,9 @@ router.get("/daily-summary", async (req: Request, res: Response) => {
   const userId = req.user?.userId;
   const userEmail = req.user?.email;
   const period = (req.query.period as string) ?? "day";
+  // tzOffset: minutes behind UTC from client (e.g. 180 for UTC-3 Brazil). Clamp to ±840.
+  const tzOffset = Math.max(-840, Math.min(840, parseInt((req.query.tzOffset as string) ?? "0", 10) || 0));
+  const tzOffsetMs = tzOffset * 60 * 1000; // convert to ms
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
@@ -166,23 +169,25 @@ router.get("/daily-summary", async (req: Request, res: Response) => {
 
   const goals = await findGoals(userId, sessionId);
 
-  const now = new Date();
+  // Shift server UTC time by tzOffset to get local "now"
+  const now = new Date(Date.now() - tzOffsetMs);
   let periodStart: Date;
   let periodEnd: Date;
 
   if (period === "week") {
-    // ISO week: Monday–Sunday in UTC
-    const day = now.getUTCDay(); // 0=Sun
+    // ISO week: Monday–Sunday in local time
+    const day = now.getUTCDay(); // 0=Sun (using UTC on the shifted date = local day)
     const daysFromMon = (day + 6) % 7;
-    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysFromMon, 0, 0, 0, 0));
-    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + (6 - daysFromMon) + 1, 0, 0, 0, 0));
+    // local midnight = UTC midnight shifted back by tzOffset
+    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysFromMon, 0, 0, 0, 0) + tzOffsetMs);
+    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + (6 - daysFromMon) + 1, 0, 0, 0, 0) + tzOffsetMs);
   } else if (period === "month") {
-    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
-    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0) + tzOffsetMs);
+    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0) + tzOffsetMs);
   } else {
-    // day: UTC midnight to next midnight (covers full UTC day)
-    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0));
+    // day: local midnight to next local midnight
+    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0) + tzOffsetMs);
+    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0) + tzOffsetMs);
   }
 
   // Collect all session IDs linked to this userId (to find analyses from before login)

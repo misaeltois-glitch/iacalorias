@@ -84,7 +84,8 @@ async function saveGoals(sessionId: string, goals: CalculatedGoals) {
 }
 
 async function fetchDailySummary(sessionId: string, period: Period = 'day') {
-  const r = await fetch(`${BASE}api/goals/daily-summary?sessionId=${sessionId}&period=${period}`, { headers: authHeaders() });
+  const tzOffset = new Date().getTimezoneOffset(); // minutes behind UTC (positive = behind, e.g. 180 for UTC-3)
+  const r = await fetch(`${BASE}api/goals/daily-summary?sessionId=${sessionId}&period=${period}&tzOffset=${tzOffset}`, { headers: authHeaders() });
   if (!r.ok) return null;
   return r.json();
 }
@@ -851,7 +852,7 @@ export default function Home() {
               </div>
               <ProgressView
                 sessionId={sessionId}
-                isPremium={isPremium}
+                isPremium={isPremium || (trialDaysRemaining !== null && trialDaysRemaining > 0)}
                 refreshSignal={goalsRefreshKey}
                 onUpgrade={() => { setPaywallDisableClose(false); setShowPaywall(true); }}
                 onSetGoals={() => setShowGoalsPanel(true)}
