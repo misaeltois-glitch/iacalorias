@@ -96,9 +96,10 @@ function getHourGreeting(): string {
   return 'Boa noite';
 }
 
-function UsageBar({ used, max, onClick }: { used: number; max: number; onClick: () => void }) {
+function UsageBar({ remaining, max, onClick }: { remaining: number; max: number; onClick: () => void }) {
+  const used = max - remaining;
   const pct = Math.min(100, (used / max) * 100);
-  const color = pct === 0 ? '#10B981' : pct <= 33 ? '#10B981' : pct <= 66 ? '#F59E0B' : '#EF4444';
+  const color = remaining === 0 ? '#EF4444' : remaining === 1 ? '#F59E0B' : '#10B981';
   return (
     <button
       onClick={onClick}
@@ -113,7 +114,7 @@ function UsageBar({ used, max, onClick }: { used: number; max: number; onClick: 
           Teste grátis
         </span>
         <span style={{ fontSize: '12px', fontWeight: 700, color }}>
-          {max - used} dia{(max - used) !== 1 ? 's' : ''} restante{(max - used) !== 1 ? 's' : ''}
+          {remaining} foto{remaining !== 1 ? 's' : ''} restante{remaining !== 1 ? 's' : ''}
         </span>
       </div>
       <div style={{ width: '100%', height: '5px', borderRadius: '99px', background: 'var(--bg-3)' }}>
@@ -122,13 +123,13 @@ function UsageBar({ used, max, onClick }: { used: number; max: number; onClick: 
           width: `${pct}%`, transition: 'width 0.5s ease',
         }} />
       </div>
-      {used >= max ? (
+      {remaining === 0 ? (
         <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: 600 }}>
           ⚠️ Teste encerrado — Faça upgrade para continuar
         </span>
-      ) : used === max - 1 ? (
+      ) : remaining === 1 ? (
         <span style={{ fontSize: '11px', color: '#F59E0B', fontWeight: 600 }}>
-          ⏳ Último dia de teste grátis!
+          ⏳ Última foto do teste grátis!
         </span>
       ) : null}
     </button>
@@ -215,7 +216,6 @@ export default function Home() {
     const daysElapsed = Math.round((nowMidnight - startMidnight) / 86400000); // dias desde o primeiro uso
     return Math.max(0, 3 - 1 - daysElapsed); // -1 porque o dia inicial já conta como dia 1
   })();
-  const trialUsed = 3 - trialDaysRemaining;
   const trialRemaining = trialDaysRemaining;
 
   const workoutTrialDaysRemaining = (() => {
@@ -912,7 +912,7 @@ export default function Home() {
 
               {/* Trial days bar */}
               {subStatus?.tier === 'free' && (
-                <UsageBar used={trialUsed} max={3} onClick={() => setShowPaywall(true)} />
+                <UsageBar remaining={subStatus.trialRemaining} max={3} onClick={() => setShowPaywall(true)} />
               )}
 
               {/* Camera card + upload */}
