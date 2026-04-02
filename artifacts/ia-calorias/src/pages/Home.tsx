@@ -58,6 +58,23 @@ function authHeaders(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Cookie helpers — cookies persist longer than localStorage on iOS Safari
+const ONBOARDED_COOKIE = 'iac_onboarded';
+function setOnboardedCookie() {
+  document.cookie = `${ONBOARDED_COOKIE}=1; max-age=31536000; SameSite=Lax; path=/`;
+}
+function isOnboardedCookie(): boolean {
+  return document.cookie.split(';').some(c => c.trim().startsWith(`${ONBOARDED_COOKIE}=`));
+}
+function isAlreadyOnboarded(): boolean {
+  return !!(
+    localStorage.getItem(ONBOARDED_KEY) ||
+    localStorage.getItem(MANDATORY_ONBOARDING_KEY) ||
+    localStorage.getItem(AUTH_TOKEN_KEY) ||
+    isOnboardedCookie()
+  );
+}
+
 async function saveGoals(sessionId: string, goals: CalculatedGoals) {
   await fetch(`${BASE}api/goals`, {
     method: 'POST',
@@ -277,8 +294,7 @@ export default function Home() {
       localStorage.setItem(FIRST_USE_TS_KEY, String(Date.now()));
     }
 
-    const alreadyOnboarded = localStorage.getItem(ONBOARDED_KEY);
-    if (!alreadyOnboarded) {
+    if (!isAlreadyOnboarded()) {
       setShowSplash(true);
     } else {
       maybeStartTour(1200);
@@ -456,6 +472,7 @@ export default function Home() {
   const handleCarouselDone = () => {
     setShowCarousel(false);
     localStorage.setItem(ONBOARDED_KEY, 'true');
+    setOnboardedCookie();
     maybeStartTour(800);
   };
 
@@ -476,6 +493,8 @@ export default function Home() {
     await saveGoals(sessionId, goals);
     setShowOnboarding(false);
     localStorage.setItem(MANDATORY_ONBOARDING_KEY, 'true');
+    localStorage.setItem(ONBOARDED_KEY, 'true');
+    setOnboardedCookie();
     if (!localStorage.getItem(FIRST_USE_TS_KEY)) {
       localStorage.setItem(FIRST_USE_TS_KEY, String(Date.now()));
     }
