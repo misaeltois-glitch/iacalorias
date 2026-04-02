@@ -1,0 +1,18 @@
+{
+  "name": "IA Calorias",
+  "short_name": "IA Calorias",
+  "description": "Monitore sua alimentação e treino com inteligência artificial. Tire uma foto da refeição e receba análise nutricional instantânea.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0D9F6E",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
