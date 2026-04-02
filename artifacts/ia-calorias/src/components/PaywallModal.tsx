@@ -24,17 +24,28 @@ type FeatureRow = {
 };
 
 const FEATURES: FeatureRow[] = [
+  // ── Nutrição ──
   { label: 'Análise de refeições por IA',              free: '3 p/ testar',    limited: '20 por mês',   unlimited: 'Ilimitadas',   highlight: true },
   { label: 'Calorias, proteínas, carbs, gordura e fibra', free: '3 dias trial', limited: true,          unlimited: true },
   { label: 'Pontuação de saúde da refeição',           free: '3 dias trial',   limited: true,           unlimited: true },
+  { label: 'Dica de substituição saudável',            free: '3 dias trial',   limited: true,           unlimited: true },
   { label: 'Histórico de refeições',                   free: '3 dias trial',   limited: '30 dias',      unlimited: 'Ilimitado',    highlight: true },
   { label: 'Metas nutricionais personalizadas',        free: '3 dias trial',   limited: true,           unlimited: true },
   { label: 'Painel de progresso diário',               free: '3 dias trial',   limited: true,           unlimited: true },
+  { label: 'Analytics semanal e mensal',               free: '3 dias trial',   limited: true,           unlimited: true },
+  { label: 'Streak e metas gamificadas',               free: '3 dias trial',   limited: true,           unlimited: true },
+  // ── Saúde ──
+  { label: 'Evolução de peso com gráfico',             free: '3 dias trial',   limited: true,           unlimited: true },
+  { label: 'Contador de água diário',                  free: '3 dias trial',   limited: true,           unlimited: true },
+  // ── IA ──
   { label: 'Chat com Sofia IA',                        free: '3 perguntas',    limited: 'Ilimitado',    unlimited: 'Ilimitado',    highlight: true },
-  { label: 'Treino do Dia gerado por IA',              free: '3 dias trial',   limited: '5/mês',        unlimited: 'Ilimitado',    highlight: true },
-  { label: 'Execução guiada com cronômetro',           free: false,            limited: false,          unlimited: true,           highlight: true },
-  { label: 'Plano semanal personalizado',              free: false,            limited: false,          unlimited: true },
+  { label: 'Cardápio semanal com Sofia',               free: false,            limited: false,          unlimited: true,           highlight: true },
   { label: 'Relatório semanal inteligente',            free: false,            limited: false,          unlimited: true },
+  // ── Treino ──
+  { label: 'Treino do Dia gerado por IA',              free: '3 dias trial',   limited: '5/mês',        unlimited: 'Ilimitado',    highlight: true },
+  { label: 'Execução guiada com cronômetro',           free: false,            limited: false,          unlimited: true },
+  // ── Conta ──
+  { label: 'Programa de indicação (ganhe bônus)',      free: false,            limited: true,           unlimited: true },
   { label: 'Suporte prioritário',                      free: false,            limited: false,          unlimited: true },
 ];
 
