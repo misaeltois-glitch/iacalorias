@@ -29,7 +29,7 @@ import { WeightTracker } from '@/components/WeightTracker';
 import { OnboardingAuthPrompt } from '@/components/OnboardingAuthPrompt';
 import { MealPlanModal } from '@/components/MealPlanModal';
 import { ProfileSetupBanner } from '@/components/ProfileSetupBanner';
-import { InstallPrompt } from '@/components/InstallPrompt';
+import { InstallPrompt, OpenInAppBanner } from '@/components/InstallPrompt';
 import { ReferralCard, applyPendingReferral, REFERRAL_CODE_KEY } from '@/components/ReferralCard';
 import { MealReminders } from '@/components/MealReminders';
 import { useMealReminders } from '@/hooks/use-meal-reminders';
@@ -646,6 +646,7 @@ export default function Home() {
 
       {/* Install PWA prompt */}
       <InstallPrompt />
+      <OpenInAppBanner />
 
       {/* LGPD */}
       {!lgpdAccepted && <LGPDConsentPopup onAccept={acceptLGPD} />}

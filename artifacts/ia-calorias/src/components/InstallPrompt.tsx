@@ -9,6 +9,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 const SESSION_KEY = 'iac_install_prompt_shown';
+const INSTALLED_KEY = 'iac_app_installed';
 
 function detectPlatform(): Platform {
   const ua = navigator.userAgent;
@@ -69,6 +70,7 @@ export function InstallPrompt() {
     await deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
+      localStorage.setItem(INSTALLED_KEY, '1'); // marca como instalado
       sessionStorage.setItem(SESSION_KEY, '1');
       setShow(false);
     }
@@ -221,6 +223,104 @@ export function InstallPrompt() {
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
         @keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
       `}</style>
+    </div>
+  );
+}
+
+// ── Banner "Abrir no app" ─────────────────────────────────────────────────────
+// Aparece quando o usuário já instalou o PWA mas está acessando pelo browser
+
+const OPEN_BANNER_KEY = 'iac_open_banner_dismissed';
+
+export function OpenInAppBanner() {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    // Não mostra se já está dentro do app instalado
+    if (isStandalone()) return;
+    // Não mostra se o usuário já fechou este banner hoje
+    if (sessionStorage.getItem(OPEN_BANNER_KEY)) return;
+
+    // Verifica se o app foi instalado via flag local ou via API do browser
+    const checkInstalled = async () => {
+      // Flag salva quando o usuário aceitou o prompt de instalação
+      if (localStorage.getItem(INSTALLED_KEY)) {
+        setShow(true);
+        return;
+      }
+      // API nativa do Chrome (Android) para detectar apps instalados
+      if ('getInstalledRelatedApps' in navigator) {
+        try {
+          const apps = await (navigator as any).getInstalledRelatedApps();
+          if (apps.length > 0) {
+            setShow(true);
+          }
+        } catch {}
+      }
+    };
+
+    // Pequeno delay para não competir com outros popups
+    const t = setTimeout(checkInstalled, 3500);
+    return () => clearTimeout(t);
+  }, []);
+
+  const handleDismiss = () => {
+    sessionStorage.setItem(OPEN_BANNER_KEY, '1');
+    setShow(false);
+  };
+
+  const handleOpen = () => {
+    // Navegar para a URL raiz — o SO redireciona para o app instalado
+    window.location.href = window.location.origin + '/';
+    handleDismiss();
+  };
+
+  if (!show) return null;
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 80, left: 12, right: 12, zIndex: 9990,
+      background: 'var(--bg)',
+      border: '1px solid rgba(13,159,110,0.3)',
+      borderRadius: 16,
+      padding: '12px 14px',
+      display: 'flex', alignItems: 'center', gap: 12,
+      boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+      animation: 'slideUp 0.3s ease',
+    }}>
+      <img src="/icon-512.png" alt="IA Calorias" style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0 }} />
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 1 }}>
+          App instalado
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
+          Você tem o IA Calorias instalado
+        </div>
+      </div>
+
+      <button
+        onClick={handleOpen}
+        style={{
+          padding: '8px 14px', borderRadius: 10, border: 'none',
+          background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+          color: '#fff', fontWeight: 700, fontSize: 13,
+          cursor: 'pointer', flexShrink: 0,
+        }}
+      >
+        Abrir →
+      </button>
+
+      <button
+        onClick={handleDismiss}
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: 'var(--text-3)', padding: 4, flexShrink: 0,
+          display: 'flex', alignItems: 'center',
+        }}
+      >
+        <X size={14} />
+      </button>
     </div>
   );
 }
