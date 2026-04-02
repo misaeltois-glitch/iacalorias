@@ -48,10 +48,13 @@ if (process.env.NODE_ENV === "production") {
   const staticPath = path.join(__dirname, "public");
 
   if (existsSync(staticPath)) {
-    app.use(express.static(staticPath));
+    // JS/CSS assets have content-hash names — cache forever
+    app.use(express.static(staticPath, { maxAge: '1y', etag: false }));
 
-    // SPA fallback: all non-API routes serve index.html
+    // SPA fallback: all non-API routes serve index.html with no-cache
+    // so the browser always fetches the latest HTML (which references the latest hashed bundles)
     app.get("/{*path}", (_req, res) => {
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.sendFile(path.join(staticPath, "index.html"));
     });
 
