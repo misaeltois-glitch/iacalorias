@@ -208,9 +208,10 @@ export default function Home() {
   const trialDaysRemaining = (() => {
     if (isPremium) return null;
     const ts = localStorage.getItem(FIRST_USE_TS_KEY);
-    if (!ts) return 7;
+    if (!ts) return 3;
     const elapsed = Date.now() - parseInt(ts, 10);
-    return Math.max(0, Math.ceil((FREE_PERIOD_MS - elapsed) / (24 * 60 * 60 * 1000)));
+    const daysElapsed = Math.floor(elapsed / (24 * 60 * 60 * 1000));
+    return Math.max(0, 3 - daysElapsed);
   })();
 
   const workoutTrialDaysRemaining = (() => {
@@ -218,7 +219,8 @@ export default function Home() {
     const ts = localStorage.getItem(WORKOUT_TRIAL_START_KEY);
     if (!ts) return 3; // not started yet
     const elapsed = Date.now() - parseInt(ts, 10);
-    return Math.max(0, Math.ceil((WORKOUT_TRIAL_MS - elapsed) / (24 * 60 * 60 * 1000)));
+    const daysElapsed = Math.floor(elapsed / (24 * 60 * 60 * 1000));
+    return Math.max(0, 3 - daysElapsed);
   })();
 
   const isWorkoutFreeAccessActive = isPremium || (workoutTrialDaysRemaining !== null && workoutTrialDaysRemaining > 0);
@@ -581,7 +583,18 @@ export default function Home() {
 
   const renderUsagePill = () => {
     if (!subStatus) return null;
-    if (subStatus.tier === 'free') return null;
+    if (subStatus.tier === 'free') return (
+      <button onClick={() => setShowPaywall(true)} style={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        padding: '5px 12px', borderRadius: '99px',
+        background: 'rgba(13,159,110,0.1)', color: '#0D9F6E',
+        fontSize: '12px', fontWeight: 700, border: '1px solid rgba(13,159,110,0.2)',
+        cursor: 'pointer', whiteSpace: 'nowrap',
+      }}>
+        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0D9F6E', display: 'inline-block', flexShrink: 0 }} />
+        {trialDaysRemaining ?? 0} dia{trialDaysRemaining !== 1 ? 's' : ''} grátis
+      </button>
+    );
     if (subStatus.tier === 'limited') return (
       <div style={{
         display: 'flex', alignItems: 'center', gap: '6px',
