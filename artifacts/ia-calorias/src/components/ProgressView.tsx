@@ -506,14 +506,21 @@ export function ProgressView({ sessionId, isPremium, refreshSignal, onUpgrade, o
 
               {/* Grouped by date */}
               {(() => {
+                const tzOff = new Date().getTimezoneOffset(); // minutes behind UTC (e.g. 180 for UTC-3)
+                function mealLocalDate(isoStr: string): string {
+                  const d = new Date(new Date(isoStr).getTime() - tzOff * 60000);
+                  return d.toISOString().slice(0, 10);
+                }
+                const nowLocal = new Date(Date.now() - tzOff * 60000);
+                const todayLocal = nowLocal.toISOString().slice(0, 10);
+                const yesterdayLocal = new Date(nowLocal.getTime() - 86400000).toISOString().slice(0, 10);
+
                 const groups: Map<string, typeof data.meals> = new Map();
                 for (const meal of data.meals) {
-                  const d = new Date(meal.createdAt).toISOString().slice(0, 10);
+                  const d = mealLocalDate(meal.createdAt);
                   if (!groups.has(d)) groups.set(d, []);
                   groups.get(d)!.push(meal);
                 }
-                const todayLocal = new Date().toISOString().slice(0, 10);
-                const yesterdayLocal = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 
                 function dayLabel(dateKey: string): string {
                   if (dateKey === todayLocal) return 'Hoje';
