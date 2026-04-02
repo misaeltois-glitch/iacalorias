@@ -370,6 +370,12 @@ Retorne APENAS o texto do resumo, sem títulos, sem bullets, sem markdown.`;
     daysInPeriod,
     lastMealAt: periodAnalyses.length > 0 ? periodAnalyses[periodAnalyses.length - 1].createdAt : null,
     streak,
+    _debug: {
+      tzOffset,
+      periodStart: periodStart.toISOString(),
+      periodEnd: periodEnd.toISOString(),
+      mealsFound: periodAnalyses.map(a => ({ name: a.dishName, createdAt: a.createdAt })),
+    },
   });
 });
 
