@@ -206,15 +206,6 @@ export default function Home() {
   const trialRemaining = subStatus?.trialRemaining ?? 3;
   const trialUsed = Math.max(0, 3 - trialRemaining);
 
-  const trialDaysRemaining = (() => {
-    if (isPremium) return null;
-    const ts = localStorage.getItem(FIRST_USE_TS_KEY);
-    if (!ts) return 3;
-    const elapsed = Date.now() - parseInt(ts, 10);
-    const daysElapsed = Math.floor(elapsed / (24 * 60 * 60 * 1000));
-    return Math.max(0, 3 - daysElapsed);
-  })();
-
   const workoutTrialDaysRemaining = (() => {
     if (isPremium) return null;
     const ts = localStorage.getItem(WORKOUT_TRIAL_START_KEY);
@@ -593,7 +584,7 @@ export default function Home() {
         cursor: 'pointer', whiteSpace: 'nowrap',
       }}>
         <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0D9F6E', display: 'inline-block', flexShrink: 0 }} />
-        {trialDaysRemaining ?? 0} dia{trialDaysRemaining !== 1 ? 's' : ''} grátis
+        {trialRemaining} dia{trialRemaining !== 1 ? 's' : ''} grátis
       </button>
     );
     if (subStatus.tier === 'limited') return (
@@ -852,7 +843,7 @@ export default function Home() {
               </div>
               <ProgressView
                 sessionId={sessionId}
-                isPremium={isPremium || (trialDaysRemaining !== null && trialDaysRemaining > 0)}
+                isPremium={isPremium || trialRemaining > 0}
                 refreshSignal={goalsRefreshKey}
                 onUpgrade={() => { setPaywallDisableClose(false); setShowPaywall(true); }}
                 onSetGoals={() => setShowGoalsPanel(true)}
@@ -879,9 +870,9 @@ export default function Home() {
                   <p style={{ fontSize: '13px', color: 'var(--text-2)', marginTop: '2px' }}>
                     {isPremium
                       ? 'Registre sua próxima refeição'
-                      : trialDaysRemaining === 0
+                      : trialRemaining === 0
                         ? 'Seu teste encerrou — faça upgrade para continuar'
-                        : `${trialDaysRemaining} dia${trialDaysRemaining !== 1 ? 's' : ''} de teste grátis restante${trialDaysRemaining !== 1 ? 's' : ''}`}
+                        : `${trialRemaining} análise${trialRemaining !== 1 ? 's' : ''} de teste grátis restante${trialRemaining !== 1 ? 's' : ''}`}
                   </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -904,7 +895,7 @@ export default function Home() {
 
               {/* Trial days bar */}
               {subStatus?.tier === 'free' && (
-                <UsageBar used={3 - (trialDaysRemaining ?? 3)} max={3} onClick={() => setShowPaywall(true)} />
+                <UsageBar used={trialUsed} max={3} onClick={() => setShowPaywall(true)} />
               )}
 
               {/* Camera card + upload */}
@@ -1255,7 +1246,7 @@ export default function Home() {
         isOpen={showAnalytics}
         onClose={() => { setShowAnalytics(false); setActiveTab('home'); }}
         sessionId={sessionId}
-        isPremium={isPremium || (trialDaysRemaining !== null && trialDaysRemaining > 0)}
+        isPremium={isPremium || trialRemaining > 0}
         onUpgrade={() => { setShowAnalytics(false); setPaywallDisableClose(false); setShowPaywall(true); }}
       />
 
