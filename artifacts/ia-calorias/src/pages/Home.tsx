@@ -24,8 +24,6 @@ import { WaterTracker } from '@/components/WaterTracker';
 import { AppTour } from '@/components/AppTour';
 import { useTour } from '@/hooks/use-tour';
 import { GoalCelebration, hasCelebratedToday, markCelebratedToday } from '@/components/GoalCelebration';
-import { StreakCelebration, shouldCelebrateStreak } from '@/components/StreakCelebration';
-import { StreakBadge } from '@/components/StreakBadge';
 import { NutritionistChat } from '@/components/NutritionistChat';
 import { WeightTracker } from '@/components/WeightTracker';
 import { OnboardingAuthPrompt } from '@/components/OnboardingAuthPrompt';
@@ -163,7 +161,6 @@ export default function Home() {
   type MandatoryStep = 'goals' | 'workout' | 'auth' | null;
   const [mandatoryStep, setMandatoryStep] = useState<MandatoryStep>(null);
   const [celebration, setCelebration] = useState<{ show: boolean; type: 'calories' | 'meals' }>({ show: false, type: 'calories' });
-  const [streakMilestone, setStreakMilestone] = useState<number | null>(null);
   const [showChat, setShowChat] = useState(false);
   const [showMealPlan, setShowMealPlan] = useState(false);
   const celebrationQueue = useRef<Array<'calories' | 'meals'>>([]);
@@ -203,8 +200,21 @@ export default function Home() {
 
   const analyzeMutation = useAnalyzeFood();
   const isPremium = subStatus?.tier === 'limited' || subStatus?.tier === 'unlimited';
-  const trialRemaining = subStatus?.trialRemaining ?? 3;
-  const trialUsed = Math.max(0, 3 - trialRemaining);
+
+  // Trial por dias de calendário: dia 1 = dia do primeiro uso, dia 2 = dia seguinte, etc.
+  const trialDaysRemaining = (() => {
+    if (isPremium) return 0;
+    const ts = localStorage.getItem(FIRST_USE_TS_KEY);
+    if (!ts) return 3;
+    const startDate = new Date(parseInt(ts, 10));
+    const startMidnight = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime();
+    const now = new Date();
+    const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const daysElapsed = Math.round((nowMidnight - startMidnight) / 86400000); // dias desde o primeiro uso
+    return Math.max(0, 3 - 1 - daysElapsed); // -1 porque o dia inicial já conta como dia 1
+  })();
+  const trialUsed = 3 - trialDaysRemaining;
+  const trialRemaining = trialDaysRemaining;
 
   const workoutTrialDaysRemaining = (() => {
     if (isPremium) return null;
@@ -229,13 +239,9 @@ export default function Home() {
       const daySummary = await fetchDailySummary(sessionId, 'day');
       if (daySummary) {
         setTodaySummary(daySummary);
-        const milestone = shouldCelebrateStreak(daySummary.streak ?? 0);
-        if (milestone) setStreakMilestone(milestone);
       }
     } else {
       setTodaySummary(summary);
-      const milestone = shouldCelebrateStreak(summary?.streak ?? 0);
-      if (milestone) setStreakMilestone(milestone);
     }
     setGoalsLoaded(true);
   }, [sessionId, isPremium, period]);
@@ -584,7 +590,7 @@ export default function Home() {
         cursor: 'pointer', whiteSpace: 'nowrap',
       }}>
         <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0D9F6E', display: 'inline-block', flexShrink: 0 }} />
-        {trialRemaining} dia{trialRemaining !== 1 ? 's' : ''} grátis
+        {trialRemaining} dia{trialRemaining !== 1 ? 's' : ''} de teste
       </button>
     );
     if (subStatus.tier === 'limited') return (
@@ -872,14 +878,11 @@ export default function Home() {
                       ? 'Registre sua próxima refeição'
                       : trialRemaining === 0
                         ? 'Seu teste encerrou — faça upgrade para continuar'
-                        : `${trialRemaining} análise${trialRemaining !== 1 ? 's' : ''} de teste grátis restante${trialRemaining !== 1 ? 's' : ''}`}
+                        : `${trialRemaining} dia${trialRemaining !== 1 ? 's' : ''} de teste grátis restante${trialRemaining !== 1 ? 's' : ''}`}
                   </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {(todaySummary?.streak ?? 0) > 0 && (
-                  <StreakBadge streak={todaySummary?.streak ?? 0} />
-                )}
-                {isPremium && subStatus?.tier === 'unlimited' && (
+{isPremium && subStatus?.tier === 'unlimited' && (
                   <div style={{
                     padding: '5px 12px', borderRadius: '99px',
                     background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)',
@@ -1317,12 +1320,6 @@ export default function Home() {
         onClose={handleCelebrationClose}
       />
 
-      {streakMilestone && (
-        <StreakCelebration
-          milestone={streakMilestone}
-          onClose={() => setStreakMilestone(null)}
-        />
-      )}
 
       {sessionId && (
         <NutritionistChat
