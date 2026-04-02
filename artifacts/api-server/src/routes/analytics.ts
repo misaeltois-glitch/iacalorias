@@ -91,9 +91,10 @@ router.get("/summary", async (req: Request, res: Response) => {
     daysInPeriod = 7;
   }
 
-  // For free users: only last 7 days
+  // For free users: cap history at last 7 days, but never expand beyond the requested period
   const effectiveStart = isPremium ? periodStart : (() => {
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 6, 0, 0, 0, 0) + tzOffsetMs);
+    const sevenDaysAgo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 6, 0, 0, 0, 0) + tzOffsetMs);
+    return sevenDaysAgo > periodStart ? sevenDaysAgo : periodStart;
   })();
 
   // Collect all session IDs linked to this userId (to find analyses from before login)
