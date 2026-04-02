@@ -461,7 +461,7 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
                       background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.25)',
                       fontSize: '12px', fontWeight: 700, color: '#F97316', marginBottom: '4px',
                     }}>
-                      🏋️ 3 dias grátis · depois disponível no plano pago
+                      🏋️ 7 dias grátis · depois disponível no plano pago
                     </div>
                   </div>
 
@@ -587,7 +587,7 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
                       {' · '}{workoutDays.length} dias/semana
                     </div>
                     <div style={{ fontSize: '11px', color: '#F97316', marginTop: '6px', fontWeight: 600 }}>
-                      ⏳ Acesso gratuito por 3 dias · depois no plano pago
+                      ⏳ Acesso gratuito por 7 dias · depois no plano pago
                     </div>
                   </div>
                   <p style={{ fontSize: '11px', color: 'var(--text-3)', lineHeight: 1.5 }}>

@@ -45,7 +45,7 @@ export function ReferralCard() {
 
   const handleWhatsApp = () => {
     const text = encodeURIComponent(
-      `🥗 Estou usando o IA Calorias para monitorar minha alimentação com inteligência artificial!\n\nUse meu link e ganhe 3 dias de teste grátis:\n${shareUrl}`
+      `🥗 Estou usando o IA Calorias para monitorar minha alimentação com inteligência artificial!\n\nUse meu link e ganhe 7 dias de teste grátis:\n${shareUrl}`
     );
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };

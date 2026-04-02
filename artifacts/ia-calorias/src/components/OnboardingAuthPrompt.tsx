@@ -136,7 +136,7 @@ export function OnboardingAuthPrompt({ onComplete }: OnboardingAuthPromptProps) 
 
           {/* Fine print */}
           <p style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'center', marginTop: 12, lineHeight: 1.5 }}>
-            Plano gratuito: 3 análises por dia · 1 plano de treino · 24h de acesso
+            Plano gratuito: análises ilimitadas · treino incluso · 7 dias de teste
           </p>
         </div>
       </motion.div>
