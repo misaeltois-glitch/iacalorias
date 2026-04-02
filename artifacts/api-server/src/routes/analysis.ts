@@ -10,7 +10,7 @@ import { getMasterTier } from "../lib/master-emails.js";
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-const FREE_TRIAL_LIMIT = 3;
+const FREE_TRIAL_DAYS = 7;
 const LIMITED_PLAN_LIMIT = 20;
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -73,9 +73,13 @@ router.post("/", upload.single("image"), async (req: Request, res: Response) => 
   const isDevAccount = !!masterTier;
   const tier = masterTier ?? (sub.tier as "free" | "limited" | "unlimited");
 
-  if (!isDevAccount && tier === "free" && sub.analysisCount >= FREE_TRIAL_LIMIT) {
-    res.status(402).json({ error: "payment_required", message: "Suas análises gratuitas acabaram.", requiresUpgrade: true, trialUsed: sub.analysisCount, trialLimit: FREE_TRIAL_LIMIT });
-    return;
+  if (!isDevAccount && tier === "free") {
+    const trialStartMs = sub.createdAt?.getTime() ?? Date.now();
+    const daysSinceStart = (Date.now() - trialStartMs) / (24 * 60 * 60 * 1000);
+    if (daysSinceStart >= FREE_TRIAL_DAYS) {
+      res.status(402).json({ error: "payment_required", message: "Seu período de teste gratuito expirou.", requiresUpgrade: true });
+      return;
+    }
   }
   if (!isDevAccount && tier === "limited" && sub.analysisCount >= LIMITED_PLAN_LIMIT) {
     res.status(402).json({ error: "payment_required", message: "Você atingiu o limite mensal.", requiresUpgrade: true, trialUsed: sub.analysisCount, trialLimit: LIMITED_PLAN_LIMIT });

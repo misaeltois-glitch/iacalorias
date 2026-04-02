@@ -48,9 +48,10 @@ const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 const ONBOARDED_KEY = 'ia-calorias-onboarded';
 const MANDATORY_ONBOARDING_KEY = 'ia-calorias-mandatory-done';
 const FIRST_USE_TS_KEY = 'ia-calorias-first-use-ts';
-const FREE_PERIOD_MS = 3 * 24 * 60 * 60 * 1000; // 3 days nutrition trial
+const FREE_TRIAL_DAYS = 7;
+const FREE_PERIOD_MS = FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000;
 const WORKOUT_TRIAL_START_KEY = 'ia-calorias-workout-trial-ts';
-const WORKOUT_TRIAL_MS = 3 * 24 * 60 * 60 * 1000; // 3 days workout trial
+const WORKOUT_TRIAL_MS = FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000;
 
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -99,7 +100,7 @@ function getHourGreeting(): string {
 function UsageBar({ remaining, max, onClick }: { remaining: number; max: number; onClick: () => void }) {
   const used = max - remaining;
   const pct = Math.min(100, (used / max) * 100);
-  const color = remaining === 0 ? '#EF4444' : remaining === 1 ? '#F59E0B' : '#10B981';
+  const color = remaining === 0 ? '#EF4444' : remaining <= 2 ? '#F59E0B' : '#10B981';
   return (
     <button
       onClick={onClick}
@@ -114,7 +115,7 @@ function UsageBar({ remaining, max, onClick }: { remaining: number; max: number;
           Teste grátis
         </span>
         <span style={{ fontSize: '12px', fontWeight: 700, color }}>
-          {remaining} foto{remaining !== 1 ? 's' : ''} restante{remaining !== 1 ? 's' : ''}
+          {remaining} dia{remaining !== 1 ? 's' : ''} restante{remaining !== 1 ? 's' : ''}
         </span>
       </div>
       <div style={{ width: '100%', height: '5px', borderRadius: '99px', background: 'var(--bg-3)' }}>
@@ -127,9 +128,9 @@ function UsageBar({ remaining, max, onClick }: { remaining: number; max: number;
         <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: 600 }}>
           ⚠️ Teste encerrado — Faça upgrade para continuar
         </span>
-      ) : remaining === 1 ? (
+      ) : remaining <= 2 ? (
         <span style={{ fontSize: '11px', color: '#F59E0B', fontWeight: 600 }}>
-          ⏳ Última foto do teste grátis!
+          ⏳ Últimos {remaining} dia{remaining !== 1 ? 's' : ''} de teste grátis!
         </span>
       ) : null}
     </button>
@@ -208,23 +209,23 @@ export default function Home() {
   const trialDaysRemaining = (() => {
     if (isPremium) return 0;
     const ts = localStorage.getItem(FIRST_USE_TS_KEY);
-    if (!ts) return 3;
+    if (!ts) return FREE_TRIAL_DAYS;
     const startDate = new Date(parseInt(ts, 10));
     const startMidnight = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime();
     const now = new Date();
     const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const daysElapsed = Math.round((nowMidnight - startMidnight) / 86400000); // dias desde o primeiro uso
-    return Math.max(0, 3 - 1 - daysElapsed); // -1 porque o dia inicial já conta como dia 1
+    const daysElapsed = Math.round((nowMidnight - startMidnight) / 86400000);
+    return Math.max(0, FREE_TRIAL_DAYS - daysElapsed);
   })();
   const trialRemaining = trialDaysRemaining;
 
   const workoutTrialDaysRemaining = (() => {
     if (isPremium) return null;
     const ts = localStorage.getItem(WORKOUT_TRIAL_START_KEY);
-    if (!ts) return 3; // not started yet
+    if (!ts) return FREE_TRIAL_DAYS;
     const elapsed = Date.now() - parseInt(ts, 10);
     const daysElapsed = Math.floor(elapsed / (24 * 60 * 60 * 1000));
-    return Math.max(0, 3 - daysElapsed);
+    return Math.max(0, FREE_TRIAL_DAYS - daysElapsed);
   })();
 
   const isWorkoutFreeAccessActive = isPremium || (workoutTrialDaysRemaining !== null && workoutTrialDaysRemaining > 0);
@@ -913,7 +914,7 @@ export default function Home() {
 
               {/* Trial days bar */}
               {subStatus?.tier === 'free' && (
-                <UsageBar remaining={subStatus.trialRemaining} max={3} onClick={() => setShowPaywall(true)} />
+                <UsageBar remaining={subStatus.trialRemaining} max={FREE_TRIAL_DAYS} onClick={() => setShowPaywall(true)} />
               )}
 
               {/* Camera card + upload */}
