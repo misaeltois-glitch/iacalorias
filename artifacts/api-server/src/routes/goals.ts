@@ -66,10 +66,12 @@ router.get("/", async (req: Request, res: Response) => {
   res.json(withPerMeal(goals));
 });
 
-function clampNum(val: unknown, min: number, max: number): number | undefined {
+function parseNum(val: unknown, min: number, max: number, label: string): { value: number; error?: never } | { value?: never; error: string } | { value: undefined; error?: never } {
+  if (val === undefined || val === null || val === "") return { value: undefined };
   const n = Number(val);
-  if (val === undefined || val === null || val === "" || Number.isNaN(n)) return undefined;
-  return Math.max(min, Math.min(max, n));
+  if (Number.isNaN(n)) return { error: `${label}: valor inválido` };
+  if (n < min || n > max) return { error: `${label}: deve estar entre ${min} e ${max}` };
+  return { value: n };
 }
 function validStr(val: unknown, allowed: string[]): string | undefined {
   return typeof val === "string" && allowed.includes(val) ? val : undefined;
@@ -84,16 +86,23 @@ router.post("/", async (req: Request, res: Response) => {
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
-  // Validate and clamp numeric fields
-  const calories   = clampNum(body.calories,   500,  10000);
-  const protein    = clampNum(body.protein,       0,   500);
-  const carbs      = clampNum(body.carbs,          0,  1500);
-  const fat        = clampNum(body.fat,             0,   500);
-  const fiber      = clampNum(body.fiber,           0,   200);
-  const mealsPerDay= clampNum(body.mealsPerDay,     1,    10);
-  const weight     = clampNum(body.weight,          20,   400);
-  const height     = clampNum(body.height,         100,   250);
-  const age        = clampNum(body.age,              5,   120);
+  // Validate numeric fields — rejeita valores fora do range com 400
+  const fields = {
+    calories:    parseNum(body.calories,    200, 10000, "Calorias"),
+    protein:     parseNum(body.protein,       0,   500, "Proteína"),
+    carbs:       parseNum(body.carbs,         0,  1500, "Carboidratos"),
+    fat:         parseNum(body.fat,           0,   500, "Gordura"),
+    fiber:       parseNum(body.fiber,         0,   200, "Fibras"),
+    mealsPerDay: parseNum(body.mealsPerDay,   1,    10, "Refeições por dia"),
+    weight:      parseNum(body.weight,       20,   400, "Peso"),
+    height:      parseNum(body.height,      100,   250, "Altura"),
+    age:         parseNum(body.age,           5,   120, "Idade"),
+  };
+  const fieldError = Object.values(fields).find(f => f.error)?.error;
+  if (fieldError) { res.status(400).json({ error: "bad_request", message: fieldError }); return; }
+  const { calories, protein, carbs, fat, fiber, mealsPerDay, weight, height, age } = Object.fromEntries(
+    Object.entries(fields).map(([k, v]) => [k, v.value])
+  ) as Record<string, number | undefined>;
   const sex        = validStr(body.sex, ["male", "female", "other"]);
   const objective  = validStr(body.objective, ["lose_weight", "maintain", "gain_muscle", "health"]);
   const activityLevel = validStr(body.activityLevel, ["sedentary", "light", "moderate", "active", "very_active"]);
