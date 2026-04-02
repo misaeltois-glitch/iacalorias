@@ -54,6 +54,12 @@ async function runMigrations() {
       ALTER TABLE subscriptions
       ADD COLUMN IF NOT EXISTS referral_bonus_days integer DEFAULT 0
     `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals (referrer_user_id)
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_referrals_referee_session ON referrals (referee_session_id)
+    `);
     logger.info("DB migrations applied");
   } catch (err) {
     logger.warn({ err }, "DB migration failed (non-critical)");

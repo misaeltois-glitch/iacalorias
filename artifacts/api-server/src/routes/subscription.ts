@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import Stripe from "stripe";
-import { db, subscriptionsTable } from "@workspace/db";
+import { db, subscriptionsTable, pool } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import {
   GetSubscriptionStatusResponse,
@@ -207,8 +207,9 @@ router.post("/webhook", async (req: Request, res: Response) => {
       const paymentType = (session.metadata?.paymentType ?? "subscription") as "subscription" | "one_time";
 
       if (sessionId && plan) {
+        const userId = session.metadata?.userId;
+
         if (paymentType === "one_time") {
-          // Acesso avulso PIX: 30 dias a partir de agora, sem stripeSubscriptionId
           const currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
           await db.update(subscriptionsTable)
             .set({ tier: plan, analysisCount: 0, paymentType: "one_time", currentPeriodEnd, updatedAt: new Date() })
@@ -228,6 +229,17 @@ router.post("/webhook", async (req: Request, res: Response) => {
             .set({ tier: plan, analysisCount: 0, paymentType: "subscription", stripeSubscriptionId: stripeSubscriptionId ?? undefined, currentPeriodEnd: currentPeriodEnd ?? undefined, updatedAt: new Date() })
             .where(eq(subscriptionsTable.sessionId, sessionId));
         }
+
+        // Marcar referral como convertido quando o referee paga
+        try {
+          await pool.query(
+            `UPDATE referrals
+             SET status = 'converted', converted_at = now()
+             WHERE status = 'applied'
+               AND (referee_session_id = $1 ${userId ? "OR referee_user_id = $2" : ""})`,
+            userId ? [sessionId, userId] : [sessionId],
+          );
+        } catch {}
       }
     }
 
