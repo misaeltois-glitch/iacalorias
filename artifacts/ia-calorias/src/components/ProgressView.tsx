@@ -62,7 +62,11 @@ const MONTH_NAMES = [
 ];
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function firstDayOfMonth(year: number, month: number): string {
@@ -95,7 +99,8 @@ export function ProgressView({ sessionId, isPremium, refreshSignal, onUpgrade, o
     if (!sessionId) return;
     setLoading(true);
     try {
-      const url = `${BASE}api/analytics/summary?sessionId=${sessionId}&period=${p}&date=${date}&pageSize=50`;
+      const tzOffset = new Date().getTimezoneOffset();
+      const url = `${BASE}api/analytics/summary?sessionId=${sessionId}&period=${p}&date=${date}&pageSize=50&tzOffset=${tzOffset}`;
       const r = await fetch(url, { headers: authHeaders() });
       if (r.ok) setData(await r.json());
     } catch { /* silent */ } finally {
@@ -106,7 +111,7 @@ export function ProgressView({ sessionId, isPremium, refreshSignal, onUpgrade, o
   const fetchMonthData = useCallback(async (year: number, month: number) => {
     if (!sessionId) return;
     try {
-      const url = `${BASE}api/analytics/summary?sessionId=${sessionId}&period=month&date=${firstDayOfMonth(year, month)}&pageSize=1`;
+      const url = `${BASE}api/analytics/summary?sessionId=${sessionId}&period=month&date=${firstDayOfMonth(year, month)}&pageSize=1&tzOffset=${new Date().getTimezoneOffset()}`;
       const r = await fetch(url, { headers: authHeaders() });
       if (r.ok) setMonthData(await r.json());
     } catch { /* silent */ }

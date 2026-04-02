@@ -25,10 +25,14 @@ async function resolveSubTier(userId?: string, sessionId?: string): Promise<"fre
 // POST /api/chat
 // Body: { sessionId: string, messages: [{role: "user"|"assistant", content: string}] }
 router.post("/", async (req: Request, res: Response) => {
-  const { sessionId, messages } = req.body as {
+  const { sessionId, messages, tzOffset: rawTzOffset } = req.body as {
     sessionId?: string;
     messages?: Array<{ role: "user" | "assistant"; content: string }>;
+    tzOffset?: number;
   };
+  // tzOffset: minutes behind UTC (e.g. 180 for UTC-3 Brazil)
+  const tzOffset = Math.max(-840, Math.min(840, Number(rawTzOffset) || 0));
+  const tzOffsetMs = tzOffset * 60 * 1000;
   const userId = req.user?.userId;
   const userEmail = req.user?.email;
 
@@ -48,25 +52,31 @@ router.post("/", async (req: Request, res: Response) => {
   const isDevAccount = !!masterTier;
   const tier = masterTier ?? await resolveSubTier(userId, sessionId);
 
-  // Build today's context
-  const now = new Date();
-  const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-  const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0));
+  // Build context using local timezone
+  // tzOffsetMs converts UTC to local: local_midnight_UTC = UTC_midnight + tzOffsetMs
+  const localNow = new Date(Date.now() - tzOffsetMs); // current moment in local "UTC" frame
+  const todayStart  = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate(),     0, 0, 0, 0) + tzOffsetMs);
+  const todayEnd    = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate() + 1, 0, 0, 0, 0) + tzOffsetMs);
+  const yesterStart = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate() - 1, 0, 0, 0, 0) + tzOffsetMs);
 
-  let todayAnalyses: { dishName: string; calories: number; protein: number; carbs: number; fat: number; fiber: number | null }[] = [];
+  type MealRow = { dishName: string; calories: number; protein: number; carbs: number; fat: number; fiber: number | null };
+  let todayAnalyses: MealRow[] = [];
+  let yesterdayAnalyses: MealRow[] = [];
   let goals: { calories: number | null; protein: number | null; carbs: number | null; fat: number | null; fiber: number | null; objective: string | null } | null = null;
+
+  const mealCols = { dishName: true, calories: true, protein: true, carbs: true, fat: true, fiber: true } as const;
 
   try {
     if (userId) {
-      todayAnalyses = await db.query.analysesTable.findMany({
-        where: and(eq(analysesTable.userId, userId), gte(analysesTable.createdAt, periodStart), lt(analysesTable.createdAt, periodEnd)),
-        columns: { dishName: true, calories: true, protein: true, carbs: true, fat: true, fiber: true },
-      });
+      [todayAnalyses, yesterdayAnalyses] = await Promise.all([
+        db.query.analysesTable.findMany({ where: and(eq(analysesTable.userId, userId), gte(analysesTable.createdAt, todayStart),  lt(analysesTable.createdAt, todayEnd)),  columns: mealCols }),
+        db.query.analysesTable.findMany({ where: and(eq(analysesTable.userId, userId), gte(analysesTable.createdAt, yesterStart), lt(analysesTable.createdAt, todayStart)), columns: mealCols }),
+      ]);
     } else if (sessionId) {
-      todayAnalyses = await db.query.analysesTable.findMany({
-        where: and(eq(analysesTable.sessionId, sessionId!), gte(analysesTable.createdAt, periodStart), lt(analysesTable.createdAt, periodEnd)),
-        columns: { dishName: true, calories: true, protein: true, carbs: true, fat: true, fiber: true },
-      });
+      [todayAnalyses, yesterdayAnalyses] = await Promise.all([
+        db.query.analysesTable.findMany({ where: and(eq(analysesTable.sessionId, sessionId!), gte(analysesTable.createdAt, todayStart),  lt(analysesTable.createdAt, todayEnd)),  columns: mealCols }),
+        db.query.analysesTable.findMany({ where: and(eq(analysesTable.sessionId, sessionId!), gte(analysesTable.createdAt, yesterStart), lt(analysesTable.createdAt, todayStart)), columns: mealCols }),
+      ]);
     }
 
     const goalsRow = userId
@@ -80,21 +90,39 @@ router.post("/", async (req: Request, res: Response) => {
     // Context fetch failed — continue without it
   }
 
-  const totals = todayAnalyses.reduce((a, m) => ({
+  const sum = (meals: MealRow[]) => meals.reduce((a, m) => ({
     calories: a.calories + m.calories,
-    protein: a.protein + m.protein,
-    carbs: a.carbs + m.carbs,
-    fat: a.fat + m.fat,
-    fiber: a.fiber + (m.fiber ?? 0),
+    protein:  a.protein  + m.protein,
+    carbs:    a.carbs    + m.carbs,
+    fat:      a.fat      + m.fat,
+    fiber:    a.fiber    + (m.fiber ?? 0),
   }), { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
 
+  const todayTotals = sum(todayAnalyses);
+  const yesterdayTotals = sum(yesterdayAnalyses);
+
   const contextParts: string[] = [];
+
+  // Today
   if (todayAnalyses.length > 0) {
-    contextParts.push(`Refeições de hoje (${todayAnalyses.length}): ${todayAnalyses.map(m => m.dishName).join(", ")}`);
-    contextParts.push(`Consumido hoje: ${Math.round(totals.calories)} kcal | Prot ${totals.protein.toFixed(1)}g | Carbs ${totals.carbs.toFixed(1)}g | Gord ${totals.fat.toFixed(1)}g | Fibras ${totals.fiber.toFixed(1)}g`);
+    contextParts.push(`Refeições de HOJE (${todayAnalyses.length}): ${todayAnalyses.map(m => m.dishName).join(", ")}`);
+    contextParts.push(`Consumido hoje: ${Math.round(todayTotals.calories)} kcal | Prot ${todayTotals.protein.toFixed(1)}g | Carbs ${todayTotals.carbs.toFixed(1)}g | Gord ${todayTotals.fat.toFixed(1)}g | Fibras ${todayTotals.fiber.toFixed(1)}g`);
   } else {
-    contextParts.push("Nenhuma refeição registrada hoje ainda.");
+    contextParts.push("Hoje: nenhuma refeição registrada ainda.");
   }
+
+  // Yesterday
+  if (yesterdayAnalyses.length > 0) {
+    contextParts.push(`Refeições de ONTEM (${yesterdayAnalyses.length}): ${yesterdayAnalyses.map(m => m.dishName).join(", ")}`);
+    contextParts.push(`Consumido ontem: ${Math.round(yesterdayTotals.calories)} kcal | Prot ${yesterdayTotals.protein.toFixed(1)}g | Carbs ${yesterdayTotals.carbs.toFixed(1)}g | Gord ${yesterdayTotals.fat.toFixed(1)}g | Fibras ${yesterdayTotals.fiber.toFixed(1)}g`);
+    if (goals?.calories) {
+      const diff = yesterdayTotals.calories - goals.calories;
+      if (diff < -50) contextParts.push(`Ontem o usuário ficou ${Math.abs(Math.round(diff))} kcal abaixo da meta calórica.`);
+      else if (diff > 50) contextParts.push(`Ontem o usuário consumiu ${Math.round(diff)} kcal acima da meta calórica.`);
+      else contextParts.push("Ontem o usuário bateu a meta calórica.");
+    }
+  }
+
   if (goals) {
     const goalParts = [`Meta calórica: ${goals.calories ?? "não definida"} kcal`];
     if (goals.protein) goalParts.push(`Proteína: ${goals.protein}g`);
@@ -115,9 +143,14 @@ router.post("/", async (req: Request, res: Response) => {
 
 Seja empática, direta e prática. Responda em português brasileiro. Respostas curtas (2-4 frases no máximo), a não ser que o usuário peça mais detalhes. Use linguagem acessível, não técnica demais.
 
+IMPORTANTE — use sempre o tempo verbal correto:
+- Ao falar do que aconteceu ONTEM use pretérito perfeito: "você consumiu", "você ficou abaixo", "ontem não bateu".
+- Ao falar do que está acontecendo HOJE use presente: "você está", "hoje você consumiu até agora".
+- Nunca confunda os dois dias.
+
 ${planNote}
 
-CONTEXTO DO USUÁRIO HOJE:
+CONTEXTO NUTRICIONAL DO USUÁRIO:
 ${contextParts.join("\n")}
 
 Você pode dar conselhos sobre alimentação, substituições, receitas, timing de refeições, hidratação, suplementação básica e interpretação dos macronutrientes. Não diagnostique doenças. Se a pergunta for médica ou clínica, oriente a consultar um profissional de saúde presencialmente.`;

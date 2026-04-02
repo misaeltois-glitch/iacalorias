@@ -47,6 +47,9 @@ router.get("/summary", async (req: Request, res: Response) => {
   const rawPeriod = (req.query.period as string) ?? "week";
   const period: "day" | "week" | "month" = rawPeriod === "month" ? "month" : rawPeriod === "day" ? "day" : "week";
   const dateParam = req.query.date as string | undefined;
+  // tzOffset: minutes behind UTC from client (e.g. 180 for UTC-3 Brazil)
+  const tzOffset = Math.max(-840, Math.min(840, parseInt((req.query.tzOffset as string) ?? "0", 10) || 0));
+  const tzOffsetMs = tzOffset * 60 * 1000;
 
   if (!sessionId && !userId) {
     res.status(400).json({ error: "bad_request", message: "sessionId required" });
@@ -60,32 +63,34 @@ router.get("/summary", async (req: Request, res: Response) => {
 
   const goals = await findGoals(userId, sessionId);
 
-  const now = dateParam ? new Date(dateParam + "T12:00:00Z") : new Date();
+  // If dateParam given, parse it as local date; otherwise use local now
+  const now = dateParam
+    ? new Date(dateParam + "T12:00:00Z") // dateParam already local YYYY-MM-DD
+    : new Date(Date.now() - tzOffsetMs);  // shift to local frame
   let periodStart: Date;
   let periodEnd: Date;
   let daysInPeriod: number;
 
   if (period === "day") {
-    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0));
+    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0) + tzOffsetMs);
+    periodEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0) + tzOffsetMs);
     daysInPeriod = 1;
   } else if (period === "month") {
-    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
-    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0) + tzOffsetMs);
+    periodEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0) + tzOffsetMs);
     daysInPeriod = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 0).getDate();
   } else {
-    // ISO week: Monday–Sunday
-    const day = now.getUTCDay(); // 0=Sun
+    // ISO week: Monday–Sunday in local time
+    const day = now.getUTCDay();
     const daysFromMon = (day + 6) % 7;
-    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysFromMon, 0, 0, 0, 0));
-    periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + (6 - daysFromMon) + 1, 0, 0, 0, 0));
+    periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysFromMon, 0, 0, 0, 0) + tzOffsetMs);
+    periodEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + (6 - daysFromMon) + 1, 0, 0, 0, 0) + tzOffsetMs);
     daysInPeriod = 7;
   }
 
-  // For free users: only last 7 days, limited to 10 meals
+  // For free users: only last 7 days
   const effectiveStart = isPremium ? periodStart : (() => {
-    const s = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 6, 0, 0, 0, 0));
-    return s;
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 6, 0, 0, 0, 0) + tzOffsetMs);
   })();
 
   // Collect all session IDs linked to this userId (to find analyses from before login)

@@ -95,6 +95,7 @@ export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgr
         body: JSON.stringify({
           sessionId,
           messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
+          tzOffset: new Date().getTimezoneOffset(),
         }),
       });
       const data = await r.json();

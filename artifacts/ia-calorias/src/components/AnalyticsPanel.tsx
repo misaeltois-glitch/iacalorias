@@ -311,7 +311,7 @@ export function AnalyticsPanel({ isOpen, onClose, sessionId, isPremium, onUpgrad
     else setLoadingMore(true);
     try {
       const r = await fetch(
-        `${BASE}api/analytics/summary?sessionId=${sessionId}&period=${p}&page=${page}&pageSize=20`,
+        `${BASE}api/analytics/summary?sessionId=${sessionId}&period=${p}&page=${page}&pageSize=20&tzOffset=${new Date().getTimezoneOffset()}`,
         { headers: authHeaders() },
       );
       if (!r.ok) return;
