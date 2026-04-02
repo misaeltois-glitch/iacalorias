@@ -162,7 +162,6 @@ export async function generateShareCard(result: AnalysisResult): Promise<Blob> {
     const cx = 180;
     const cy = scoreTop + 90;
     const r = 70;
-    const circumference = 2 * Math.PI * r;
 
     ctx.strokeStyle = 'rgba(255,255,255,0.08)';
     ctx.lineWidth = 12;
@@ -208,7 +207,7 @@ export async function generateShareCard(result: AnalysisResult): Promise<Blob> {
   }
 
   // Substitution tip
-  if ((result as any).substitutionTip) {
+  if (result.substitutionTip) {
     const tipY = scoreTop + 220;
     ctx.fillStyle = 'rgba(245,158,11,0.12)';
     roundRect(ctx, 80, tipY, W - 160, 130, 20);
