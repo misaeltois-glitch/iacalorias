@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { db, pool, usersTable, analysesTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
+import { maybeRunWeeklyReportCron } from "./lib/weekly-report-cron.js";
 
 const rawPort = process.env["PORT"];
 
@@ -88,4 +89,9 @@ app.listen(port, async (err) => {
   logger.info({ port }, "Server listening");
   await runMigrations();
   await cleanupDevAccount();
+
+  // Cron: verifica a cada hora se é hora de enviar relatórios semanais (domingo 7h BRT)
+  setInterval(() => {
+    maybeRunWeeklyReportCron().catch(err => logger.error({ err }, "weekly report cron error"));
+  }, 60 * 60 * 1000);
 });
