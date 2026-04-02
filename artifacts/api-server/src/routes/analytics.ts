@@ -34,8 +34,10 @@ async function findGoals(userId?: string, sessionId?: string) {
   return null;
 }
 
+// tzOffset = getTimezoneOffset() from client (positive = behind UTC, e.g. 180 for UTC-3)
+// To convert UTC timestamp → local date: subtract tzOffset minutes
 function toLocalDateStr(date: Date, tzOffset = 0): string {
-  const d = new Date(date.getTime() + tzOffset * 60000);
+  const d = new Date(date.getTime() - tzOffset * 60000);
   return d.toISOString().slice(0, 10);
 }
 
@@ -146,7 +148,7 @@ router.get("/summary", async (req: Request, res: Response) => {
     meals: acc.meals + 1,
   }), { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, meals: 0 });
 
-  const daysWithData = new Set(analyses.map(a => toLocalDateStr(a.createdAt))).size;
+  const daysWithData = new Set(analyses.map(a => toLocalDateStr(a.createdAt, tzOffset))).size;
   const dailyAvg = daysWithData > 0 ? {
     calories: Math.round(totals.calories / daysWithData),
     protein: Math.round(totals.protein / daysWithData * 10) / 10,
@@ -158,7 +160,7 @@ router.get("/summary", async (req: Request, res: Response) => {
   // Build day-by-day breakdown (for bar chart)
   const dayMap: Map<string, { calories: number; protein: number; carbs: number; fat: number; fiber: number; mealsCount: number }> = new Map();
   for (const a of analyses) {
-    const key = toLocalDateStr(a.createdAt);
+    const key = toLocalDateStr(a.createdAt, tzOffset);
     const existing = dayMap.get(key) ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, mealsCount: 0 };
     dayMap.set(key, {
       calories: existing.calories + a.calories,
@@ -174,7 +176,7 @@ router.get("/summary", async (req: Request, res: Response) => {
   const days: { date: string; calories: number; protein: number; carbs: number; fat: number; fiber: number; mealsCount: number }[] = [];
   const cursor = new Date(periodStart);
   while (cursor <= periodEnd) {
-    const key = toLocalDateStr(cursor);
+    const key = toLocalDateStr(cursor, tzOffset);
     const data = dayMap.get(key);
     days.push({
       date: key,
@@ -195,7 +197,7 @@ router.get("/summary", async (req: Request, res: Response) => {
   let streak = 0;
   if (goals?.calories) {
     const streakTarget = goals.calories * 0.8;
-    const todayStr = toLocalDateStr(new Date());
+    const todayStr = toLocalDateStr(new Date(), tzOffset);
 
     // Build full history map (all time) for streak
     let allAnalyses;
@@ -215,13 +217,13 @@ router.get("/summary", async (req: Request, res: Response) => {
 
     const allDayMap: Map<string, number> = new Map();
     for (const a of allAnalyses) {
-      const key = toLocalDateStr(a.createdAt);
+      const key = toLocalDateStr(a.createdAt, tzOffset);
       allDayMap.set(key, (allDayMap.get(key) ?? 0) + a.calories);
     }
 
     let checkDate = new Date();
     while (true) {
-      const key = toLocalDateStr(checkDate);
+      const key = toLocalDateStr(checkDate, tzOffset);
       const dayCalories = allDayMap.get(key) ?? 0;
       if (dayCalories >= streakTarget) {
         streak++;
