@@ -267,10 +267,11 @@ export default function Home() {
 
   useEffect(() => {
     if (!sessionId) return;
+    setHasWorkoutPlan(false);
     fetch(`${BASE}api/workout/profile?sessionId=${sessionId}`, { headers: authHeaders() })
       .then(r => setHasWorkoutPlan(r.ok))
-      .catch(() => {});
-  }, [sessionId]);
+      .catch(() => setHasWorkoutPlan(false));
+  }, [sessionId, isAuthenticated]);
 
   // After login, check if user had a pending upgrade plan and open checkout
   useEffect(() => {
