@@ -66,38 +66,55 @@ router.get("/", async (req: Request, res: Response) => {
   res.json(withPerMeal(goals));
 });
 
+function clampNum(val: unknown, min: number, max: number): number | undefined {
+  const n = Number(val);
+  if (val === undefined || val === null || val === "" || Number.isNaN(n)) return undefined;
+  return Math.max(min, Math.min(max, n));
+}
+function validStr(val: unknown, allowed: string[]): string | undefined {
+  return typeof val === "string" && allowed.includes(val) ? val : undefined;
+}
+
 // ── POST /api/goals ────────────────────────────────────────────────────────────
 router.post("/", async (req: Request, res: Response) => {
-  const { sessionId, calories, protein, carbs, fat, fiber, mealsPerDay, weight, height, age, sex, objective, activityLevel, restrictions } = req.body;
+  const body = req.body;
+  const sessionId = typeof body.sessionId === "string" ? body.sessionId : undefined;
   const userId = req.user?.userId;
   const userEmail = req.user?.email;
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
 
-  const masterTier = getMasterTier(req.user?.email);
-  const isDevAccount = !!masterTier;
-  const tier = masterTier ?? await resolveSubTier(userId, sessionId);
-
-  const restrictionsStr = Array.isArray(restrictions) ? JSON.stringify(restrictions) : restrictions;
-
-  const effectiveCarbs = carbs;
-  const effectiveFat = fat;
-  const effectiveFiber = fiber;
+  // Validate and clamp numeric fields
+  const calories   = clampNum(body.calories,   500,  10000);
+  const protein    = clampNum(body.protein,       0,   500);
+  const carbs      = clampNum(body.carbs,          0,  1500);
+  const fat        = clampNum(body.fat,             0,   500);
+  const fiber      = clampNum(body.fiber,           0,   200);
+  const mealsPerDay= clampNum(body.mealsPerDay,     1,    10);
+  const weight     = clampNum(body.weight,          20,   400);
+  const height     = clampNum(body.height,         100,   250);
+  const age        = clampNum(body.age,              5,   120);
+  const sex        = validStr(body.sex, ["male", "female", "other"]);
+  const objective  = validStr(body.objective, ["lose_weight", "maintain", "gain_muscle", "health"]);
+  const activityLevel = validStr(body.activityLevel, ["sedentary", "light", "moderate", "active", "very_active"]);
+  const restrictions = Array.isArray(body.restrictions)
+    ? JSON.stringify(body.restrictions.slice(0, 20).map(String))
+    : (typeof body.restrictions === "string" ? body.restrictions.slice(0, 500) : undefined);
 
   const existing = await findGoals(userId, sessionId);
 
   if (existing) {
     await db.update(goalsTable)
-      .set({ calories, protein, carbs: effectiveCarbs, fat: effectiveFat, fiber: effectiveFiber, mealsPerDay: mealsPerDay ?? existing.mealsPerDay ?? 3, weight, height, age, sex, objective, activityLevel, restrictions: restrictionsStr, userId: userId ?? existing.userId, updatedAt: new Date() })
+      .set({ calories, protein, carbs, fat, fiber, mealsPerDay: mealsPerDay ?? existing.mealsPerDay ?? 3, weight, height, age, sex, objective, activityLevel, restrictions, userId: userId ?? existing.userId, updatedAt: new Date() })
       .where(eq(goalsTable.sessionId, existing.sessionId));
   } else {
     const effectiveSessionId = sessionId ?? `user-${userId}`;
     await db.insert(goalsTable).values({
       sessionId: effectiveSessionId,
       userId: userId ?? null,
-      calories, protein, carbs: effectiveCarbs, fat: effectiveFat, fiber: effectiveFiber, mealsPerDay: mealsPerDay ?? 3,
+      calories, protein, carbs, fat, fiber, mealsPerDay: mealsPerDay ?? 3,
       weight, height, age, sex, objective, activityLevel,
-      restrictions: restrictionsStr,
+      restrictions,
       updatedAt: new Date(),
     });
   }

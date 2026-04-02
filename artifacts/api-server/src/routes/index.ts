@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { optionalAuth } from "../lib/auth-middleware.js";
+import { analysisRateLimit, authRateLimit, generalRateLimit } from "../lib/rate-limit.js";
 import healthRouter from "./health";
 import userRouter from "./user";
 import analysisRouter from "./analysis";
@@ -19,17 +20,17 @@ const router: IRouter = Router();
 router.use(optionalAuth);
 
 router.use(healthRouter);
-router.use("/auth", authRouter);
-router.use("/user", userRouter);
-router.use("/analysis", analysisRouter);
-router.use("/subscription", subscriptionRouter);
-router.use("/goals", goalsRouter);
-router.use("/analytics", analyticsRouter);
-router.use("/workout", workoutRouter);
-router.use("/chat", chatRouter);
-router.use("/weight", weightRouter);
-router.use("/weekly-report", weeklyReportRouter);
-router.use("/meal-plan", mealPlanRouter);
-router.use("/referral", referralRouter);
+router.use("/auth", authRateLimit, authRouter);
+router.use("/user", generalRateLimit, userRouter);
+router.use("/analysis", analysisRateLimit, analysisRouter);
+router.use("/subscription", generalRateLimit, subscriptionRouter);
+router.use("/goals", generalRateLimit, goalsRouter);
+router.use("/analytics", generalRateLimit, analyticsRouter);
+router.use("/workout", generalRateLimit, workoutRouter);
+router.use("/chat", analysisRateLimit, chatRouter);
+router.use("/weight", generalRateLimit, weightRouter);
+router.use("/weekly-report", generalRateLimit, weeklyReportRouter);
+router.use("/meal-plan", analysisRateLimit, mealPlanRouter);
+router.use("/referral", generalRateLimit, referralRouter);
 
 export default router;
