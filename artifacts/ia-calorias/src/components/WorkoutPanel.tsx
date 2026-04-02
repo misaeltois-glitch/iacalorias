@@ -734,7 +734,7 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
               <span style={{ fontSize: '13px', fontWeight: 700, color: workoutTrialDaysRemaining <= 1 ? '#EF4444' : '#F97316' }}>
                 🏋️ {workoutTrialDaysRemaining > 0
                   ? `Treino grátis: ${workoutTrialDaysRemaining} dia${workoutTrialDaysRemaining !== 1 ? 's' : ''} restante${workoutTrialDaysRemaining !== 1 ? 's' : ''}`
-                  : 'Trial de treino expirado'}
+                  : 'Teste de treino encerrado'}
               </span>
               {workoutTrialDaysRemaining <= 0 && (
                 <button onClick={onUpgrade} style={{

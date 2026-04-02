@@ -110,7 +110,7 @@ function UsageBar({ used, max, onClick }: { used: number; max: number; onClick: 
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: '12px', color: 'var(--text-2)', fontWeight: 500 }}>
-          Trial gratuito
+          Teste grátis
         </span>
         <span style={{ fontSize: '12px', fontWeight: 700, color }}>
           {max - used} dia{(max - used) !== 1 ? 's' : ''} restante{(max - used) !== 1 ? 's' : ''}
@@ -124,11 +124,11 @@ function UsageBar({ used, max, onClick }: { used: number; max: number; onClick: 
       </div>
       {used >= max ? (
         <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: 600 }}>
-          ⚠️ Trial expirado — Faça upgrade para continuar
+          ⚠️ Teste encerrado — Faça upgrade para continuar
         </span>
       ) : used === max - 1 ? (
         <span style={{ fontSize: '11px', color: '#F59E0B', fontWeight: 600 }}>
-          ⏳ Último dia de trial gratuito!
+          ⏳ Último dia de teste grátis!
         </span>
       ) : null}
     </button>
@@ -879,8 +879,8 @@ export default function Home() {
                     {isPremium
                       ? 'Registre sua próxima refeição'
                       : trialDaysRemaining === 0
-                        ? 'Seu trial expirou — faça upgrade para continuar'
-                        : `${trialDaysRemaining} dia${trialDaysRemaining !== 1 ? 's' : ''} de trial gratuito restante${trialDaysRemaining !== 1 ? 's' : ''}`}
+                        ? 'Seu teste encerrou — faça upgrade para continuar'
+                        : `${trialDaysRemaining} dia${trialDaysRemaining !== 1 ? 's' : ''} de teste grátis restante${trialDaysRemaining !== 1 ? 's' : ''}`}
                   </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1097,7 +1097,7 @@ export default function Home() {
                   background: 'rgba(13,159,110,0.1)', border: '1px solid rgba(13,159,110,0.2)',
                   fontSize: '11px', fontWeight: 700, color: '#0D9F6E', flexShrink: 0,
                 }}>
-                  {isPremium ? 'Ilimitado' : 'No trial'}
+                  {isPremium ? 'Ilimitado' : 'No teste'}
                 </div>
               </button>
 
