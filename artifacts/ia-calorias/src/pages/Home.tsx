@@ -685,25 +685,25 @@ export default function Home() {
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div data-tour="usage-pill" style={{ display: 'flex' }}>{renderUsagePill()}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+            <div data-tour="usage-pill" style={{ display: 'flex', minWidth: 0, overflow: 'hidden' }}>{renderUsagePill()}</div>
 
             <button
               onClick={() => setShowAnalytics(true)}
-              style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
+              style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', flexShrink: 0 }}
             >
               <BarChart2 size={16} />
             </button>
 
             <button
               onClick={() => setShowGoalsPanel(true)}
-              style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
+              style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', flexShrink: 0 }}
             >
               <Settings size={16} />
             </button>
 
             {isAuthenticated ? (
-              <div ref={userMenuRef} style={{ position: 'relative' }}>
+              <div ref={userMenuRef} style={{ position: 'relative', flexShrink: 0 }}>
                 <button
                   onClick={() => setShowUserMenu(v => !v)}
                   style={{ padding: '2px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
