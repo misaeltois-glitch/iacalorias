@@ -156,8 +156,9 @@ router.get("/daily-summary", async (req: Request, res: Response) => {
   const userId = req.user?.userId;
   const userEmail = req.user?.email;
   const period = (req.query.period as string) ?? "day";
-  // tzOffset: minutes behind UTC from client (e.g. 180 for UTC-3 Brazil). Clamp to ±840.
-  const tzOffset = Math.max(-840, Math.min(840, parseInt((req.query.tzOffset as string) ?? "0", 10) || 0));
+  // tzOffset: minutes behind UTC from client (e.g. 180 for UTC-3 Brazil). Default 180 (Brazil).
+  const rawTz = parseInt(req.query.tzOffset as string, 10);
+  const tzOffset = Math.max(-840, Math.min(840, Number.isNaN(rawTz) ? 180 : rawTz));
   const tzOffsetMs = tzOffset * 60 * 1000; // convert to ms
 
   if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
