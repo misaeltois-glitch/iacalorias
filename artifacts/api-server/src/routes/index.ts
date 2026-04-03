@@ -14,6 +14,7 @@ import weightRouter from "./weight";
 import weeklyReportRouter from "./weekly-report";
 import mealPlanRouter from "./meal-plan";
 import referralRouter from "./referral";
+import recipeRouter from "./recipe";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use("/weight", generalRateLimit, weightRouter);
 router.use("/weekly-report", generalRateLimit, weeklyReportRouter);
 router.use("/meal-plan", analysisRateLimit, mealPlanRouter);
 router.use("/referral", generalRateLimit, referralRouter);
+router.use("/recipe", analysisRateLimit, recipeRouter);
 
 export default router;
