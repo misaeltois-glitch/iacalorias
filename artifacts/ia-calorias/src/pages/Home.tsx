@@ -33,6 +33,7 @@ import { InstallPrompt, OpenInAppBanner } from '@/components/InstallPrompt';
 import { ReferralCard, applyPendingReferral, REFERRAL_CODE_KEY } from '@/components/ReferralCard';
 import { MealReminders } from '@/components/MealReminders';
 import { useMealReminders } from '@/hooks/use-meal-reminders';
+import { RecipeSuggestor } from '@/components/RecipeSuggestor';
 
 import {
   useAnalyzeFood,
@@ -100,39 +101,48 @@ function getHourGreeting(): string {
 function UsageBar({ remaining, max, onClick }: { remaining: number; max: number; onClick: () => void }) {
   const used = max - remaining;
   const pct = Math.min(100, (used / max) * 100);
-  const color = remaining === 0 ? '#EF4444' : remaining <= 2 ? '#F59E0B' : '#10B981';
+  const isExpired = remaining === 0;
+  const isUrgent = !isExpired && remaining <= 2;
+  const barColor = isExpired ? '#EF4444' : isUrgent ? '#F59E0B' : '#10B981';
   return (
     <button
       onClick={onClick}
       style={{
         width: '100%', padding: '10px 14px', borderRadius: '12px',
-        background: 'var(--bg-2)', border: '1px solid var(--border)',
+        background: isExpired ? 'rgba(239,68,68,0.06)' : 'var(--bg-2)',
+        border: `1px solid ${isExpired ? 'rgba(239,68,68,0.25)' : isUrgent ? 'rgba(245,158,11,0.25)' : 'var(--border)'}`,
         cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '6px',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: '12px', color: 'var(--text-2)', fontWeight: 500 }}>
-          Teste grátis
+          {isExpired ? '⚠️ Teste encerrado' : `🎁 Teste grátis · ${remaining} dia${remaining !== 1 ? 's' : ''}`}
         </span>
-        <span style={{ fontSize: '12px', fontWeight: 700, color }}>
-          {remaining} dia{remaining !== 1 ? 's' : ''} restante{remaining !== 1 ? 's' : ''}
+        <span style={{
+          fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '99px',
+          background: isExpired ? 'rgba(239,68,68,0.12)' : 'rgba(13,159,110,0.10)',
+          color: isExpired ? '#EF4444' : '#0D9F6E',
+        }}>
+          {isExpired ? 'Expirado' : 'Ativo'}
         </span>
       </div>
-      <div style={{ width: '100%', height: '5px', borderRadius: '99px', background: 'var(--bg-3)' }}>
+      <div style={{ width: '100%', height: '4px', borderRadius: '99px', background: 'var(--bg-3)' }}>
         <div style={{
-          height: '100%', borderRadius: '99px', background: color,
+          height: '100%', borderRadius: '99px', background: barColor,
           width: `${pct}%`, transition: 'width 0.5s ease',
         }} />
       </div>
-      {remaining === 0 ? (
-        <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: 600 }}>
-          ⚠️ Teste encerrado — Faça upgrade para continuar
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginTop: '2px',
+      }}>
+        <span style={{ fontSize: '11px', color: isExpired ? '#EF4444' : isUrgent ? '#F59E0B' : 'var(--text-3)', fontWeight: 500 }}>
+          {isExpired ? 'Faça upgrade para continuar analisando' : isUrgent ? `⏳ Últimos ${remaining} dia${remaining !== 1 ? 's' : ''}!` : 'Análises ilimitadas no período de teste'}
         </span>
-      ) : remaining <= 2 ? (
-        <span style={{ fontSize: '11px', color: '#F59E0B', fontWeight: 600 }}>
-          ⏳ Últimos {remaining} dia{remaining !== 1 ? 's' : ''} de teste grátis!
+        <span style={{ fontSize: '11px', fontWeight: 700, color: '#0D9F6E', whiteSpace: 'nowrap', marginLeft: 8 }}>
+          Fazer upgrade →
         </span>
-      ) : null}
+      </div>
     </button>
   );
 }
