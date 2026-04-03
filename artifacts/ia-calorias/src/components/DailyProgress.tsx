@@ -187,6 +187,98 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
         )}
       </div>
 
+      {/* Deficit recovery feedback (day only) */}
+      {period === 'day' && goals?.calories && totals.calories > 0 && (() => {
+        const pct = totals.calories / goals.calories;
+        if (pct >= 0.8) return null; // within acceptable range
+
+        const deficit = Math.round(goals.calories - totals.calories);
+        const isSevere  = pct < 0.5;
+        const isModerate = pct >= 0.5 && pct < 0.75;
+
+        const config = isSevere ? {
+          icon: '🚨',
+          title: 'Déficit calórico severo detectado',
+          color: '#EF4444',
+          bg: 'rgba(239,68,68,0.07)',
+          border: 'rgba(239,68,68,0.25)',
+          recovery: 'Amanhã distribua as calorias em 5–6 refeições menores ao longo do dia. Priorize proteínas, gorduras boas (abacate, azeite, ovos) e carboidratos de digestão lenta como batata-doce e aveia.',
+          effects: [
+            'Perda muscular acelerada',
+            'Desaceleração do metabolismo',
+            'Queda de imunidade e concentração',
+            'Alterações hormonais',
+            'Deficiências nutricionais',
+          ],
+        } : isModerate ? {
+          icon: '⚠️',
+          title: 'Déficit moderado — atenção',
+          color: '#F59E0B',
+          bg: 'rgba(245,158,11,0.07)',
+          border: 'rgba(245,158,11,0.25)',
+          recovery: 'Amanhã aumente as porções das refeições principais e inclua um lanche proteico extra. Prefira proteínas magras, carboidratos complexos e gorduras boas.',
+          effects: [
+            'Fadiga e queda de desempenho',
+            'Perda muscular gradual',
+            'Dificuldade de concentração',
+          ],
+        } : {
+          icon: '📉',
+          title: 'Ficou um pouco abaixo da meta',
+          color: '#3B82F6',
+          bg: 'rgba(59,130,246,0.06)',
+          border: 'rgba(59,130,246,0.2)',
+          recovery: 'Complete a meta com um lanche rico em proteína antes de dormir — iogurte grego, queijo cottage, ovos mexidos ou uma fruta com pasta de amendoim.',
+          effects: [],
+        };
+
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              borderRadius: '16px', padding: '14px 16px',
+              background: config.bg, border: `1px solid ${config.border}`,
+              display: 'flex', flexDirection: 'column', gap: '10px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px' }}>{config.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: config.color }}>{config.title}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '1px' }}>
+                  Faltaram <strong style={{ color: config.color }}>{deficit} kcal</strong> para atingir a meta
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '10px 12px', borderRadius: '10px', background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.4px', marginBottom: '5px' }}>
+                💡 RECUPERAÇÃO AMANHÃ
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-1)', lineHeight: 1.6, margin: 0 }}>{config.recovery}</p>
+            </div>
+
+            {config.effects.length > 0 && (
+              <div style={{ padding: '10px 12px', borderRadius: '10px', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#EF4444', letterSpacing: '0.4px', marginBottom: '6px' }}>
+                  ⚠️ EFEITOS DE DÉFICITS FREQUENTES
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                  {config.effects.map(e => (
+                    <span key={e} style={{
+                      fontSize: '11px', padding: '2px 8px', borderRadius: '99px',
+                      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                      color: '#EF4444', fontWeight: 500,
+                    }}>{e}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        );
+      })()}
+
       {/* Alerts (day only) */}
       {alerts.length > 0 && period === 'day' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

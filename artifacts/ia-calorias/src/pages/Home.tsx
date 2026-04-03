@@ -34,6 +34,7 @@ import { ReferralCard, applyPendingReferral, REFERRAL_CODE_KEY } from '@/compone
 import { MealReminders } from '@/components/MealReminders';
 import { useMealReminders } from '@/hooks/use-meal-reminders';
 import { RecipeSuggestor } from '@/components/RecipeSuggestor';
+import { MealFoodPrefsModal } from '@/components/MealFoodPrefsModal';
 import { trackEvent } from '@/lib/tracking';
 
 import {
@@ -178,6 +179,7 @@ export default function Home() {
   const [showChat, setShowChat] = useState(false);
   const [showMealPlan, setShowMealPlan] = useState(false);
   const [showRecipeSuggestor, setShowRecipeSuggestor] = useState(false);
+  const [showFoodPrefs, setShowFoodPrefs] = useState(false);
   const celebrationQueue = useRef<Array<'calories' | 'meals'>>([]);
   const celebrationInflight = useRef<Set<'calories' | 'meals'>>(new Set());
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -1170,6 +1172,43 @@ export default function Home() {
                 </div>
               </button>
 
+              {/* Meal Food Prefs CTA */}
+              <button
+                onClick={() => setShowFoodPrefs(true)}
+                style={{
+                  width: '100%', padding: '14px 18px', borderRadius: '18px',
+                  background: 'var(--bg-2)', border: '1px solid var(--border)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-3)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-2)')}
+              >
+                <div style={{
+                  width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+                  background: 'linear-gradient(135deg, #0D9F6E, #3B82F6)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '22px', boxShadow: '0 2px 10px rgba(13,159,110,0.25)',
+                }}>
+                  🥗
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '3px' }}>
+                    Personalizar meu cardápio
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                    Selecione os alimentos que você costuma comer
+                  </div>
+                </div>
+                <div style={{
+                  padding: '4px 10px', borderRadius: '99px',
+                  background: 'rgba(13,159,110,0.1)', border: '1px solid rgba(13,159,110,0.2)',
+                  fontSize: '11px', fontWeight: 700, color: '#0D9F6E', flexShrink: 0,
+                }}>
+                  Grátis
+                </div>
+              </button>
+
               {/* Recipe Suggestor CTA */}
               <button
                 onClick={() => setShowRecipeSuggestor(true)}
@@ -1417,6 +1456,10 @@ export default function Home() {
           onClose={() => setShowRecipeSuggestor(false)}
           sessionId={sessionId}
         />
+      )}
+
+      {showFoodPrefs && (
+        <MealFoodPrefsModal onClose={() => setShowFoodPrefs(false)} />
       )}
 
       <style>{`
