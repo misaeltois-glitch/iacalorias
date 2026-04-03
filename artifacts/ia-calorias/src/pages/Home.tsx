@@ -613,7 +613,7 @@ export default function Home() {
         cursor: 'pointer', whiteSpace: 'nowrap',
       }}>
         <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0D9F6E', display: 'inline-block', flexShrink: 0 }} />
-        {trialRemaining} dia{trialRemaining !== 1 ? 's' : ''} de teste
+        {trialRemaining}d grátis
       </button>
     );
     if (subStatus.tier === 'limited') return (
