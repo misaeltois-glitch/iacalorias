@@ -736,7 +736,8 @@ export default function Home() {
                       position: 'absolute', right: 0, top: '42px',
                       background: 'var(--bg-2)', border: '1px solid var(--border)',
                       borderRadius: '16px', padding: '8px',
-                      minWidth: '200px', zIndex: 101,
+                      minWidth: '200px', maxWidth: '260px', width: 'max-content',
+                      zIndex: 101,
                       boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
                     }}>
                       <div style={{ padding: '8px 12px 10px', borderBottom: '1px solid var(--border)', marginBottom: '4px' }}>
