@@ -26,7 +26,10 @@ async function resolveSubTier(userId?: string, sessionId?: string): Promise<"fre
 router.post("/", async (req: Request, res: Response) => {
   const userId = req.user?.userId;
   const userEmail = req.user?.email;
-  const { sessionId } = req.body;
+  const { sessionId, foodPrefs } = req.body as {
+    sessionId?: string;
+    foodPrefs?: Record<string, string[]>;
+  };
 
   if (!sessionId && !userId) {
     res.status(400).json({ error: "bad_request" });
@@ -79,10 +82,24 @@ router.post("/", async (req: Request, res: Response) => {
     ? `Restrições/preferências: ${restrictions.join(", ")}.`
     : "Sem restrições alimentares específicas.";
 
+  const mealLabels: Record<string, string> = {
+    breakfast: "Café da manhã", morningSnack: "Lanche da manhã",
+    lunch: "Almoço", afternoonSnack: "Lanche da tarde", dinner: "Jantar",
+  };
+  const foodPrefsLine = foodPrefs
+    ? Object.entries(foodPrefs)
+        .filter(([, foods]) => Array.isArray(foods) && (foods as string[]).length > 0)
+        .map(([meal, foods]) => `${mealLabels[meal] ?? meal}: ${(foods as string[]).join(", ")}`)
+        .join(" | ")
+    : "";
+  const foodPrefsPrompt = foodPrefsLine
+    ? `\nPreferências alimentares do usuário (priorize esses alimentos no cardápio): ${foodPrefsLine}.`
+    : "";
+
   const prompt = `Você é uma nutricionista brasileira chamada Sofia. Crie um plano de refeições para 7 dias (segunda a domingo) em JSON, com culinária brasileira variada, saudável e gostosa.
 
 Metas nutricionais diárias: ${macroLine}.
-${restrictionLine}
+${restrictionLine}${foodPrefsPrompt}
 Refeições por dia: ${mealNames.join(", ")}.
 
 Retorne APENAS o JSON no seguinte formato (sem markdown, sem explicações):

@@ -25,10 +25,11 @@ async function resolveSubTier(userId?: string, sessionId?: string): Promise<"fre
 // POST /api/chat
 // Body: { sessionId: string, messages: [{role: "user"|"assistant", content: string}] }
 router.post("/", async (req: Request, res: Response) => {
-  const { sessionId, messages, tzOffset: rawTzOffset } = req.body as {
+  const { sessionId, messages, tzOffset: rawTzOffset, foodPrefs } = req.body as {
     sessionId?: string;
     messages?: Array<{ role: "user" | "assistant"; content: string }>;
     tzOffset?: number;
+    foodPrefs?: Record<string, string[]>;
   };
   // tzOffset: minutes behind UTC (e.g. 180 for UTC-3 Brazil)
   const tzOffset = Math.max(-840, Math.min(840, Number(rawTzOffset) || 0));
@@ -139,6 +140,19 @@ router.post("/", async (req: Request, res: Response) => {
     ? "O usuário está no plano Limitado (20 análises/mês)."
     : "O usuário está no plano Ilimitado.";
 
+  const mealLabels: Record<string, string> = {
+    breakfast: "Café da manhã", morningSnack: "Lanche da manhã",
+    lunch: "Almoço", afternoonSnack: "Lanche da tarde", dinner: "Jantar",
+  };
+  const foodPrefsLines = foodPrefs
+    ? Object.entries(foodPrefs)
+        .filter(([, foods]) => Array.isArray(foods) && foods.length > 0)
+        .map(([meal, foods]) => `- ${mealLabels[meal] ?? meal}: ${(foods as string[]).join(", ")}`)
+    : [];
+  const foodPrefsContext = foodPrefsLines.length > 0
+    ? `\nPREFERÊNCIAS ALIMENTARES DO USUÁRIO:\n${foodPrefsLines.join("\n")}`
+    : "";
+
   const systemPrompt = `Você é Sofia, nutricionista clínica especialista em alimentação saudável e emagrecimento. Você faz parte do app IA Calorias.
 
 Seja empática, direta e prática. Responda em português brasileiro. Respostas curtas (2-4 frases no máximo), a não ser que o usuário peça mais detalhes. Use linguagem acessível, não técnica demais.
@@ -151,7 +165,7 @@ IMPORTANTE — use sempre o tempo verbal correto:
 ${planNote}
 
 CONTEXTO NUTRICIONAL DO USUÁRIO:
-${contextParts.join("\n")}
+${contextParts.join("\n")}${foodPrefsContext}
 
 Você pode dar conselhos sobre alimentação, substituições, receitas, timing de refeições, hidratação, suplementação básica e interpretação dos macronutrientes. Não diagnostique doenças. Se a pergunta for médica ou clínica, oriente a consultar um profissional de saúde presencialmente.`;
 

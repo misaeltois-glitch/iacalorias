@@ -202,7 +202,10 @@ export function MealPlanModal({ isOpen, onClose, sessionId, isPremium, onUpgrade
       const r = await fetch(`${BASE}api/meal-plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({
+          sessionId,
+          foodPrefs: (() => { try { return JSON.parse(localStorage.getItem('ia-calorias-food-prefs') ?? '{}'); } catch { return {}; } })(),
+        }),
       });
       if (r.status === 403) {
         setError('forbidden');

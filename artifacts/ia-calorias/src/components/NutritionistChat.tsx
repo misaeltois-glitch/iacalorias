@@ -96,6 +96,7 @@ export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgr
           sessionId,
           messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
           tzOffset: new Date().getTimezoneOffset(),
+          foodPrefs: (() => { try { return JSON.parse(localStorage.getItem('ia-calorias-food-prefs') ?? '{}'); } catch { return {}; } })(),
         }),
       });
       const data = await r.json();
