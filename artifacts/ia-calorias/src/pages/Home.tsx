@@ -35,6 +35,7 @@ import { MealReminders } from '@/components/MealReminders';
 import { useMealReminders } from '@/hooks/use-meal-reminders';
 import { RecipeSuggestor } from '@/components/RecipeSuggestor';
 import { MealFoodPrefsModal } from '@/components/MealFoodPrefsModal';
+import { SupportChat } from '@/components/SupportChat';
 import { trackEvent } from '@/lib/tracking';
 
 import {
@@ -180,6 +181,7 @@ export default function Home() {
   const [showMealPlan, setShowMealPlan] = useState(false);
   const [showRecipeSuggestor, setShowRecipeSuggestor] = useState(false);
   const [showFoodPrefs, setShowFoodPrefs] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
   const celebrationQueue = useRef<Array<'calories' | 'meals'>>([]);
   const celebrationInflight = useRef<Set<'calories' | 'meals'>>(new Set());
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -231,7 +233,8 @@ export default function Home() {
     const daysElapsed = Math.round((nowMidnight - startMidnight) / 86400000);
     return Math.max(0, FREE_TRIAL_DAYS - daysElapsed);
   })();
-  const trialRemaining = trialDaysRemaining;
+  const trialRemaining = subStatus?.trialRemaining ?? trialDaysRemaining;
+  const daysElapsed = FREE_TRIAL_DAYS - trialRemaining;
 
   const workoutTrialDaysRemaining = (() => {
     if (isPremium) return null;
@@ -794,6 +797,19 @@ export default function Home() {
                         Tour do aplicativo
                       </button>
                       <button
+                        onClick={() => { setShowUserMenu(false); setShowSupport(true); }}
+                        style={{
+                          width: '100%', padding: '8px 12px',
+                          background: 'none', border: 'none', color: 'var(--text-2)',
+                          fontSize: '13px', cursor: 'pointer', borderRadius: '10px',
+                          display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left',
+                          marginBottom: '2px',
+                        }}
+                      >
+                        <span style={{ fontSize: '14px' }}>🛟</span>
+                        Suporte
+                      </button>
+                      <button
                         onClick={() => { toggleTheme(); }}
                         style={{
                           width: '100%', padding: '8px 12px',
@@ -932,6 +948,32 @@ export default function Home() {
                 <UsageBar remaining={subStatus.trialRemaining} max={FREE_TRIAL_DAYS} onClick={() => setShowPaywall(true)} />
               )}
 
+              {/* Urgency banner — últimos 3 dias */}
+              {subStatus?.tier === 'free' && trialRemaining > 0 && trialRemaining <= 3 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={() => setShowPaywall(true)}
+                  style={{
+                    padding: '12px 16px', borderRadius: '14px', cursor: 'pointer',
+                    background: 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,158,11,0.06))',
+                    border: '1px solid rgba(239,68,68,0.25)',
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                  }}
+                >
+                  <span style={{ fontSize: '20px', flexShrink: 0 }}>⏳</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444', marginBottom: '2px' }}>
+                      Seu teste acaba em {trialRemaining} dia{trialRemaining !== 1 ? 's' : ''}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                      Não perca seu histórico de {subStatus.analysisCount} refeição{subStatus.analysisCount !== 1 ? 'ões' : ''} registrada{subStatus.analysisCount !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '13px', color: '#0D9F6E', fontWeight: 700, flexShrink: 0 }}>Upgrade →</span>
+                </motion.div>
+              )}
+
               {/* Camera card + upload */}
               <div style={{
                 borderRadius: '24px',
@@ -1002,6 +1044,30 @@ export default function Home() {
                     Entrar
                   </button>
                 </div>
+              )}
+
+              {/* Feature discovery — jornada guiada dias 1-4 */}
+              {!isPremium && trialRemaining > 0 && daysElapsed >= 1 && daysElapsed <= 4 && (
+                <button
+                  onClick={() => setShowChat(true)}
+                  style={{
+                    width: '100%', padding: '14px 16px', borderRadius: '14px',
+                    background: 'linear-gradient(135deg, rgba(13,159,110,0.08), rgba(59,130,246,0.06))',
+                    border: '1px solid rgba(13,159,110,0.2)',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left',
+                  }}
+                >
+                  <span style={{ fontSize: '22px', flexShrink: 0 }}>💡</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>
+                      Sabia que você pode perguntar para a Sofia?
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                      "O que comer antes do treino?" · "Como bater minha meta de proteína?" — grátis no teste
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '12px', color: '#0D9F6E', fontWeight: 700, flexShrink: 0 }}>Testar →</span>
+                </button>
               )}
 
               {/* Upgrade banner for free users */}
@@ -1122,10 +1188,11 @@ export default function Home() {
                 </div>
                 <div style={{
                   padding: '4px 10px', borderRadius: '99px',
-                  background: 'rgba(13,159,110,0.1)', border: '1px solid rgba(13,159,110,0.2)',
+                  background: isPremium ? 'rgba(13,159,110,0.1)' : 'rgba(13,159,110,0.12)',
+                  border: '1px solid rgba(13,159,110,0.2)',
                   fontSize: '11px', fontWeight: 700, color: '#0D9F6E', flexShrink: 0,
                 }}>
-                  {isPremium ? 'Ilimitado' : 'No teste'}
+                  {isPremium ? 'Ilimitado' : '🎁 Grátis no teste'}
                 </div>
               </button>
 
@@ -1380,12 +1447,20 @@ export default function Home() {
         workoutTrialDaysRemaining={workoutTrialDaysRemaining}
       />
 
+      <SupportChat
+        isOpen={showSupport}
+        onClose={() => setShowSupport(false)}
+        sessionId={sessionId}
+      />
+
       <PaywallModal
         isOpen={showPaywall}
         onClose={() => { setShowPaywall(false); setPaywallDisableClose(false); }}
         sessionId={sessionId}
         disableClose={paywallDisableClose}
         onShowAuth={paywallDisableClose ? () => { setShowPaywall(false); setPaywallDisableClose(false); navigate('/login'); } : undefined}
+        retrospective={!isPremium && trialRemaining === 0 && subStatus ? { mealCount: subStatus.analysisCount, daysUsed: FREE_TRIAL_DAYS } : undefined}
+        userObjective={savedGoals?.objective ?? undefined}
       />
 
       <AnimatePresence>

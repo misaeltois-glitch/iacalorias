@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 
 const router: IRouter = Router();
 
-const FREE_TRIAL_LIMIT = 3;
+const FREE_TRIAL_DAYS = 7;
 const LIMITED_PLAN_LIMIT = 20;
 
 router.get("/me", async (req: Request, res: Response) => {
@@ -40,8 +40,10 @@ router.get("/me", async (req: Request, res: Response) => {
   }
 
   const tier = sub.tier as "free" | "limited" | "unlimited";
-  const analysisLimit = tier === "limited" ? LIMITED_PLAN_LIMIT : tier === "unlimited" ? null : FREE_TRIAL_LIMIT;
-  const trialRemaining = tier === "free" ? Math.max(0, FREE_TRIAL_LIMIT - sub.analysisCount) : 0;
+  const analysisLimit = tier === "limited" ? LIMITED_PLAN_LIMIT : null;
+  const trialRemaining = tier === "free"
+    ? Math.max(0, FREE_TRIAL_DAYS - Math.floor((Date.now() - (sub.createdAt?.getTime() ?? Date.now())) / (24 * 60 * 60 * 1000)))
+    : 0;
 
   const data = GetMeResponse.parse({
     sessionId: sub.sessionId,

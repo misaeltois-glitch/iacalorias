@@ -12,6 +12,8 @@ interface PaywallModalProps {
   sessionId: string;
   disableClose?: boolean;
   onShowAuth?: () => void;
+  retrospective?: { mealCount: number; daysUsed: number };
+  userObjective?: string;
 }
 
 const accent = '#0D9F6E';
@@ -81,7 +83,13 @@ type BillingCycle = 'monthly' | 'annual';
 const ANNUAL_UNLIMITED = 179.90;
 const ANNUAL_LIMITED = 119.90;
 
-export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowAuth }: PaywallModalProps) {
+const OBJECTIVE_COPY: Record<string, { title: string; sub: string }> = {
+  fat_loss:     { title: 'Não perca seu progresso de emagrecimento', sub: 'Continue monitorando cada refeição para atingir seu peso ideal.' },
+  muscle_gain:  { title: 'Seus ganhos dependem de consistência', sub: 'Cada refeição registrada é um passo a mais para o shape que você quer.' },
+  maintenance:  { title: 'Continue mantendo sua saúde com IA', sub: 'Monitoramento diário é o que separa quem mantém de quem regride.' },
+};
+
+export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowAuth, retrospective, userObjective }: PaywallModalProps) {
   const [loadingPlan, setLoadingPlan] = useState<LoadingKey | null>(null);
   const [tab, setTab] = useState<'cards' | 'compare'>('cards');
   const [billing, setBilling] = useState<BillingCycle>('monthly');
@@ -167,6 +175,34 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
         {/* Scrollable body */}
         <div style={{ overflowY: 'auto', flex: 1, padding: '20px 20px 32px' }}>
 
+          {/* Retrospectiva — aparece quando o trial expira */}
+          {retrospective && retrospective.mealCount > 0 && (
+            <div style={{
+              borderRadius: 16, padding: '16px', marginBottom: 18,
+              background: 'linear-gradient(135deg, rgba(13,159,110,0.08), rgba(59,130,246,0.06))',
+              border: '1px solid rgba(13,159,110,0.2)',
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: accent, marginBottom: 10, letterSpacing: '0.4px' }}>
+                📊 SEU PROGRESSO EM {retrospective.daysUsed} DIAS
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                {[
+                  { emoji: '📸', value: String(retrospective.mealCount), label: 'refeições analisadas' },
+                  { emoji: '📅', value: `${retrospective.daysUsed}`, label: 'dias de uso' },
+                ].map(s => (
+                  <div key={s.label} style={{ background: 'var(--bg-2)', borderRadius: 12, padding: '10px 12px', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 18 }}>{s.emoji}</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1.2 }}>{s.value}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>
+                Não perca esse histórico — continue de onde parou com o plano pago.
+              </div>
+            </div>
+          )}
+
           {/* Hero */}
           <div style={{ textAlign: 'center', marginBottom: 22 }}>
             <div style={{
@@ -178,13 +214,17 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
               </svg>
-              {disableClose ? 'Análises gratuitas esgotadas' : 'Desbloqueie o IA Calorias completo'}
+              {disableClose ? 'Teste encerrado — continue seu progresso' : 'Desbloqueie o IA Calorias completo'}
             </div>
             <h2 style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.4px', color: 'var(--text-1)', marginBottom: 6, lineHeight: 1.3 }}>
-              Nutrição + Treino com IA,<br />tudo no mesmo app
+              {userObjective && OBJECTIVE_COPY[userObjective]
+                ? OBJECTIVE_COPY[userObjective].title
+                : 'Nutrição + Treino com IA,\ntudo no mesmo app'}
             </h2>
             <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.55 }}>
-              Análise de refeições, calorias e nutrientes detalhados, treinos personalizados e acompanhamento inteligente — do jeito que um nutricionista faria.
+              {userObjective && OBJECTIVE_COPY[userObjective]
+                ? OBJECTIVE_COPY[userObjective].sub
+                : 'Análise de refeições, calorias e nutrientes detalhados, treinos personalizados e acompanhamento inteligente — do jeito que um nutricionista faria.'}
             </p>
           </div>
 

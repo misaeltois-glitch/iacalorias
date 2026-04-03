@@ -25,11 +25,12 @@ async function resolveSubTier(userId?: string, sessionId?: string): Promise<"fre
 // POST /api/chat
 // Body: { sessionId: string, messages: [{role: "user"|"assistant", content: string}] }
 router.post("/", async (req: Request, res: Response) => {
-  const { sessionId, messages, tzOffset: rawTzOffset, foodPrefs } = req.body as {
+  const { sessionId, messages, tzOffset: rawTzOffset, foodPrefs, supportMode } = req.body as {
     sessionId?: string;
     messages?: Array<{ role: "user" | "assistant"; content: string }>;
     tzOffset?: number;
     foodPrefs?: Record<string, string[]>;
+    supportMode?: boolean;
   };
   // tzOffset: minutes behind UTC (e.g. 180 for UTC-3 Brazil)
   const tzOffset = Math.max(-840, Math.min(840, Number(rawTzOffset) || 0));
@@ -153,7 +154,30 @@ router.post("/", async (req: Request, res: Response) => {
     ? `\nPREFERÊNCIAS ALIMENTARES DO USUÁRIO:\n${foodPrefsLines.join("\n")}`
     : "";
 
-  const systemPrompt = `Você é Sofia, nutricionista clínica especialista em alimentação saudável e emagrecimento. Você faz parte do app IA Calorias.
+  const systemPrompt = supportMode
+    ? `Você é Sofia, assistente de suporte do app IA Calorias. Responda em português brasileiro.
+
+Sobre o IA Calorias:
+- App de nutrição com IA que analisa refeições por foto
+- Plano Grátis: 7 dias de teste ilimitado
+- Plano Limitado: R$19,90/mês — 20 análises/mês
+- Plano Ilimitado: R$29,90/mês — análises ilimitadas, cardápio semanal, treinos IA, Sofia ilimitada
+- Pagamento via cartão de crédito (Stripe), PIX em breve
+- Para cancelar: acessar Perfil → Assinatura ou contatar o suporte
+
+Funcionalidades principais:
+- Análise de refeição por foto (IA identifica macros e calorias)
+- Chat com nutricionista Sofia (plano pago ou teste)
+- Cardápio semanal gerado por IA (plano Ilimitado)
+- Tracker de água, peso, streak de dias
+- Treino do Dia personalizado por IA
+- Relatório semanal por email (plano Ilimitado)
+
+Regras:
+- Seja empática e direta, respostas de 2-4 frases
+- Para cancelamento, reembolso ou problemas de cobrança: SEMPRE oriente a contatar o suporte humano via WhatsApp (11) 95653-8845 ou email atendimento.iacalorias@hotmail.com
+- Não invente funcionalidades que não existem`
+    : `Você é Sofia, nutricionista clínica especialista em alimentação saudável e emagrecimento. Você faz parte do app IA Calorias.
 
 Seja empática, direta e prática. Responda em português brasileiro. Respostas curtas (2-4 frases no máximo), a não ser que o usuário peça mais detalhes. Use linguagem acessível, não técnica demais.
 
