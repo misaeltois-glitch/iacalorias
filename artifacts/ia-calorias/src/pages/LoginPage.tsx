@@ -18,7 +18,8 @@ const FEATURES = [
 
 const BASE = import.meta.env.BASE_URL ?? '/';
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)
+  || '210315717128-1htdab52e5eateekrbeieuvi6gtt53rg.apps.googleusercontent.com';
 
 function GoogleIcon() {
   return (
