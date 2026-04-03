@@ -121,7 +121,8 @@ router.get("/status", async (req: Request, res: Response) => {
 });
 
 router.post("/checkout", async (req: Request, res: Response) => {
-  const { sessionId, plan, paymentType = "subscription" } = req.body;
+  const { sessionId, plan, paymentType = "subscription",
+    utm_source, utm_medium, utm_campaign, utm_content, utm_term } = req.body;
   const userId = req.user?.userId;
 
   if (!sessionId || !plan) {
@@ -176,7 +177,15 @@ router.post("/checkout", async (req: Request, res: Response) => {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${domain}/?checkout_success=true&session_id=${sessionId}`,
       cancel_url: `${domain}/?checkout_cancelled=true`,
-      metadata: { sessionId, plan, paymentType, ...(userId ? { userId } : {}) },
+      metadata: {
+        sessionId, plan, paymentType,
+        ...(userId ? { userId } : {}),
+        ...(utm_source   ? { utm_source }   : {}),
+        ...(utm_medium   ? { utm_medium }   : {}),
+        ...(utm_campaign ? { utm_campaign } : {}),
+        ...(utm_content  ? { utm_content }  : {}),
+        ...(utm_term     ? { utm_term }     : {}),
+      },
     });
 
     const result = CreateCheckoutSessionResponse.parse({ url: session.url });

@@ -34,6 +34,7 @@ import { ReferralCard, applyPendingReferral, REFERRAL_CODE_KEY } from '@/compone
 import { MealReminders } from '@/components/MealReminders';
 import { useMealReminders } from '@/hooks/use-meal-reminders';
 import { RecipeSuggestor } from '@/components/RecipeSuggestor';
+import { trackEvent } from '@/lib/tracking';
 
 import {
   useAnalyzeFood,
@@ -303,6 +304,7 @@ export default function Home() {
     if (params.get('checkout_success') === 'true') {
       toast({ title: "Assinatura confirmada!", description: "Seu plano foi ativado. Aproveite!" });
       window.history.replaceState({}, document.title, window.location.pathname);
+      trackEvent('Purchase', { content_name: 'subscription' });
       refetchStatus();
     }
     const refCode = params.get('ref');

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
+import { getStoredUTMs, trackEvent } from '@/lib/tracking';
 
 const PENDING_PLAN_KEY = 'ia-calorias-pending-plan';
 const PENDING_PAYMENT_TYPE_KEY = 'ia-calorias-pending-payment-type';
@@ -98,10 +99,13 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
       return;
     }
     setLoadingPlan(key);
+    const utms = getStoredUTMs();
+    const price = plan === 'unlimited' ? (billing === 'annual' ? 179.90 : 29.90) : (billing === 'annual' ? 119.90 : 19.90);
+    trackEvent('InitiateCheckout', { value: price, content_name: `${plan}_${paymentType}` });
     fetch('/api/subscription/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('ia-calorias-auth-token') ?? ''}` },
-      body: JSON.stringify({ sessionId, plan, paymentType }),
+      body: JSON.stringify({ sessionId, plan, paymentType, ...utms }),
     })
       .then(r => r.json())
       .then(data => {

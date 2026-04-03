@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { Eye, EyeOff, ArrowLeft, CheckCircle2, Leaf, Dumbbell, BarChart2, Zap } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useSession } from '@/hooks/use-session';
+import { trackEvent } from '@/lib/tracking';
 
 type Tab = 'login' | 'register' | 'forgot';
 
@@ -64,6 +65,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await register(email, password, sessionId);
+      trackEvent('CompleteRegistration');
       navigate('/');
     } catch (err: any) {
       setError(err.message || 'Erro ao criar conta.');
