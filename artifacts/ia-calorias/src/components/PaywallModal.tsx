@@ -557,6 +557,10 @@ export function PaywallModal({ isOpen, onClose, sessionId, disableClose, onShowA
               </div>
             ))}
           </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 12 }}>
+            <a href="/termos" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--text-3)', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>Termos de Uso</a>
+            <a href="/privacidade" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--text-3)', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>Política de Privacidade</a>
+          </div>
         </div>
       </div>
     </div>

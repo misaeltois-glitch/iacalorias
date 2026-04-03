@@ -48,7 +48,7 @@ export default function PrivacyPage() {
           },
           {
             title: '4. Compartilhamento com Terceiros',
-            body: 'Compartilhamos dados apenas com: (a) OpenAI — imagens de refeições para processamento via GPT-4o Vision, sujeitas à política de privacidade da OpenAI; (b) Stripe — dados de pagamento, sujeitos à política do Stripe; (c) provedores de hospedagem (Replit). Não vendemos seus dados pessoais a terceiros.',
+            body: 'Compartilhamos dados apenas com: (a) OpenAI — imagens de refeições para processamento via GPT-4o Vision, sujeitas à política de privacidade da OpenAI; (b) Stripe — dados de pagamento, sujeitos à política do Stripe; (c) Railway — provedor de hospedagem da infraestrutura; (d) Google Analytics (GA4) — dados de uso anônimos para análise de desempenho do app, sem identificação pessoal. Não vendemos seus dados pessoais a terceiros.',
           },
           {
             title: '5. Retenção de Dados',
@@ -64,7 +64,7 @@ export default function PrivacyPage() {
           },
           {
             title: '8. Cookies e Armazenamento Local',
-            body: 'Utilizamos localStorage no seu navegador para armazenar preferências de sessão, configurações do app e histórico de uso offline. Não utilizamos cookies de rastreamento ou publicidade.',
+            body: 'Utilizamos localStorage no seu navegador para armazenar preferências de sessão, configurações do app e histórico de uso offline. Utilizamos o Google Analytics (GA4) para medir o uso do serviço de forma anônima — nenhum dado pessoal identificável é enviado ao Google. Não utilizamos cookies de publicidade comportamental.',
           },
           {
             title: '9. Menores de Idade',
@@ -72,7 +72,7 @@ export default function PrivacyPage() {
           },
           {
             title: '10. Contato e DPO',
-            body: 'Para questões sobre privacidade ou exercício de direitos LGPD, entre em contato: privacidade@iacalorias.com.br\n\nResponderemos em até 15 dias úteis.',
+            body: 'Para questões sobre privacidade ou exercício de direitos LGPD, entre em contato:\n\nE-mail: atendimento.iacalorias@hotmail.com\nWhatsApp: (11) 95653-8845\n\nResponderemos em até 15 dias úteis.',
           },
         ].map(({ title, body }) => (
           <div key={title} style={{ marginBottom: 28 }}>

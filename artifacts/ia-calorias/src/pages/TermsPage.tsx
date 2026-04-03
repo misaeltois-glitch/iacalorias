@@ -68,7 +68,7 @@ export default function TermsPage() {
           },
           {
             title: '9. Contato',
-            body: 'Para dúvidas sobre estes Termos, entre em contato pelo e-mail: suporte@iacalorias.com.br',
+            body: 'Para dúvidas sobre estes Termos, entre em contato pelo e-mail: atendimento.iacalorias@hotmail.com ou pelo WhatsApp: (11) 95653-8845.',
           },
         ].map(({ title, body }) => (
           <div key={title} style={{ marginBottom: 28 }}>
