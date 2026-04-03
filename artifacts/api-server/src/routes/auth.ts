@@ -161,6 +161,62 @@ router.post("/reset-password", async (req: Request, res: Response) => {
   res.json({ message: "Senha alterada com sucesso. Faça login com sua nova senha." });
 });
 
+// ─── POST /api/auth/google-oauth ─────────────────────────────────────────────
+router.post("/google-oauth", async (req: Request, res: Response) => {
+  const { credential, sessionId } = req.body as { credential?: string; sessionId?: string };
+
+  if (!credential) {
+    res.status(400).json({ error: "bad_request", message: "Google credential é obrigatório." });
+    return;
+  }
+
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    res.status(503).json({ error: "not_configured", message: "Google OAuth não configurado." });
+    return;
+  }
+
+  try {
+    const { OAuth2Client } = await import("google-auth-library");
+    const client = new OAuth2Client(clientId);
+    const ticket = await client.verifyIdToken({ idToken: credential, audience: clientId });
+    const payload = ticket.getPayload();
+
+    if (!payload?.email) {
+      res.status(400).json({ error: "invalid_credential", message: "Token Google inválido." });
+      return;
+    }
+
+    const email = payload.email.toLowerCase();
+    const name = payload.name ?? payload.given_name ?? undefined;
+    const avatarUrl = payload.picture ?? undefined;
+
+    let user = await db.query.usersTable.findFirst({ where: eq(usersTable.email, email) });
+
+    if (!user) {
+      const userId = randomUUID();
+      // OAuth users don't have a password — store a non-reversible hash
+      const fakeHash = await bcrypt.hash(randomBytes(32).toString("hex"), SALT_ROUNDS);
+      await db.insert(usersTable).values({ id: userId, email, passwordHash: fakeHash, name, avatarUrl });
+      user = await db.query.usersTable.findFirst({ where: eq(usersTable.id, userId) });
+      if (sessionId && user) await migrateAnonymousData(sessionId, userId);
+    } else {
+      // Update name/avatar only if not set yet
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      if (!user.name && name) updates.name = name;
+      if (!user.avatarUrl && avatarUrl) updates.avatarUrl = avatarUrl;
+      await db.update(usersTable).set(updates).where(eq(usersTable.id, user.id));
+      if (sessionId) await migrateAnonymousData(sessionId, user.id);
+    }
+
+    const token = signToken({ userId: user!.id, email: user!.email });
+    res.json({ token, user: { id: user!.id, email: user!.email } });
+  } catch (err: any) {
+    req.log.error({ err }, "Google OAuth error");
+    res.status(401).json({ error: "invalid_credential", message: "Falha ao verificar token Google. Tente novamente." });
+  }
+});
+
 // ─── POST /api/auth/logout ────────────────────────────────────────────────────
 router.post("/logout", (_req: Request, res: Response) => {
   // JWT is stateless — client deletes the token
