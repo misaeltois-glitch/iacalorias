@@ -236,16 +236,9 @@ export default function Home() {
   const trialRemaining = subStatus?.trialRemaining ?? trialDaysRemaining;
   const daysElapsed = FREE_TRIAL_DAYS - trialRemaining;
 
-  const workoutTrialDaysRemaining = (() => {
-    if (isPremium) return null;
-    const ts = localStorage.getItem(WORKOUT_TRIAL_START_KEY);
-    if (!ts) return FREE_TRIAL_DAYS;
-    const elapsed = Date.now() - parseInt(ts, 10);
-    const daysElapsed = Math.floor(elapsed / (24 * 60 * 60 * 1000));
-    return Math.max(0, FREE_TRIAL_DAYS - daysElapsed);
-  })();
+  const workoutTrialDaysRemaining = isPremium ? null : trialRemaining;
 
-  const isWorkoutFreeAccessActive = isPremium || (workoutTrialDaysRemaining !== null && workoutTrialDaysRemaining > 0);
+  const isWorkoutFreeAccessActive = isPremium || trialRemaining > 0;
 
   const refreshSummary = useCallback(async (p?: Period) => {
     if (!sessionId) return;
