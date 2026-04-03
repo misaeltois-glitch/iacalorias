@@ -1,11 +1,32 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCcw, Sparkles, Share2, Pencil, Check, X } from 'lucide-react';
+import { RotateCcw, Sparkles, Share2, Pencil, Check, X, Loader2 } from 'lucide-react';
 import type { AnalysisResult } from '@workspace/api-client-react/src/generated/api.schemas';
 import { shareResult } from '@/lib/share-card';
 
 const BASE = import.meta.env.BASE_URL ?? '/';
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
+
+const MEAL_TYPES = [
+  { key: 'breakfast',       label: '☀️ Café da manhã' },
+  { key: 'morning_snack',   label: '🍎 Lanche manhã' },
+  { key: 'lunch',           label: '🍽️ Almoço' },
+  { key: 'afternoon_snack', label: '🥤 Lanche tarde' },
+  { key: 'dinner',          label: '🌙 Jantar' },
+  { key: 'other',           label: '➕ Outro' },
+] as const;
+
+const SENTIMENT_CONFIG = {
+  positive: { emoji: '✅', color: '#0D9F6E', bg: 'rgba(13,159,110,0.08)', border: 'rgba(13,159,110,0.22)', label: 'ÓTIMA ESCOLHA' },
+  neutral:  { emoji: '💡', color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.22)', label: 'PODE MELHORAR' },
+  negative: { emoji: '⚠️', color: '#EF4444', bg: 'rgba(239,68,68,0.08)',  border: 'rgba(239,68,68,0.22)',  label: 'ATENÇÃO' },
+} as const;
+
+interface MealFeedback {
+  sentiment: 'positive' | 'neutral' | 'negative';
+  message: string;
+  tips: string[];
+}
 
 interface ResultCardProps {
   result: AnalysisResult;
@@ -59,6 +80,9 @@ export function ResultCard({ result, onReset, photoUrl, sessionId }: ResultCardP
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [mealType, setMealType] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<MealFeedback | null>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [editValues, setEditValues] = useState({
     dishName: result.dishName,
     calories: result.calories,
@@ -108,6 +132,32 @@ export function ResultCard({ result, onReset, photoUrl, sessionId }: ResultCardP
     }
   }, [result]);
 
+  const handleMealSelect = useCallback(async (key: string) => {
+    if (mealType === key) return; // no-op if same pill
+    setMealType(key);
+    setFeedback(null);
+    setFeedbackLoading(true);
+    try {
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      const r = await fetch(`${BASE}api/meal-feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ analysisId: liveResult.id, mealType: key, sessionId }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        setFeedback(data);
+      }
+    } catch {
+      // silently fail — not critical
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }, [liveResult.id, mealType, sessionId]);
+
   const macroValues = {
     protein: liveResult.macros.protein,
     carbs: liveResult.macros.carbs,
@@ -138,6 +188,7 @@ export function ResultCard({ result, onReset, photoUrl, sessionId }: ResultCardP
       animate="show"
       style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}
     >
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       {/* Hero Card */}
       <motion.div variants={item} style={{
         borderRadius: '24px',
@@ -351,6 +402,101 @@ export function ResultCard({ result, onReset, photoUrl, sessionId }: ResultCardP
           </div>
         </motion.div>
       )}
+
+      {/* Meal Type Selector */}
+      <motion.div variants={item} style={{
+        borderRadius: '18px',
+        background: 'var(--bg-2)',
+        border: '1px solid var(--border)',
+        padding: '16px',
+      }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.5px', marginBottom: '10px' }}>
+          🍽️ QUAL REFEIÇÃO É ESSA?
+        </div>
+        <div style={{
+          display: 'flex', gap: '7px',
+          overflowX: 'auto', paddingBottom: '2px',
+          scrollbarWidth: 'none',
+        }}>
+          {MEAL_TYPES.map(({ key, label }) => {
+            const selected = mealType === key;
+            return (
+              <button
+                key={key}
+                onClick={() => handleMealSelect(key)}
+                style={{
+                  padding: '7px 13px',
+                  borderRadius: '99px',
+                  border: selected ? '1.5px solid #0D9F6E' : '1px solid var(--border)',
+                  background: selected ? 'rgba(13,159,110,0.12)' : 'var(--bg-3)',
+                  color: selected ? '#0D9F6E' : 'var(--text-2)',
+                  fontSize: '12px', fontWeight: selected ? 700 : 500,
+                  cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </motion.div>
+
+      {/* Meal Feedback */}
+      <AnimatePresence>
+        {(feedbackLoading || feedback) && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+          >
+            {feedbackLoading ? (
+              <div style={{
+                padding: '16px',
+                borderRadius: '18px',
+                background: 'var(--bg-2)',
+                border: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', gap: '10px',
+              }}>
+                <Loader2 size={16} style={{ color: '#0D9F6E', animation: 'spin 1s linear infinite' }} />
+                <span style={{ fontSize: '13px', color: 'var(--text-2)' }}>Analisando para o seu objetivo…</span>
+              </div>
+            ) : feedback && (() => {
+              const cfg = SENTIMENT_CONFIG[feedback.sentiment] ?? SENTIMENT_CONFIG.neutral;
+              return (
+                <div style={{
+                  padding: '16px',
+                  borderRadius: '18px',
+                  background: cfg.bg,
+                  border: `1px solid ${cfg.border}`,
+                  display: 'flex', flexDirection: 'column', gap: '10px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '20px' }}>{cfg.emoji}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: cfg.color, letterSpacing: '0.4px' }}>
+                      {cfg.label}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '13px', color: 'var(--text-1)', lineHeight: 1.6, margin: 0, fontWeight: 500 }}>
+                    {feedback.message}
+                  </p>
+                  {feedback.tips.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '4px', borderTop: `1px solid ${cfg.border}` }}>
+                      {feedback.tips.map((tip, i) => (
+                        <div key={i} style={{ display: 'flex', gap: '7px', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '12px', color: cfg.color, flexShrink: 0, marginTop: '1px' }}>→</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.5 }}>{tip}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Footer */}
       <motion.div variants={item} style={{
