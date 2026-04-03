@@ -182,6 +182,9 @@ export default function Home() {
   const [showRecipeSuggestor, setShowRecipeSuggestor] = useState(false);
   const [showFoodPrefs, setShowFoodPrefs] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
+  const [showAITools, setShowAITools] = useState(() => {
+    try { return localStorage.getItem('iac-ai-tools-expanded') !== 'false'; } catch { return true; }
+  });
   const celebrationQueue = useRef<Array<'calories' | 'meals'>>([]);
   const celebrationInflight = useRef<Set<'calories' | 'meals'>>(new Set());
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -1150,163 +1153,129 @@ export default function Home() {
               {/* Referral Card — authenticated users only */}
               {isAuthenticated && <ReferralCard />}
 
-              {/* Nutritionist Chat CTA */}
-              <button
-                onClick={() => setShowChat(true)}
-                style={{
-                  width: '100%', padding: '14px 18px', borderRadius: '18px',
-                  background: 'var(--bg-2)', border: '1px solid var(--border)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-3)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-2)')}
-              >
-                <div style={{
-                  width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-                  background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '22px',
-                  boxShadow: '0 2px 10px rgba(13,159,110,0.25)',
-                }}>
-                  🩺
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '3px' }}>
-                    Sofia — Nutricionista IA
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
-                    Tire dúvidas sobre sua alimentação de hoje
-                  </div>
-                </div>
-                <div style={{
-                  padding: '4px 10px', borderRadius: '99px',
-                  background: isPremium ? 'rgba(13,159,110,0.1)' : 'rgba(13,159,110,0.12)',
-                  border: '1px solid rgba(13,159,110,0.2)',
-                  fontSize: '11px', fontWeight: 700, color: '#0D9F6E', flexShrink: 0,
-                }}>
-                  {isPremium ? 'Ilimitado' : '🎁 Grátis no teste'}
-                </div>
-              </button>
+              {/* Ferramentas IA — bloco recolhível */}
+              <div style={{ borderRadius: '18px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                {/* Header toggle */}
+                <button
+                  onClick={() => {
+                    const next = !showAITools;
+                    setShowAITools(next);
+                    try { localStorage.setItem('iac-ai-tools-expanded', String(next)); } catch {}
+                  }}
+                  style={{
+                    width: '100%', padding: '13px 18px',
+                    background: 'var(--bg-2)', border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '10px', textAlign: 'left',
+                  }}
+                >
+                  <span style={{ fontSize: '16px' }}>🤖</span>
+                  <span style={{ flex: 1, fontSize: '14px', fontWeight: 700, color: 'var(--text-1)' }}>
+                    Ferramentas IA
+                  </span>
+                  <span style={{ display: 'flex', gap: '4px', marginRight: '8px' }}>
+                    {['🩺','🥗','🍳'].map(e => (
+                      <span key={e} style={{ fontSize: '13px', opacity: showAITools ? 0 : 0.6 }}>{e}</span>
+                    ))}
+                  </span>
+                  <motion.span
+                    animate={{ rotate: showAITools ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                    style={{ display: 'flex', color: 'var(--text-3)', fontSize: '16px', lineHeight: 1 }}
+                  >
+                    ▾
+                  </motion.span>
+                </button>
 
-              {/* Meal Plan CTA */}
-              <button
-                onClick={() => {
-                  if (!isPremium) { setPaywallDisableClose(false); setShowPaywall(true); return; }
-                  setShowMealPlan(true);
-                }}
-                style={{
-                  width: '100%', padding: '14px 18px', borderRadius: '18px',
-                  background: 'var(--bg-2)', border: '1px solid var(--border)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-3)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-2)')}
-              >
-                <div style={{
-                  width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-                  background: 'linear-gradient(135deg, #F59E0B, #EF4444)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '22px',
-                  boxShadow: '0 2px 10px rgba(245,158,11,0.25)',
-                }}>
-                  🥗
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '3px' }}>
-                    Cardápio semanal com IA
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
-                    7 dias de refeições baseadas nas suas metas
-                  </div>
-                </div>
-                <div style={{
-                  padding: '4px 10px', borderRadius: '99px',
-                  background: isPremium ? 'rgba(245,158,11,0.1)' : 'rgba(139,92,246,0.1)',
-                  border: `1px solid ${isPremium ? 'rgba(245,158,11,0.2)' : 'rgba(139,92,246,0.2)'}`,
-                  fontSize: '11px', fontWeight: 700,
-                  color: isPremium ? '#F59E0B' : '#8B5CF6', flexShrink: 0,
-                }}>
-                  {isPremium ? 'Gerar' : '👑 Premium'}
-                </div>
-              </button>
+                {/* Conteúdo animado */}
+                <AnimatePresence initial={false}>
+                  {showAITools && (
+                    <motion.div
+                      key="ai-tools"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: 'easeInOut' }}
+                      style={{ overflow: 'hidden' }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)' }}>
 
-              {/* Meal Food Prefs CTA */}
-              <button
-                onClick={() => setShowFoodPrefs(true)}
-                style={{
-                  width: '100%', padding: '14px 18px', borderRadius: '18px',
-                  background: 'var(--bg-2)', border: '1px solid var(--border)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-3)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-2)')}
-              >
-                <div style={{
-                  width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-                  background: 'linear-gradient(135deg, #0D9F6E, #3B82F6)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '22px', boxShadow: '0 2px 10px rgba(13,159,110,0.25)',
-                }}>
-                  🥗
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '3px' }}>
-                    Personalizar meu cardápio
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
-                    Selecione os alimentos que você costuma comer
-                  </div>
-                </div>
-                <div style={{
-                  padding: '4px 10px', borderRadius: '99px',
-                  background: 'rgba(13,159,110,0.1)', border: '1px solid rgba(13,159,110,0.2)',
-                  fontSize: '11px', fontWeight: 700, color: '#0D9F6E', flexShrink: 0,
-                }}>
-                  Grátis
-                </div>
-              </button>
+                        {/* Sofia */}
+                        <button
+                          onClick={() => setShowChat(true)}
+                          style={{
+                            width: '100%', padding: '14px 18px',
+                            background: 'var(--bg-2)', border: 'none',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
+                          }}
+                        >
+                          <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #0D9F6E, #057A55)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🩺</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>Sofia — Nutricionista IA</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>Tire dúvidas sobre sua alimentação</div>
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#0D9F6E', padding: '3px 9px', borderRadius: 99, background: 'rgba(13,159,110,0.1)', border: '1px solid rgba(13,159,110,0.2)', flexShrink: 0 }}>
+                            {isPremium ? 'Ilimitado' : '🎁 Grátis'}
+                          </span>
+                        </button>
 
-              {/* Recipe Suggestor CTA */}
-              <button
-                onClick={() => setShowRecipeSuggestor(true)}
-                style={{
-                  width: '100%', padding: '14px 18px', borderRadius: '18px',
-                  background: 'var(--bg-2)', border: '1px solid var(--border)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-3)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-2)')}
-              >
-                <div style={{
-                  width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-                  background: 'linear-gradient(135deg, #F59E0B, #EF4444)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '22px',
-                  boxShadow: '0 2px 10px rgba(245,158,11,0.25)',
-                }}>
-                  🍳
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '3px' }}>
-                    Receita com o que tenho
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
-                    Informe os ingredientes e a IA cria uma receita
-                  </div>
-                </div>
-                <div style={{
-                  padding: '4px 10px', borderRadius: '99px',
-                  background: 'rgba(245,158,11,0.1)',
-                  border: '1px solid rgba(245,158,11,0.2)',
-                  fontSize: '11px', fontWeight: 700, color: '#F59E0B', flexShrink: 0,
-                }}>
-                  Grátis
-                </div>
-              </button>
+                        {/* Cardápio semanal */}
+                        <button
+                          onClick={() => { if (!isPremium) { setPaywallDisableClose(false); setShowPaywall(true); return; } setShowMealPlan(true); }}
+                          style={{
+                            width: '100%', padding: '14px 18px',
+                            background: 'var(--bg-2)', border: 'none',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
+                          }}
+                        >
+                          <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #F59E0B, #EF4444)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🥗</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>Cardápio semanal com IA</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>7 dias de refeições baseadas nas suas metas</div>
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 9px', borderRadius: 99, flexShrink: 0, background: isPremium ? 'rgba(245,158,11,0.1)' : 'rgba(139,92,246,0.1)', border: `1px solid ${isPremium ? 'rgba(245,158,11,0.2)' : 'rgba(139,92,246,0.2)'}`, color: isPremium ? '#F59E0B' : '#8B5CF6' }}>
+                            {isPremium ? 'Gerar' : '👑 Premium'}
+                          </span>
+                        </button>
+
+                        {/* Personalizar cardápio */}
+                        <button
+                          onClick={() => setShowFoodPrefs(true)}
+                          style={{
+                            width: '100%', padding: '14px 18px',
+                            background: 'var(--bg-2)', border: 'none',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
+                          }}
+                        >
+                          <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #0D9F6E, #3B82F6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🥗</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>Personalizar meu cardápio</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>Selecione os alimentos que você costuma comer</div>
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#0D9F6E', padding: '3px 9px', borderRadius: 99, background: 'rgba(13,159,110,0.1)', border: '1px solid rgba(13,159,110,0.2)', flexShrink: 0 }}>Grátis</span>
+                        </button>
+
+                        {/* Receita */}
+                        <button
+                          onClick={() => setShowRecipeSuggestor(true)}
+                          style={{
+                            width: '100%', padding: '14px 18px',
+                            background: 'var(--bg-2)', border: 'none',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
+                          }}
+                        >
+                          <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #F59E0B, #EF4444)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🍳</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>Receita com o que tenho</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>Informe os ingredientes e a IA cria uma receita</div>
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#F59E0B', padding: '3px 9px', borderRadius: 99, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', flexShrink: 0 }}>Grátis</span>
+                        </button>
+
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
               {/* Como funciona */}
               <div style={{ paddingTop: '24px', borderTop: '1px solid var(--border)' }}>
