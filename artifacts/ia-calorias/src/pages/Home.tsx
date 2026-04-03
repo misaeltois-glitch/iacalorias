@@ -706,7 +706,7 @@ export default function Home() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-            <div data-tour="usage-pill" style={{ display: 'flex', minWidth: 0, overflow: 'hidden' }}>{renderUsagePill()}</div>
+            <div data-tour="usage-pill" style={{ display: 'flex', flexShrink: 0 }}>{renderUsagePill()}</div>
 
             <button
               onClick={() => setShowAnalytics(true)}
