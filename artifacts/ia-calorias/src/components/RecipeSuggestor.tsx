@@ -1,6 +1,98 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, ChefHat, Loader2, RotateCcw } from 'lucide-react';
+import { X, ChefHat, Loader2, RotateCcw, ChevronDown } from 'lucide-react';
+
+interface FoodSubcategory {
+  name: string;
+  items: string[];
+}
+interface FoodCategory {
+  emoji: string;
+  name: string;
+  subcategories: FoodSubcategory[];
+}
+
+const FOOD_CATALOG: FoodCategory[] = [
+  {
+    emoji: '🥩', name: 'Carnes & Proteínas',
+    subcategories: [
+      { name: 'Frango', items: ['peito de frango', 'coxa de frango', 'sobrecoxa', 'frango inteiro', 'frango moído', 'fígado de frango'] },
+      { name: 'Bovina', items: ['patinho moído', 'acém', 'músculo', 'coxão mole', 'picanha', 'costela', 'contra-filé', 'alcatra', 'maminha'] },
+      { name: 'Suína', items: ['lombo suíno', 'pernil', 'costelinha suína', 'bacon', 'linguiça calabresa', 'linguiça toscana'] },
+      { name: 'Peixe & Frutos do Mar', items: ['atum em lata', 'sardinha em lata', 'tilápia', 'salmão', 'merluza', 'camarão', 'bacalhau'] },
+      { name: 'Ovos', items: ['ovo de galinha', 'ovo de codorna', 'clara de ovo'] },
+      { name: 'Frios & Embutidos', items: ['peito de peru', 'presunto', 'apresuntado', 'salsicha', 'mortadela'] },
+    ],
+  },
+  {
+    emoji: '🌾', name: 'Grãos & Carboidratos',
+    subcategories: [
+      { name: 'Arroz & Cereais', items: ['arroz branco', 'arroz integral', 'arroz parboilizado', 'arroz arbóreo', 'quinoa', 'aveia em flocos', 'granola', 'milho verde', 'cuscuz (milho)'] },
+      { name: 'Massas', items: ['macarrão espaguete', 'macarrão parafuso', 'macarrão penne', 'macarrão instantâneo', 'nhoque', 'lasanha'] },
+      { name: 'Pães & Farinhas', items: ['pão de forma', 'pão francês', 'pão integral', 'pão de queijo', 'tapioca', 'farinha de trigo', 'farinha de mandioca', 'farinha de aveia', 'farinha de arroz', 'amido de milho'] },
+      { name: 'Tubérculos', items: ['batata-doce', 'batata inglesa', 'mandioca (aipim)', 'inhame', 'cará', 'mandioquinha'] },
+    ],
+  },
+  {
+    emoji: '🫘', name: 'Leguminosas',
+    subcategories: [
+      { name: 'Feijões', items: ['feijão carioca', 'feijão preto', 'feijão branco', 'feijão-fradinho', 'feijão de corda'] },
+      { name: 'Outras', items: ['lentilha', 'grão-de-bico', 'ervilha seca', 'ervilha em lata', 'soja', 'edamame'] },
+    ],
+  },
+  {
+    emoji: '🥦', name: 'Vegetais',
+    subcategories: [
+      { name: 'Folhas', items: ['alface', 'rúcula', 'espinafre', 'couve', 'acelga', 'repolho', 'agrião', 'manjericão'] },
+      { name: 'Legumes', items: ['brócolis', 'couve-flor', 'chuchu', 'abobrinha', 'pepino', 'berinjela', 'pimentão', 'vagem', 'cenoura', 'beterraba', 'milho verde', 'abóbora', 'jiló'] },
+      { name: 'Temperos frescos', items: ['tomate', 'cebola', 'alho', 'gengibre', 'salsinha', 'cebolinha', 'coentro', 'alho-poró'] },
+    ],
+  },
+  {
+    emoji: '🍎', name: 'Frutas',
+    subcategories: [
+      { name: 'Comuns', items: ['banana', 'maçã', 'laranja', 'mamão', 'melancia', 'melão', 'manga', 'uva', 'pera', 'pêssego'] },
+      { name: 'Tropicais', items: ['abacaxi', 'goiaba', 'maracujá', 'caju', 'acerola', 'abacate', 'coco', 'jaca'] },
+      { name: 'Vermelhas & Berries', items: ['morango', 'amora', 'framboesa', 'mirtilo (blueberry)', 'açaí'] },
+    ],
+  },
+  {
+    emoji: '🥛', name: 'Laticínios',
+    subcategories: [
+      { name: 'Leites', items: ['leite integral', 'leite desnatado', 'leite semidesnatado', 'leite condensado', 'creme de leite'] },
+      { name: 'Queijos', items: ['queijo mussarela', 'queijo prato', 'queijo minas', 'queijo coalho', 'queijo cottage', 'ricota', 'requeijão', 'cream cheese'] },
+      { name: 'Iogurtes', items: ['iogurte natural', 'iogurte grego', 'iogurte desnatado', 'coalhada'] },
+      { name: 'Outros', items: ['manteiga', 'margarina', 'nata', 'ghee'] },
+    ],
+  },
+  {
+    emoji: '🥜', name: 'Oleaginosas & Sementes',
+    subcategories: [
+      { name: 'Oleaginosas', items: ['amendoim', 'castanha-do-pará', 'castanha de caju', 'amêndoas', 'nozes', 'avelã', 'pistache'] },
+      { name: 'Sementes & Pastas', items: ['chia', 'linhaça', 'gergelim', 'semente de abóbora', 'pasta de amendoim', 'tahine'] },
+    ],
+  },
+  {
+    emoji: '🛢️', name: 'Óleos & Gorduras',
+    subcategories: [
+      { name: 'Óleos', items: ['azeite de oliva', 'óleo de coco', 'óleo de milho', 'óleo de girassol', 'óleo de soja'] },
+    ],
+  },
+  {
+    emoji: '🧂', name: 'Temperos & Molhos',
+    subcategories: [
+      { name: 'Secos', items: ['sal', 'pimenta-do-reino', 'cúrcuma', 'páprica', 'cominho', 'orégano', 'curry', 'canela', 'noz-moscada'] },
+      { name: 'Molhos', items: ['molho de tomate', 'molho shoyu', 'molho inglês', 'vinagre', 'limão', 'mostarda', 'ketchup', 'molho tabasco'] },
+    ],
+  },
+  {
+    emoji: '🍫', name: 'Outros',
+    subcategories: [
+      { name: 'Doces & Panificação', items: ['açúcar', 'mel', 'cacau em pó', 'chocolate meio amargo', 'achocolatado', 'geleia', 'fermento biológico', 'fermento químico', 'extrato de baunilha'] },
+      { name: 'Suplementos', items: ['whey protein', 'proteína vegana', 'albumina', 'colágeno', 'creatina'] },
+    ],
+  },
+];
 
 const BASE = import.meta.env.BASE_URL ?? '/';
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
@@ -35,6 +127,8 @@ export function RecipeSuggestor({ onClose, sessionId }: RecipeSuggestorProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
+  const [openSubcategory, setOpenSubcategory] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const addTag = (raw: string) => {
@@ -222,31 +316,114 @@ export function RecipeSuggestor({ onClose, sessionId }: RecipeSuggestorProps) {
                   />
                 </div>
 
-                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 16, lineHeight: 1.5 }}>
-                  Pressione <strong>Enter</strong> ou <strong>vírgula</strong> para adicionar ingrediente. A IA usará o que você tiver em casa.
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 12, lineHeight: 1.5 }}>
+                  Pressione <strong>Enter</strong> ou <strong>vírgula</strong> para digitar, ou selecione por categoria abaixo.
                 </div>
 
-                {/* Quick suggestions */}
+                {/* Categorized food browser */}
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.4px', marginBottom: 8 }}>
-                    SUGESTÕES RÁPIDAS
+                    SELECIONAR POR CATEGORIA
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {['frango', 'ovo', 'arroz', 'feijão', 'batata-doce', 'brócolis', 'atum', 'aveia', 'banana', 'espinafre'].map(s => (
-                      <button
-                        key={s}
-                        onClick={() => { if (!tags.includes(s)) setTags(prev => [...prev, s]); }}
-                        style={{
-                          padding: '5px 12px', borderRadius: 99,
-                          background: tags.includes(s) ? 'rgba(245,158,11,0.15)' : 'var(--bg-2)',
-                          border: `1px solid ${tags.includes(s) ? 'rgba(245,158,11,0.4)' : 'var(--border)'}`,
-                          fontSize: 12, color: tags.includes(s) ? '#D97706' : 'var(--text-2)',
-                          cursor: 'pointer', fontWeight: 500, transition: 'all 0.15s',
-                        }}
-                      >
-                        {tags.includes(s) ? '✓ ' : '+ '}{s}
-                      </button>
-                    ))}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {FOOD_CATALOG.map(cat => {
+                      const isOpen = openCategory === cat.name;
+                      return (
+                        <div key={cat.name} style={{ borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
+                          {/* Category header */}
+                          <button
+                            onClick={() => {
+                              setOpenCategory(isOpen ? null : cat.name);
+                              setOpenSubcategory(null);
+                            }}
+                            style={{
+                              width: '100%', padding: '10px 12px',
+                              background: isOpen ? 'rgba(245,158,11,0.07)' : 'var(--bg-2)',
+                              border: 'none', cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left',
+                            }}
+                          >
+                            <span style={{ fontSize: 16 }}>{cat.emoji}</span>
+                            <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{cat.name}</span>
+                            <motion.span
+                              animate={{ rotate: isOpen ? 180 : 0 }}
+                              transition={{ duration: 0.2 }}
+                              style={{ display: 'flex', color: 'var(--text-3)' }}
+                            >
+                              <ChevronDown size={14} />
+                            </motion.span>
+                          </button>
+
+                          {/* Subcategories */}
+                          <AnimatePresence initial={false}>
+                            {isOpen && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                style={{ overflow: 'hidden', background: 'var(--bg)' }}
+                              >
+                                <div style={{ padding: '8px 10px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                  {cat.subcategories.map(sub => {
+                                    const subOpen = openSubcategory === `${cat.name}/${sub.name}`;
+                                    return (
+                                      <div key={sub.name}>
+                                        {/* Subcategory toggle */}
+                                        <button
+                                          onClick={() => setOpenSubcategory(subOpen ? null : `${cat.name}/${sub.name}`)}
+                                          style={{
+                                            background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0',
+                                            fontSize: 11, fontWeight: 700, color: subOpen ? '#D97706' : 'var(--text-2)',
+                                            letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: 4,
+                                            textTransform: 'uppercase',
+                                          }}
+                                        >
+                                          <motion.span animate={{ rotate: subOpen ? 90 : 0 }} transition={{ duration: 0.15 }} style={{ display: 'flex' }}>
+                                            <ChevronDown size={11} style={{ transform: 'rotate(-90deg)' }} />
+                                          </motion.span>
+                                          {sub.name}
+                                        </button>
+                                        <AnimatePresence initial={false}>
+                                          {subOpen && (
+                                            <motion.div
+                                              initial={{ height: 0, opacity: 0 }}
+                                              animate={{ height: 'auto', opacity: 1 }}
+                                              exit={{ height: 0, opacity: 0 }}
+                                              transition={{ duration: 0.15 }}
+                                              style={{ overflow: 'hidden' }}
+                                            >
+                                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, paddingTop: 6 }}>
+                                                {sub.items.map(item => (
+                                                  <button
+                                                    key={item}
+                                                    onClick={() => { if (!tags.includes(item)) setTags(prev => [...prev, item]); }}
+                                                    style={{
+                                                      padding: '4px 10px', borderRadius: 99,
+                                                      background: tags.includes(item) ? 'rgba(245,158,11,0.15)' : 'var(--bg-2)',
+                                                      border: `1px solid ${tags.includes(item) ? 'rgba(245,158,11,0.4)' : 'var(--border)'}`,
+                                                      fontSize: 12, color: tags.includes(item) ? '#D97706' : 'var(--text-2)',
+                                                      cursor: tags.includes(item) ? 'default' : 'pointer',
+                                                      fontWeight: 500, transition: 'all 0.12s',
+                                                    }}
+                                                  >
+                                                    {tags.includes(item) ? '✓ ' : '+ '}{item}
+                                                  </button>
+                                                ))}
+                                              </div>
+                                            </motion.div>
+                                          )}
+                                        </AnimatePresence>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
