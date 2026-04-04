@@ -16,6 +16,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   login: (email: string, password: string, sessionId: string) => Promise<void>;
   register: (email: string, password: string, sessionId: string) => Promise<void>;
+  loginWithData: (token: string, user: AuthUser) => void;
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<string>;
   resetPassword: (token: string, password: string) => Promise<string>;
@@ -72,6 +73,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuth(data.token, data.user);
   }, [setAuth]);
 
+  const loginWithData = useCallback((t: string, u: AuthUser) => {
+    setAuth(t, u);
+  }, [setAuth]);
+
   const login = useCallback(async (email: string, password: string, sessionId: string) => {
     const res = await fetch(apiUrl('login'), {
       method: 'POST',
@@ -114,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       user, token,
       isAuthenticated: !!user,
-      login, register, logout,
+      login, register, loginWithData, logout,
       forgotPassword, resetPassword,
       updateLocalUser,
     }}>

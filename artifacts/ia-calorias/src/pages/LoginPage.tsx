@@ -17,14 +17,13 @@ const FEATURES = [
 ];
 
 const BASE = import.meta.env.BASE_URL ?? '/';
-const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)
   || '210315717128-1htdab52e5eateekrbeieuvi6gtt53rg.apps.googleusercontent.com';
 
 
 export default function LoginPage() {
   const [, navigate] = useLocation();
-  const { login, register, forgotPassword, isAuthenticated } = useAuth();
+  const { login, register, forgotPassword, loginWithData, isAuthenticated } = useAuth();
   const { sessionId } = useSession();
 
   const [tab, setTab] = useState<Tab>('login');
@@ -61,7 +60,7 @@ export default function LoginPage() {
             });
             const data = await r.json();
             if (!r.ok) throw new Error(data.message ?? 'Erro ao autenticar com Google.');
-            localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+            loginWithData(data.token, data.user);
             trackEvent('CompleteRegistration');
             navigate('/');
           } catch (err: any) {
