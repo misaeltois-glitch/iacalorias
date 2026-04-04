@@ -48,6 +48,7 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loginFailCount, setLoginFailCount] = useState(0);
 
   // Carrega o script do Google Identity Services
   useEffect(() => {
@@ -117,9 +118,19 @@ export default function LoginPage() {
     setError(''); setLoading(true);
     try {
       await login(email, password, sessionId);
+      setLoginFailCount(0);
       navigate('/');
     } catch (err: any) {
-      setError(err.message || 'Erro ao fazer login.');
+      const next = loginFailCount + 1;
+      setLoginFailCount(next);
+      if (next >= 5) {
+        setLoginFailCount(0);
+        reset('forgot');
+        setError('Muitas tentativas incorretas. Redefina sua senha abaixo.');
+      } else {
+        const remaining = 5 - next;
+        setError(`${err.message || 'Senha incorreta.'} ${remaining} tentativa${remaining > 1 ? 's' : ''} restante${remaining > 1 ? 's' : ''}.`);
+      }
     } finally { setLoading(false); }
   };
 
