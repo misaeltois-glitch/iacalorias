@@ -1,23 +1,54 @@
 import { useEffect, useRef } from 'react';
+import { FOOD_PREFS_KEY, type MealFoodPrefs } from '@/components/MealFoodPrefsModal';
 
 export const REMINDERS_KEY = 'ia-calorias-reminders';
 const NOTIFIED_KEY = 'ia-calorias-reminder-last-notified';
 
-export interface ReminderSettings {
+export type MealSlotKey = 'breakfast' | 'morningSnack' | 'lunch' | 'afternoonSnack' | 'dinner';
+
+export interface MealSlot {
+  key: MealSlotKey;
+  label: string;
+  emoji: string;
+  defaultTime: string;
+  time: string;
   enabled: boolean;
-  times: string[]; // e.g. ["08:00", "12:30", "19:00"]
 }
+
+export interface ReminderSettings {
+  globalEnabled: boolean;
+  slots: MealSlot[];
+}
+
+export const DEFAULT_SLOTS: MealSlot[] = [
+  { key: 'breakfast',     label: 'Café da manhã',    emoji: '☀️',  defaultTime: '07:30', time: '07:30', enabled: true  },
+  { key: 'morningSnack',  label: 'Lanche da manhã',  emoji: '🍎',  defaultTime: '10:00', time: '10:00', enabled: false },
+  { key: 'lunch',         label: 'Almoço',            emoji: '🍽️', defaultTime: '12:30', time: '12:30', enabled: true  },
+  { key: 'afternoonSnack',label: 'Lanche da tarde',  emoji: '🥤',  defaultTime: '15:30', time: '15:30', enabled: false },
+  { key: 'dinner',        label: 'Jantar',            emoji: '🌙',  defaultTime: '19:30', time: '19:30', enabled: true  },
+];
 
 export function loadReminders(): ReminderSettings {
   try {
     const raw = localStorage.getItem(REMINDERS_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // migrate old format
+      if (parsed.slots) return parsed as ReminderSettings;
+    }
   } catch {}
-  return { enabled: false, times: ['08:00', '12:00', '19:00'] };
+  return { globalEnabled: false, slots: DEFAULT_SLOTS.map(s => ({ ...s })) };
 }
 
 export function saveReminders(s: ReminderSettings) {
   localStorage.setItem(REMINDERS_KEY, JSON.stringify(s));
+}
+
+function loadFoodPrefs(): MealFoodPrefs | null {
+  try {
+    const raw = localStorage.getItem(FOOD_PREFS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
 }
 
 function pad(n: number) { return n.toString().padStart(2, '0'); }
@@ -42,27 +73,26 @@ function markNotified(key: string) {
   } catch {}
 }
 
-function showNotification(time: string) {
-  const mealNames: Record<string, string> = {
-    '06:00': 'café da manhã', '07:00': 'café da manhã', '08:00': 'café da manhã',
-    '09:00': 'lanche da manhã', '10:00': 'lanche da manhã',
-    '11:00': 'almoço', '12:00': 'almoço', '13:00': 'almoço',
-    '14:00': 'lanche da tarde', '15:00': 'lanche da tarde', '16:00': 'lanche da tarde',
-    '18:00': 'jantar', '19:00': 'jantar', '20:00': 'jantar',
-    '21:00': 'ceia',
-  };
-  const mealName = mealNames[time] ?? 'refeição';
-  const body = `Hora de registrar seu ${mealName}! 📸`;
+function showNotification(slot: MealSlot) {
+  const prefs = loadFoodPrefs();
+  const foods: string[] = prefs?.[slot.key as keyof MealFoodPrefs] ?? [];
+  const foodHint = foods.length > 0
+    ? `Sugestão: ${foods.slice(0, 2).join(', ')} 😋`
+    : `Hora de registrar seu ${slot.label.toLowerCase()}! 📸`;
+
+  const body = foodHint;
 
   if (navigator.serviceWorker?.controller) {
     navigator.serviceWorker.controller.postMessage({
       type: 'SHOW_NOTIFICATION',
-      title: 'IA Calorias',
+      title: `${slot.emoji} ${slot.label} — IA Calorias`,
       body,
-      tag: `meal-${time}`,
+      tag: `meal-${slot.key}`,
     });
   } else {
-    new Notification('IA Calorias', { body, icon: '/icon-512.png', tag: `meal-${time}` });
+    new Notification(`${slot.emoji} ${slot.label} — IA Calorias`, {
+      body, icon: '/icon-512.png', tag: `meal-${slot.key}`,
+    });
   }
 }
 
@@ -72,28 +102,28 @@ function showNotification(time: string) {
  */
 function checkReminders(windowMinutes = 1) {
   const settings = loadReminders();
-  if (!settings.enabled) return;
+  if (!settings.globalEnabled) return;
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
   const now = new Date();
   const today = todayDateStr();
 
-  for (const time of settings.times) {
-    const [h, m] = time.split(':').map(Number);
+  for (const slot of settings.slots) {
+    if (!slot.enabled) continue;
+    const [h, m] = slot.time.split(':').map(Number);
     const reminderDate = new Date(now);
     reminderDate.setHours(h, m, 0, 0);
 
     const diffMs = now.getTime() - reminderDate.getTime();
     const diffMin = diffMs / 60000;
 
-    // Dentro da janela: entre 0 e windowMinutes minutos atrás
     if (diffMin < 0 || diffMin >= windowMinutes) continue;
 
-    const notifiedKey = `${today}-${time}`;
+    const notifiedKey = `${today}-${slot.key}-${slot.time}`;
     if (alreadyNotified(notifiedKey)) continue;
 
     markNotified(notifiedKey);
-    showNotification(time);
+    showNotification(slot);
   }
 }
 

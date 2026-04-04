@@ -1,56 +1,59 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, BellOff, Plus, X } from 'lucide-react';
-import { loadReminders, saveReminders, type ReminderSettings } from '@/hooks/use-meal-reminders';
+import { Bell, BellOff } from 'lucide-react';
+import { loadReminders, saveReminders, type ReminderSettings, type MealSlot } from '@/hooks/use-meal-reminders';
+import { FOOD_PREFS_KEY, type MealFoodPrefs } from '@/components/MealFoodPrefsModal';
 
-const PRESET_TIMES = ['07:00', '08:00', '10:00', '12:00', '15:00', '19:00', '20:00', '21:00'];
+function loadFoodPrefs(): MealFoodPrefs | null {
+  try {
+    const raw = localStorage.getItem(FOOD_PREFS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
 
 export function MealReminders() {
   const [settings, setSettings] = useState<ReminderSettings>(() => loadReminders());
   const [permission, setPermission] = useState<NotificationPermission>('default');
-  const [showAdd, setShowAdd] = useState(false);
-  const [customTime, setCustomTime] = useState('');
+  const [foodPrefs, setFoodPrefs] = useState<MealFoodPrefs | null>(null);
 
   useEffect(() => {
-    if ('Notification' in window) {
-      setPermission(Notification.permission);
-    }
+    if ('Notification' in window) setPermission(Notification.permission);
+    setFoodPrefs(loadFoodPrefs());
   }, []);
 
-  const persist = (next: ReminderSettings) => {
-    setSettings(next);
-    saveReminders(next);
-  };
+  const persist = (next: ReminderSettings) => { setSettings(next); saveReminders(next); };
 
   const requestPermission = async () => {
-    if (!('Notification' in window)) return;
+    if (!('Notification' in window)) return false;
     const result = await Notification.requestPermission();
     setPermission(result);
-    if (result === 'granted') {
-      persist({ ...settings, enabled: true });
+    return result === 'granted';
+  };
+
+  const toggleGlobal = async () => {
+    if (!settings.globalEnabled && permission !== 'granted') {
+      const granted = await requestPermission();
+      if (!granted) return;
     }
+    persist({ ...settings, globalEnabled: !settings.globalEnabled });
   };
 
-  const toggleEnabled = async () => {
-    if (!settings.enabled && permission !== 'granted') {
-      await requestPermission();
-      return;
-    }
-    persist({ ...settings, enabled: !settings.enabled });
+  const toggleSlot = (key: string) => {
+    persist({
+      ...settings,
+      slots: settings.slots.map(s => s.key === key ? { ...s, enabled: !s.enabled } : s),
+    });
   };
 
-  const addTime = (time: string) => {
-    if (!time || settings.times.includes(time) || settings.times.length >= 6) return;
-    const sorted = [...settings.times, time].sort();
-    persist({ ...settings, times: sorted });
-    setShowAdd(false);
-    setCustomTime('');
-  };
-
-  const removeTime = (time: string) => {
-    persist({ ...settings, times: settings.times.filter(t => t !== time) });
+  const updateTime = (key: string, time: string) => {
+    persist({
+      ...settings,
+      slots: settings.slots.map(s => s.key === key ? { ...s, time } : s),
+    });
   };
 
   if (!('Notification' in window)) return null;
+
+  const enabledCount = settings.slots.filter(s => s.enabled).length;
 
   return (
     <div style={{
@@ -59,15 +62,15 @@ export function MealReminders() {
       padding: '14px 16px',
       display: 'flex', flexDirection: 'column', gap: '10px',
     }}>
-      {/* Header row */}
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             width: '36px', height: '36px', borderRadius: '10px',
-            background: settings.enabled ? 'rgba(13,159,110,0.12)' : 'var(--bg-3)',
+            background: settings.globalEnabled ? 'rgba(13,159,110,0.12)' : 'var(--bg-3)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            {settings.enabled
+            {settings.globalEnabled
               ? <Bell size={18} style={{ color: '#0D9F6E' }} />
               : <BellOff size={18} style={{ color: 'var(--text-3)' }} />}
           </div>
@@ -76,123 +79,113 @@ export function MealReminders() {
               Lembretes de refeição
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-2)' }}>
-              {settings.enabled
-                ? `${settings.times.length} lembrete${settings.times.length !== 1 ? 's' : ''} ativo${settings.times.length !== 1 ? 's' : ''}`
+              {settings.globalEnabled
+                ? `${enabledCount} refeição${enabledCount !== 1 ? 'ões' : ''} ativa${enabledCount !== 1 ? 's' : ''}`
                 : 'Notificações desativadas'}
             </div>
           </div>
         </div>
-
-        {/* Toggle */}
         <button
-          onClick={toggleEnabled}
+          onClick={toggleGlobal}
           style={{
             width: '44px', height: '24px', borderRadius: '99px', border: 'none',
-            background: settings.enabled ? '#0D9F6E' : 'var(--bg-3)',
+            background: settings.globalEnabled ? '#0D9F6E' : 'var(--bg-3)',
             cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0,
           }}
         >
           <div style={{
             width: '18px', height: '18px', borderRadius: '50%', background: '#fff',
             position: 'absolute', top: '3px',
-            left: settings.enabled ? '23px' : '3px',
+            left: settings.globalEnabled ? '23px' : '3px',
             transition: 'left 0.2s',
             boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
           }} />
         </button>
       </div>
 
-      {/* Permission denied warning */}
       {permission === 'denied' && (
         <div style={{
           padding: '8px 10px', borderRadius: '10px',
           background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
           fontSize: '11px', color: '#ef4444',
         }}>
-          Notificações bloqueadas. Habilite nas configurações do navegador para usar lembretes.
+          Notificações bloqueadas. Habilite nas configurações do navegador.
         </div>
       )}
 
-      {/* Times list */}
-      {settings.enabled && permission === 'granted' && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-          {settings.times.map(time => (
-            <div key={time} style={{
-              display: 'flex', alignItems: 'center', gap: '4px',
-              padding: '5px 10px', borderRadius: '99px',
-              background: 'rgba(13,159,110,0.1)', border: '1px solid rgba(13,159,110,0.2)',
-            }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#0D9F6E', fontVariantNumeric: 'tabular-nums' }}>
-                {time}
-              </span>
-              <button
-                onClick={() => removeTime(time)}
+      {/* Meal slots */}
+      {settings.globalEnabled && permission === 'granted' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {settings.slots.map((slot: MealSlot) => {
+            const prefs = foodPrefs?.[slot.key as keyof MealFoodPrefs] ?? [];
+            return (
+              <div
+                key={slot.key}
                 style={{
-                  width: '14px', height: '14px', borderRadius: '50%',
-                  background: 'rgba(13,159,110,0.2)', border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '10px 12px', borderRadius: '12px',
+                  background: slot.enabled ? 'rgba(13,159,110,0.06)' : 'var(--bg-3)',
+                  border: `1px solid ${slot.enabled ? 'rgba(13,159,110,0.18)' : 'var(--border)'}`,
+                  transition: 'all 0.15s',
                 }}
               >
-                <X size={8} style={{ color: '#0D9F6E' }} />
-              </button>
-            </div>
-          ))}
+                {/* Emoji + label */}
+                <span style={{ fontSize: '18px', flexShrink: 0 }}>{slot.emoji}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: slot.enabled ? 'var(--text-1)' : 'var(--text-3)' }}>
+                    {slot.label}
+                  </div>
+                  {prefs.length > 0 && slot.enabled && (
+                    <div style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {prefs.slice(0, 2).join(' · ')}
+                      {prefs.length > 2 && ` +${prefs.length - 2}`}
+                    </div>
+                  )}
+                  {prefs.length === 0 && slot.enabled && (
+                    <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
+                      Sem preferências — configure em "Personalizar cardápio"
+                    </div>
+                  )}
+                </div>
 
-          {settings.times.length < 6 && (
-            <button
-              onClick={() => setShowAdd(v => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '3px',
-                padding: '5px 10px', borderRadius: '99px',
-                background: 'var(--bg-3)', border: '1px dashed var(--border)',
-                cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--text-2)',
-              }}
-            >
-              <Plus size={11} /> Adicionar
-            </button>
-          )}
-        </div>
-      )}
+                {/* Time picker */}
+                <input
+                  type="time"
+                  value={slot.time}
+                  disabled={!slot.enabled}
+                  onChange={e => updateTime(slot.key, e.target.value)}
+                  style={{
+                    padding: '4px 8px', borderRadius: '8px', flexShrink: 0,
+                    border: `1px solid ${slot.enabled ? 'rgba(13,159,110,0.25)' : 'var(--border)'}`,
+                    background: slot.enabled ? 'var(--bg)' : 'var(--bg-2)',
+                    color: slot.enabled ? 'var(--text-1)' : 'var(--text-3)',
+                    fontSize: '13px', fontWeight: 700, outline: 'none',
+                    fontVariantNumeric: 'tabular-nums',
+                    opacity: slot.enabled ? 1 : 0.5,
+                  }}
+                />
 
-      {/* Add time panel */}
-      {showAdd && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-            {PRESET_TIMES.filter(t => !settings.times.includes(t)).map(t => (
-              <button key={t} onClick={() => addTime(t)} style={{
-                padding: '4px 10px', borderRadius: '99px',
-                background: 'var(--bg-3)', border: '1px solid var(--border)',
-                fontSize: '12px', fontWeight: 600, color: 'var(--text-1)', cursor: 'pointer',
-              }}>
-                {t}
-              </button>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <input
-              type="time"
-              value={customTime}
-              onChange={e => setCustomTime(e.target.value)}
-              style={{
-                flex: 1, padding: '6px 10px', borderRadius: '8px',
-                border: '1px solid var(--border)', background: 'var(--bg-3)',
-                color: 'var(--text-1)', fontSize: '13px', outline: 'none',
-              }}
-            />
-            <button
-              onClick={() => addTime(customTime)}
-              disabled={!customTime}
-              style={{
-                padding: '6px 14px', borderRadius: '8px',
-                background: customTime ? '#0D9F6E' : 'var(--bg-3)',
-                color: customTime ? '#fff' : 'var(--text-3)',
-                border: 'none', fontWeight: 700, fontSize: '12px',
-                cursor: customTime ? 'pointer' : 'default',
-              }}
-            >
-              Adicionar
-            </button>
-          </div>
+                {/* Toggle */}
+                <button
+                  onClick={() => toggleSlot(slot.key)}
+                  style={{
+                    width: '36px', height: '20px', borderRadius: '99px', border: 'none', flexShrink: 0,
+                    background: slot.enabled ? '#0D9F6E' : 'var(--bg-2)',
+                    cursor: 'pointer', position: 'relative', transition: 'background 0.2s',
+                    border: `1px solid ${slot.enabled ? 'transparent' : 'var(--border)'}` as any,
+                  }}
+                >
+                  <div style={{
+                    width: '14px', height: '14px', borderRadius: '50%', background: '#fff',
+                    position: 'absolute', top: '2px',
+                    left: slot.enabled ? '19px' : '2px',
+                    transition: 'left 0.2s',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  }} />
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
