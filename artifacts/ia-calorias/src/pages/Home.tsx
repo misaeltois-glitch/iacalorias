@@ -183,7 +183,7 @@ export default function Home() {
   const [showFoodPrefs, setShowFoodPrefs] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
   const [showAITools, setShowAITools] = useState(() => {
-    try { return localStorage.getItem('iac-ai-tools-expanded') !== 'false'; } catch { return true; }
+    try { return localStorage.getItem('iac-ai-tools-expanded') === 'true'; } catch { return false; }
   });
   const celebrationQueue = useRef<Array<'calories' | 'meals'>>([]);
   const celebrationInflight = useRef<Set<'calories' | 'meals'>>(new Set());
@@ -1156,6 +1156,17 @@ export default function Home() {
 
               {/* Ferramentas IA — bloco recolhível */}
               <div style={{ borderRadius: '18px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                <style>{`
+                  @keyframes iac-pulse-ring {
+                    0% { box-shadow: 0 0 0 0 rgba(13,159,110,0.55); }
+                    70% { box-shadow: 0 0 0 8px rgba(13,159,110,0); }
+                    100% { box-shadow: 0 0 0 0 rgba(13,159,110,0); }
+                  }
+                  @keyframes iac-shimmer {
+                    0% { background-position: -200% center; }
+                    100% { background-position: 200% center; }
+                  }
+                `}</style>
                 {/* Header toggle */}
                 <button
                   onClick={() => {
@@ -1170,7 +1181,15 @@ export default function Home() {
                   }}
                 >
                   <span style={{ fontSize: '16px' }}>🤖</span>
-                  <span style={{ flex: 1, fontSize: '14px', fontWeight: 700, color: 'var(--text-1)' }}>
+                  <span style={{
+                    flex: 1, fontSize: '14px', fontWeight: 800,
+                    background: 'linear-gradient(90deg, #0D9F6E 0%, #34d399 40%, #0D9F6E 60%, #057A55 100%)',
+                    backgroundSize: '200% auto',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                    animation: showAITools ? 'none' : 'iac-shimmer 2.4s linear infinite',
+                  }}>
                     Ferramentas IA
                   </span>
                   <span style={{ display: 'flex', gap: '4px', marginRight: '8px' }}>
@@ -1181,7 +1200,11 @@ export default function Home() {
                   <motion.span
                     animate={{ rotate: showAITools ? 180 : 0 }}
                     transition={{ duration: 0.2 }}
-                    style={{ display: 'flex', color: 'var(--text-3)', fontSize: '16px', lineHeight: 1 }}
+                    style={{
+                      display: 'flex', color: '#0D9F6E', fontSize: '16px', lineHeight: 1,
+                      borderRadius: '50%',
+                      animation: showAITools ? 'none' : 'iac-pulse-ring 1.8s ease-out infinite',
+                    }}
                   >
                     ▾
                   </motion.span>
