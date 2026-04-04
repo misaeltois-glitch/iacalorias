@@ -61,6 +61,9 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData>({
     name: '', avatarUrl: '', weight: '', height: '', age: '', sex: '', objective: '',
   });
+  const [savedProfile, setSavedProfile] = useState<ProfileData>({
+    name: '', avatarUrl: '', weight: '', height: '', age: '', sex: '', objective: '',
+  });
 
   const [passSection, setPassSection] = useState(false);
   const [currentPass, setCurrentPass] = useState('');
@@ -80,7 +83,7 @@ export default function ProfilePage() {
     fetch(`${BASE}api/user/profile?sessionId=${sessionId}`, { headers: authHeaders() })
       .then(r => r.json())
       .then(d => {
-        setProfile({
+        const loaded: ProfileData = {
           name: d.name ?? '',
           avatarUrl: d.avatarUrl ?? '',
           weight: d.biometrics?.weight?.toString() ?? '',
@@ -88,7 +91,9 @@ export default function ProfilePage() {
           age: d.biometrics?.age?.toString() ?? '',
           sex: d.biometrics?.sex ?? '',
           objective: d.biometrics?.objective ?? '',
-        });
+        };
+        setProfile(loaded);
+        setSavedProfile(loaded);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -125,6 +130,7 @@ export default function ProfilePage() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.message || 'Erro ao salvar');
       updateLocalUser({ name: d.name, avatarUrl: d.avatarUrl });
+      setSavedProfile({ ...profile });
       setSaveOk(true);
       setTimeout(() => setSaveOk(false), 3000);
     } catch (err: any) {
@@ -189,13 +195,16 @@ export default function ProfilePage() {
         <span style={{ fontWeight: 700, fontSize: '16px', color: 'var(--text-1)' }}>Meu Perfil</span>
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || JSON.stringify(profile) === JSON.stringify(savedProfile)}
           style={{
-            padding: '8px 16px', borderRadius: '10px', border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
-            background: saveOk ? 'rgba(13,159,110,0.12)' : `linear-gradient(135deg, ${ACCENT}, #057A55)`,
-            color: saveOk ? ACCENT : '#fff', fontSize: '14px', fontWeight: 700,
+            padding: '8px 16px', borderRadius: '10px', border: 'none',
+            cursor: (saving || JSON.stringify(profile) === JSON.stringify(savedProfile)) ? 'not-allowed' : 'pointer',
+            background: saveOk ? 'rgba(13,159,110,0.12)' : JSON.stringify(profile) === JSON.stringify(savedProfile) ? 'var(--bg-3)' : `linear-gradient(135deg, ${ACCENT}, #057A55)`,
+            color: saveOk ? ACCENT : JSON.stringify(profile) === JSON.stringify(savedProfile) ? 'var(--text-3)' : '#fff',
+            fontSize: '14px', fontWeight: 700,
             display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'inherit',
             transition: 'all 0.2s',
+            opacity: JSON.stringify(profile) === JSON.stringify(savedProfile) ? 0.5 : 1,
           }}
         >
           {saving ? <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> : saveOk ? <Check size={14} /> : null}

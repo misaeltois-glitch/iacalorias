@@ -1142,9 +1142,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Water Tracker */}
-              <WaterTracker />
-
               {/* Meal Reminders */}
               <MealReminders />
 
