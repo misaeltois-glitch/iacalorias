@@ -1,24 +1,12 @@
 import { useState, useCallback } from 'react';
 
-const VISIT_COUNT_KEY = 'ia-calorias-tour-visits';
-const MAX_TOUR_VISITS = 2;
-
-function getVisitCount(): number {
-  return parseInt(localStorage.getItem(VISIT_COUNT_KEY) ?? '0', 10);
-}
-
-function incrementVisit(): number {
-  const next = getVisitCount() + 1;
-  localStorage.setItem(VISIT_COUNT_KEY, String(next));
-  return next;
-}
+const TOUR_DONE_KEY = 'ia-calorias-tour-done';
 
 export function useTour() {
   const [showTour, setShowTour] = useState(false);
 
   const maybeStartTour = useCallback((delayMs = 600) => {
-    const visitNumber = incrementVisit();
-    if (visitNumber > MAX_TOUR_VISITS) return;
+    if (localStorage.getItem(TOUR_DONE_KEY)) return;
     const t = setTimeout(() => setShowTour(true), delayMs);
     return () => clearTimeout(t);
   }, []);
@@ -27,10 +15,11 @@ export function useTour() {
 
   const endTour = useCallback(() => {
     setShowTour(false);
+    localStorage.setItem(TOUR_DONE_KEY, 'true');
   }, []);
 
   const resetTour = useCallback(() => {
-    localStorage.removeItem(VISIT_COUNT_KEY);
+    localStorage.removeItem(TOUR_DONE_KEY);
     setShowTour(true);
   }, []);
 
