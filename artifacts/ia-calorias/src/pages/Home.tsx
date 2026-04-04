@@ -279,6 +279,19 @@ export default function Home() {
     if (sessionId) refreshSummary();
   }, [sessionId, isPremium, refreshSummary]);
 
+  // Quando o usuário troca de conta, limpa dados anteriores e recarrega
+  const prevUserIdRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    const currentId = user?.id ?? null;
+    if (prevUserIdRef.current !== null && prevUserIdRef.current !== currentId) {
+      setDailySummary(null);
+      setCurrentResult(null);
+      refetchStatus();
+      if (sessionId) refreshSummary();
+    }
+    prevUserIdRef.current = currentId;
+  }, [user?.id]);
+
   useEffect(() => {
     if (!sessionId) return;
     setHasWorkoutPlan(false);
@@ -459,6 +472,9 @@ export default function Home() {
   const handleLogout = async () => {
     setShowUserMenu(false);
     await logout();
+    // Limpa dados em memória para não vazar dados entre contas
+    setDailySummary(null);
+    setCurrentResult(null);
     refetchStatus();
     toast({ title: "Até logo!", description: "Você saiu da sua conta." });
   };
