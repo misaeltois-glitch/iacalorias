@@ -1190,7 +1190,7 @@ export default function Home() {
                     backgroundClip: 'text',
                     animation: showAITools ? 'none' : 'iac-shimmer 2.4s linear infinite',
                   }}>
-                    Ferramentas IA
+                    Ferramentas de IA
                   </span>
                   <span style={{ display: 'flex', gap: '4px', marginRight: '8px' }}>
                     {['🩺','🥗','🍳'].map(e => (
