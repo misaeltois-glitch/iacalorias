@@ -701,19 +701,19 @@ export default function Home() {
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-            <div data-tour="usage-pill" style={{ display: 'flex', flexShrink: 0 }}>{renderUsagePill()}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, flexShrink: 0 }}>
+            <div data-tour="usage-pill" style={{ display: 'flex', flexShrink: 1, minWidth: 0, overflow: 'hidden' }}>{renderUsagePill()}</div>
 
             <button
               onClick={() => setShowAnalytics(true)}
-              style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', flexShrink: 0 }}
+              style={{ padding: '6px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', flexShrink: 0 }}
             >
               <BarChart2 size={16} />
             </button>
 
             <button
               onClick={() => setShowGoalsPanel(true)}
-              style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', flexShrink: 0 }}
+              style={{ padding: '6px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', flexShrink: 0 }}
             >
               <Settings size={16} />
             </button>
@@ -841,13 +841,13 @@ export default function Home() {
               <>
                 <button
                   onClick={toggleTheme}
-                  style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
+                  style={{ padding: '6px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', flexShrink: 0 }}
                 >
                   {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                 </button>
                 <button
                   onClick={() => navigate('/login')}
-                  style={{ padding: '8px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
+                  style={{ padding: '6px', borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', flexShrink: 0 }}
                 >
                   <LogIn size={16} />
                 </button>
