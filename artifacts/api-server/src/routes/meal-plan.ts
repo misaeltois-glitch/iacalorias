@@ -61,7 +61,12 @@ router.post("/", async (req: Request, res: Response) => {
   const carbsGoal = goals?.carbs ?? null;
   const fatGoal = goals?.fat ?? null;
   const fiberGoal = goals?.fiber ?? null;
-  const restrictions: string[] = goals?.restrictions ?? [];
+  let restrictions: string[] = [];
+  try {
+    const raw = goals?.restrictions;
+    if (Array.isArray(raw)) restrictions = raw;
+    else if (typeof raw === "string" && raw.trim()) restrictions = JSON.parse(raw);
+  } catch { restrictions = []; }
 
   const mealsPerDay = goals?.mealsPerDay ?? 3;
   const mealNames = mealsPerDay >= 5
