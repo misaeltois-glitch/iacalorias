@@ -130,12 +130,20 @@ Inclua todos os 7 dias. Use alimentos brasileiros comuns, variados por dia. Os t
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 3500,
+      max_tokens: 6000,
       temperature: 0.85,
       response_format: { type: "json_object" },
     });
 
-    const raw = completion.choices[0]?.message?.content ?? "{}";
+    const choice = completion.choices[0];
+    const raw = choice?.message?.content ?? "{}";
+
+    if (choice?.finish_reason === "length") {
+      req.log?.warn?.("meal-plan truncated by max_tokens");
+      res.status(500).json({ error: "parse_error", message: "Erro ao processar o cardápio" });
+      return;
+    }
+
     let parsed: any;
     try {
       parsed = JSON.parse(raw);
