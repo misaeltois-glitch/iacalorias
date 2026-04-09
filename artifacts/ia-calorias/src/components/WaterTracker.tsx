@@ -1,14 +1,31 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { loadReminders, saveReminders } from '@/hooks/use-meal-reminders';
 
 const WATER_KEY_PREFIX = 'ia-calorias-water-';
 const DEFAULT_GOAL = 8;
 const WATER_REMINDER_PREFIX = 'water-hydration-';
+const REMINDERS_KEY = 'ia-calorias-reminders';
 
 function todayKey(): string {
   const d = new Date();
   return `${WATER_KEY_PREFIX}${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Lê/escreve diretamente no mesmo localStorage que use-meal-reminders usa,
+// sem importar o hook (evita dependência circular)
+function readSettings(): { globalEnabled: boolean; slots: unknown[]; customSlots: Array<{ key: string; label: string; emoji: string; time: string; enabled: boolean }> } {
+  try {
+    const raw = localStorage.getItem(REMINDERS_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      return { globalEnabled: false, slots: [], customSlots: [], ...p };
+    }
+  } catch { /* ignore */ }
+  return { globalEnabled: false, slots: [], customSlots: [] };
+}
+
+function writeSettings(s: { globalEnabled: boolean; slots: unknown[]; customSlots: Array<{ key: string; label: string; emoji: string; time: string; enabled: boolean }> }) {
+  try { localStorage.setItem(REMINDERS_KEY, JSON.stringify(s)); } catch { /* ignore */ }
 }
 
 function generateWaterSlots(intervalHours: number): Array<{ key: string; label: string; emoji: string; time: string; enabled: boolean }> {
@@ -27,20 +44,19 @@ function generateWaterSlots(intervalHours: number): Array<{ key: string; label: 
 }
 
 function isWaterRemindersEnabled(): boolean {
-  const settings = loadReminders();
-  return settings.customSlots?.some(s => s.key.startsWith(WATER_REMINDER_PREFIX)) ?? false;
+  const s = readSettings();
+  return s.customSlots.some(c => c.key.startsWith(WATER_REMINDER_PREFIX));
 }
 
 function enableWaterReminders(intervalHours: number) {
-  const settings = loadReminders();
-  const filtered = (settings.customSlots ?? []).filter(s => !s.key.startsWith(WATER_REMINDER_PREFIX));
-  const slots = generateWaterSlots(intervalHours);
-  saveReminders({ ...settings, customSlots: [...filtered, ...slots] });
+  const s = readSettings();
+  const filtered = s.customSlots.filter(c => !c.key.startsWith(WATER_REMINDER_PREFIX));
+  writeSettings({ ...s, customSlots: [...filtered, ...generateWaterSlots(intervalHours)] });
 }
 
 function disableWaterReminders() {
-  const settings = loadReminders();
-  saveReminders({ ...settings, customSlots: (settings.customSlots ?? []).filter(s => !s.key.startsWith(WATER_REMINDER_PREFIX)) });
+  const s = readSettings();
+  writeSettings({ ...s, customSlots: s.customSlots.filter(c => !c.key.startsWith(WATER_REMINDER_PREFIX)) });
 }
 
 export function WaterTracker() {
@@ -63,7 +79,6 @@ export function WaterTracker() {
 
   const toggleWaterReminders = async () => {
     if (!waterReminders) {
-      // Request notification permission first
       if ('Notification' in window && Notification.permission !== 'granted') {
         const perm = await Notification.requestPermission();
         if (perm !== 'granted') return;
@@ -78,9 +93,7 @@ export function WaterTracker() {
 
   const handleIntervalChange = (interval: number) => {
     setReminderInterval(interval);
-    if (waterReminders) {
-      enableWaterReminders(interval);
-    }
+    if (waterReminders) enableWaterReminders(interval);
   };
 
   const pct = Math.min(1, count / goal);
@@ -169,7 +182,6 @@ export function WaterTracker() {
             background: 'var(--bg-3)', border: '1px solid var(--border)',
             color: count === 0 ? 'var(--text-3)' : 'var(--text-1)',
             fontSize: '18px', cursor: count === 0 ? 'not-allowed' : 'pointer',
-            transition: 'opacity 0.15s',
             opacity: count === 0 ? 0.4 : 1,
           }}
         >
