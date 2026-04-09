@@ -175,11 +175,17 @@ export function registerServiceWorker() {
       })
       .catch(() => {});
 
-    // Recarrega a página quando o SW avisa de update (garante que o usuário vê a versão nova)
-    navigator.serviceWorker.addEventListener('message', e => {
-      if (e.data?.type === 'SW_UPDATED') {
-        window.location.reload();
+    // Recarrega apenas quando um NOVO SW assume o controle (atualização real, não primeiro install).
+    // controllerchange dispara ao trocar de SW ativo — nunca na primeira instalação.
+    let firstController = !navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (firstController) {
+        // Primeiro controller assumindo — não recarregar, só marcar como conhecido
+        firstController = false;
+        return;
       }
+      // SW diferente tomou o controle → atualização real → recarregar para servir novo bundle
+      window.location.reload();
     });
   }
 }
