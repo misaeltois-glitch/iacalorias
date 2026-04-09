@@ -54,6 +54,7 @@ interface ProgressViewProps {
   refreshSignal?: number;
   onUpgrade: () => void;
   onSetGoals: () => void;
+  freshNotif?: boolean;
 }
 
 const MONTH_NAMES = [
@@ -82,7 +83,7 @@ function SkeletonBlock({ h }: { h: number }) {
   );
 }
 
-export function ProgressView({ sessionId, isPremium, refreshSignal, onUpgrade, onSetGoals }: ProgressViewProps) {
+export function ProgressView({ sessionId, isPremium, refreshSignal, onUpgrade, onSetGoals, freshNotif }: ProgressViewProps) {
   const now = new Date();
   const [period, setPeriod] = useState<Period>('day');
   const [selectedDate, setSelectedDate] = useState<string>(todayStr());
@@ -203,9 +204,10 @@ export function ProgressView({ sessionId, isPremium, refreshSignal, onUpgrade, o
 
   return (
     <motion.div
-      key="progress-view"
-      initial={{ opacity: 0, y: 10 }}
+      key={freshNotif ? 'progress-view-fresh' : 'progress-view'}
+      initial={{ opacity: 0, y: freshNotif ? 20 : 10 }}
       animate={{ opacity: 1, y: 0 }}
+      transition={freshNotif ? { type: 'spring', stiffness: 300, damping: 26 } : undefined}
       style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '4px' }}
     >
       {/* Period pills */}

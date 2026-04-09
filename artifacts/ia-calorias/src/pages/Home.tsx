@@ -28,11 +28,13 @@ import { NutritionistChat } from '@/components/NutritionistChat';
 import { WeightTracker } from '@/components/WeightTracker';
 import { OnboardingAuthPrompt } from '@/components/OnboardingAuthPrompt';
 import { MealPlanModal } from '@/components/MealPlanModal';
+import { CardapioChoiceModal } from '@/components/CardapioChoiceModal';
 import { ProfileSetupBanner } from '@/components/ProfileSetupBanner';
 import { InstallPrompt, OpenInAppBanner } from '@/components/InstallPrompt';
 import { ReferralCard, applyPendingReferral, REFERRAL_CODE_KEY } from '@/components/ReferralCard';
 import { MealReminders } from '@/components/MealReminders';
-import { useMealReminders } from '@/hooks/use-meal-reminders';
+import { useMealReminders, loadReminders } from '@/hooks/use-meal-reminders';
+import { useCheatDays } from '@/hooks/use-cheat-days';
 import { RecipeSuggestor } from '@/components/RecipeSuggestor';
 import { MealFoodPrefsModal } from '@/components/MealFoodPrefsModal';
 import { SupportChat } from '@/components/SupportChat';
@@ -158,6 +160,39 @@ export default function Home() {
   const { accepted: lgpdAccepted, accept: acceptLGPD } = useLGPDConsent();
   const { showTour, maybeStartTour, endTour, resetTour } = useTour();
   useMealReminders();
+  const { isCheatDay, toggleCheatDay } = useCheatDays();
+
+  // Alerta motivacional: verifica se há lembretes disparados nas últimas 2h sem análise
+  const todaySummaryRef = useRef<any>(null);
+  todaySummaryRef.current = todaySummary;
+
+  useEffect(() => {
+    const checkMissed = () => {
+      const settings = loadReminders();
+      if (!settings.globalEnabled) return;
+      const now = new Date();
+      const twoHoursAgo = now.getTime() - 2 * 60 * 60 * 1000;
+      let hasMissed = false;
+      for (const slot of [...settings.slots, ...(settings.customSlots ?? [])]) {
+        if (!slot.enabled) continue;
+        const [h, m] = slot.time.split(':').map(Number);
+        const slotTime = new Date(now);
+        slotTime.setHours(h, m, 0, 0);
+        if (slotTime.getTime() >= twoHoursAgo && slotTime.getTime() <= now.getTime()) {
+          hasMissed = true;
+          break;
+        }
+      }
+      const todayAnalyses = (todaySummaryRef.current?.analysesCount ?? 0);
+      if (hasMissed && todayAnalyses === 0) setShowMissedMealAlert(true);
+    };
+
+    // Check on mount and on visibility change
+    checkMissed();
+    const handler = () => { if (document.visibilityState === 'visible') checkMissed(); };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, []);
 
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [currentResult, setCurrentResult] = useState<AnalysisResult | null>(null);
@@ -179,9 +214,11 @@ export default function Home() {
   const [celebration, setCelebration] = useState<{ show: boolean; type: 'calories' | 'meals' }>({ show: false, type: 'calories' });
   const [showChat, setShowChat] = useState(false);
   const [showMealPlan, setShowMealPlan] = useState(false);
+  const [showCardapioChoice, setShowCardapioChoice] = useState(false);
   const [showRecipeSuggestor, setShowRecipeSuggestor] = useState(false);
   const [showFoodPrefs, setShowFoodPrefs] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
+  const [logoutStep, setLogoutStep] = useState<0 | 1>(0);
   const [showAITools, setShowAITools] = useState(() => {
     try { return localStorage.getItem('iac-ai-tools-expanded') === 'true'; } catch { return false; }
   });
@@ -213,6 +250,9 @@ export default function Home() {
 
   const [activeTab, setActiveTab] = useState<BottomNavTab>('home');
   const [goalsRefreshKey, setGoalsRefreshKey] = useState(0);
+  const [pendingNotifCount, setPendingNotifCount] = useState(0);
+  const [freshAnalyticsNotif, setFreshAnalyticsNotif] = useState(false);
+  const [showMissedMealAlert, setShowMissedMealAlert] = useState(false);
 
   const prevTrialRemaining = useRef<number | null>(null);
 
@@ -255,11 +295,28 @@ export default function Home() {
       const daySummary = await fetchDailySummary(sessionId, 'day');
       if (daySummary) {
         setTodaySummary(daySummary);
+        const warnCount = (daySummary.alerts ?? []).filter((a: any) => a.type === 'warning').length;
+        if (warnCount > 0) setPendingNotifCount(warnCount);
       }
     } else {
       setTodaySummary(summary);
+      const warnCount = (summary?.alerts ?? []).filter((a: any) => a.type === 'warning').length;
+      if (warnCount > 0) setPendingNotifCount(warnCount);
     }
     setGoalsLoaded(true);
+
+    // Alerta de manhã: se streak === 0 e nenhuma análise hoje, notificar uma vez por dia
+    if (summary?.streak === 0 && (summary?.analysesCount ?? 0) === 0) {
+      const pad2 = (n: number) => n.toString().padStart(2, '0');
+      const d = new Date();
+      const todayKey = `ia-calorias-morning-alert-${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+      if (!localStorage.getItem(todayKey)) {
+        localStorage.setItem(todayKey, '1');
+        setTimeout(() => {
+          toast({ title: "Sofia diz:", description: "Ontem ficou faltando um pouco — hoje é a sua chance de recuperar. Você consegue! 💪" });
+        }, 3000);
+      }
+    }
   }, [sessionId, isPremium, period]);
 
   const loadGoalsDirect = useCallback(async () => {
@@ -470,6 +527,7 @@ export default function Home() {
   };
 
   const handleLogout = async () => {
+    setLogoutStep(0);
     setShowUserMenu(false);
     await logout();
     // Limpa dados em memória para não vazar dados entre contas
@@ -605,6 +663,11 @@ export default function Home() {
     setActiveTab(tab);
     if (tab !== 'profile') setShowUserMenu(false);
     if (tab === 'home') { setCurrentResult(null); }
+    if (tab === 'analytics' && pendingNotifCount > 0) {
+      setFreshAnalyticsNotif(true);
+      setPendingNotifCount(0);
+      setTimeout(() => setFreshAnalyticsNotif(false), 2000);
+    }
     if (tab === 'workout') {
       if (isWorkoutFreeAccessActive) {
         // Start trial on first open if not started from onboarding
@@ -837,18 +900,38 @@ export default function Home() {
                           : <Moon size={14} />}
                         {theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
                       </button>
-                      <button
-                        onClick={handleLogout}
-                        style={{
-                          width: '100%', padding: '8px 12px',
-                          background: 'none', border: 'none', color: '#f87171',
-                          fontSize: '14px', cursor: 'pointer', borderRadius: '10px',
-                          display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left',
-                        }}
-                      >
-                        <LogOut size={14} />
-                        Sair da conta
-                      </button>
+                      {logoutStep === 0 ? (
+                        <button
+                          onClick={() => setLogoutStep(1)}
+                          style={{
+                            width: '100%', padding: '8px 12px',
+                            background: 'none', border: 'none', color: '#f87171',
+                            fontSize: '14px', cursor: 'pointer', borderRadius: '10px',
+                            display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left',
+                          }}
+                        >
+                          <LogOut size={14} />
+                          Sair da conta
+                        </button>
+                      ) : (
+                        <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ fontSize: '12px', color: '#f87171', fontWeight: 600 }}>Tem certeza que quer sair?</div>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              onClick={() => setLogoutStep(0)}
+                              style={{ flex: 1, padding: '6px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-2)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              onClick={handleLogout}
+                              style={{ flex: 1, padding: '6px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              Sair
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
@@ -913,6 +996,7 @@ export default function Home() {
                 refreshSignal={goalsRefreshKey}
                 onUpgrade={() => { setPaywallDisableClose(false); setShowPaywall(true); }}
                 onSetGoals={() => setShowGoalsPanel(true)}
+                freshNotif={freshAnalyticsNotif}
               />
             </motion.div>
           ) : !currentResult ? (
@@ -1154,6 +1238,7 @@ export default function Home() {
                     onPeriodChange={undefined}
                     onSetGoals={() => setShowGoalsPanel(true)}
                     isPremium={isPremium}
+                    isCheatDay={isCheatDay}
                   />
                 </div>
               )}
@@ -1255,9 +1340,9 @@ export default function Home() {
                           </span>
                         </button>
 
-                        {/* Cardápio semanal */}
+                        {/* Cardápio semanal — ponto de entrada unificado */}
                         <button
-                          onClick={() => { if (!isPremium) { setPaywallDisableClose(false); setShowPaywall(true); return; } setShowMealPlan(true); }}
+                          onClick={() => setShowCardapioChoice(true)}
                           style={{
                             width: '100%', padding: '14px 18px',
                             background: 'var(--bg-2)', border: 'none',
@@ -1266,46 +1351,12 @@ export default function Home() {
                         >
                           <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #F59E0B, #EF4444)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🥗</div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>Cardápio semanal com IA</div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>7 dias de refeições baseadas nas suas metas</div>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>Cardápio Semanal</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>Gerar com IA ou usar o que você tem em casa</div>
                           </div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 9px', borderRadius: 99, flexShrink: 0, background: isPremium ? 'rgba(245,158,11,0.1)' : 'rgba(139,92,246,0.1)', border: `1px solid ${isPremium ? 'rgba(245,158,11,0.2)' : 'rgba(139,92,246,0.2)'}`, color: isPremium ? '#F59E0B' : '#8B5CF6' }}>
-                            {isPremium ? 'Gerar' : '👑 Premium'}
+                          <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 9px', borderRadius: 99, flexShrink: 0, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}>
+                            Ver opções
                           </span>
-                        </button>
-
-                        {/* Personalizar cardápio */}
-                        <button
-                          onClick={() => setShowFoodPrefs(true)}
-                          style={{
-                            width: '100%', padding: '14px 18px',
-                            background: 'var(--bg-2)', border: 'none',
-                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
-                          }}
-                        >
-                          <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #0D9F6E, #3B82F6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🥗</div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>Personalizar meu cardápio</div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>Selecione os alimentos que você costuma comer</div>
-                          </div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#0D9F6E', padding: '3px 9px', borderRadius: 99, background: 'rgba(13,159,110,0.1)', border: '1px solid rgba(13,159,110,0.2)', flexShrink: 0 }}>Grátis</span>
-                        </button>
-
-                        {/* Receita */}
-                        <button
-                          onClick={() => setShowRecipeSuggestor(true)}
-                          style={{
-                            width: '100%', padding: '14px 18px',
-                            background: 'var(--bg-2)', border: 'none',
-                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
-                          }}
-                        >
-                          <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #F59E0B, #EF4444)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🍳</div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>Receita com o que tenho</div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>Informe os ingredientes e a IA cria uma receita</div>
-                          </div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#F59E0B', padding: '3px 9px', borderRadius: 99, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', flexShrink: 0 }}>Grátis</span>
                         </button>
 
                       </div>
@@ -1348,7 +1399,14 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               style={{ width: '100%', paddingTop: '8px' }}
             >
-              <ResultCard result={currentResult} onReset={() => { setCurrentResult(null); setPhotoUrl(undefined); }} photoUrl={photoUrl} sessionId={sessionId} />
+              <ResultCard
+                result={currentResult}
+                onReset={() => { setCurrentResult(null); setPhotoUrl(undefined); }}
+                photoUrl={photoUrl}
+                sessionId={sessionId}
+                isCheatDay={isCheatDay}
+                onToggleCheatDay={toggleCheatDay}
+              />
 
               {/* Post-result save CTA — anonymous only */}
               {!isAuthenticated && (
@@ -1403,6 +1461,8 @@ export default function Home() {
                     onPeriodChange={handlePeriodChange}
                     onSetGoals={() => setShowGoalsPanel(true)}
                     isPremium={isPremium}
+                    showAlerts={true}
+                    isCheatDay={isCheatDay}
                   />
                 </div>
               )}
@@ -1417,6 +1477,7 @@ export default function Home() {
         onTabChange={handleTabChange}
         isPremium={isPremium}
         onCameraCapture={handleCameraCapture}
+        analyticsNotifCount={pendingNotifCount}
       />
 
       {/* Panels / Modals */}
@@ -1515,6 +1576,15 @@ export default function Home() {
         />
       )}
 
+      <CardapioChoiceModal
+        isOpen={showCardapioChoice}
+        onClose={() => setShowCardapioChoice(false)}
+        isPremium={isPremium}
+        onSelectAI={() => setShowMealPlan(true)}
+        onSelectRecipe={() => setShowRecipeSuggestor(true)}
+        onUpgrade={() => { setPaywallDisableClose(false); setShowPaywall(true); }}
+      />
+
       {sessionId && (
         <MealPlanModal
           isOpen={showMealPlan}
@@ -1522,6 +1592,7 @@ export default function Home() {
           sessionId={sessionId}
           isPremium={isPremium}
           onUpgrade={() => { setShowMealPlan(false); setPaywallDisableClose(false); setShowPaywall(true); }}
+          onOpenFoodPrefs={() => setShowFoodPrefs(true)}
         />
       )}
 
@@ -1535,6 +1606,57 @@ export default function Home() {
       {showFoodPrefs && (
         <MealFoodPrefsModal onClose={() => setShowFoodPrefs(false)} />
       )}
+
+      {/* Alerta motivacional de foto esquecida */}
+      <AnimatePresence>
+        {showMissedMealAlert && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+            style={{
+              position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
+              width: 'calc(100% - 32px)', maxWidth: '440px',
+              zIndex: 500,
+              borderRadius: '20px',
+              background: 'var(--bg-2)',
+              border: '1px solid rgba(13,159,110,0.3)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+              padding: '16px 18px',
+              display: 'flex', flexDirection: 'column', gap: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0, background: 'linear-gradient(135deg, #0D9F6E, #057A55)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                🩺
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '4px' }}>Sofia lembra de você</div>
+                <p style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.6, margin: 0 }}>
+                  Sei que é difícil conciliar trabalho e disciplina alimentar — e é por isso que a Sofia existe. Em segundos, fotografe seu prato e eu cuido do resto. 📸
+                </p>
+              </div>
+              <button
+                onClick={() => setShowMissedMealAlert(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '2px', flexShrink: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+            <button
+              onClick={() => { setShowMissedMealAlert(false); handleTabChange('analyze'); }}
+              style={{
+                width: '100%', padding: '11px', borderRadius: '12px', border: 'none',
+                background: 'linear-gradient(135deg, #0D9F6E, #057A55)', color: '#fff',
+                fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              📸 Fotografar agora
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <style>{`
         @keyframes ping {

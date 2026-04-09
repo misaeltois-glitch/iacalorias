@@ -15,9 +15,31 @@ export interface MealSlot {
   enabled: boolean;
 }
 
+export interface CustomSlot {
+  key: string; // unique uuid-like key
+  label: string;
+  emoji: string;
+  time: string;
+  enabled: boolean;
+}
+
 export interface ReminderSettings {
   globalEnabled: boolean;
   slots: MealSlot[];
+  customSlots: CustomSlot[];
+}
+
+export function emojiFromName(name: string): string {
+  const n = name.toLowerCase();
+  if (/treino|academia|exerc/.test(n)) return '🏋️';
+  if (/água|agua|hidrat/.test(n)) return '💧';
+  if (/suple|vitamina|omega|prote/.test(n)) return '💊';
+  if (/café|coffee/.test(n)) return '☕';
+  if (/fruta|lanche/.test(n)) return '🍎';
+  if (/med|remedio|remédio/.test(n)) return '💉';
+  if (/sono|dormir|descanso/.test(n)) return '😴';
+  if (/peso|balança/.test(n)) return '⚖️';
+  return '⏰';
 }
 
 export const DEFAULT_SLOTS: MealSlot[] = [
@@ -33,11 +55,13 @@ export function loadReminders(): ReminderSettings {
     const raw = localStorage.getItem(REMINDERS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // migrate old format
-      if (parsed.slots) return parsed as ReminderSettings;
+      // migrate old format — ensure customSlots exists
+      if (parsed.slots) {
+        return { customSlots: [], ...parsed } as ReminderSettings;
+      }
     }
   } catch {}
-  return { globalEnabled: false, slots: DEFAULT_SLOTS.map(s => ({ ...s })) };
+  return { globalEnabled: false, slots: DEFAULT_SLOTS.map(s => ({ ...s })), customSlots: [] };
 }
 
 export function saveReminders(s: ReminderSettings) {
@@ -108,7 +132,12 @@ function checkReminders(windowMinutes = 1) {
   const now = new Date();
   const today = todayDateStr();
 
-  for (const slot of settings.slots) {
+  const allSlots: Array<{ key: string; label: string; emoji: string; time: string; enabled: boolean }> = [
+    ...settings.slots,
+    ...(settings.customSlots ?? []),
+  ];
+
+  for (const slot of allSlots) {
     if (!slot.enabled) continue;
     const [h, m] = slot.time.split(':').map(Number);
     const reminderDate = new Date(now);
@@ -123,7 +152,7 @@ function checkReminders(windowMinutes = 1) {
     if (alreadyNotified(notifiedKey)) continue;
 
     markNotified(notifiedKey);
-    showNotification(slot);
+    showNotification(slot as MealSlot);
   }
 }
 

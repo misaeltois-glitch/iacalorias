@@ -74,7 +74,10 @@ export default function ProfilePage() {
   const [passMsg, setPassMsg] = useState('');
   const [passErr, setPassErr] = useState('');
 
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<'idle' | 'confirm' | 'password'>('idle');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deletePasswordErr, setDeletePasswordErr] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -158,12 +161,30 @@ export default function ProfilePage() {
     } finally { setPassLoading(false); }
   };
 
-  const handleDeleteData = async () => {
+  const handleDeleteVerifyPassword = async () => {
+    if (!deletePassword.trim()) { setDeletePasswordErr('Digite sua senha.'); return; }
+    setDeleteLoading(true);
+    setDeletePasswordErr('');
     try {
+      const r = await fetch(`${BASE}api/auth/verify-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ password: deletePassword }),
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        setDeletePasswordErr(data.message ?? 'Senha incorreta.');
+        return;
+      }
+      // Password confirmed — proceed with deletion
       await fetch(`${BASE}api/user/data`, { method: 'DELETE', headers: authHeaders() });
-    } catch {}
-    await logout();
-    navigate('/');
+      await logout();
+      navigate('/');
+    } catch {
+      setDeletePasswordErr('Erro ao verificar senha. Tente novamente.');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const inputStyle: React.CSSProperties = {
@@ -373,9 +394,9 @@ export default function ProfilePage() {
             <LogOut size={16} color="var(--text-2)" /> Sair da conta
           </button>
 
-          {!deleteConfirm ? (
+          {deleteStep === 'idle' && (
             <button
-              onClick={() => setDeleteConfirm(true)}
+              onClick={() => setDeleteStep('confirm')}
               style={{
                 width: '100%', padding: '13px 14px', borderRadius: '10px',
                 background: 'rgba(239,68,68,0.07)', border: '1.5px solid rgba(239,68,68,0.2)',
@@ -385,18 +406,52 @@ export default function ProfilePage() {
             >
               <Trash2 size={16} /> Apagar meus dados
             </button>
-          ) : (
+          )}
+
+          {deleteStep === 'confirm' && (
             <div style={{ padding: '14px', borderRadius: '12px', background: 'rgba(239,68,68,0.09)', border: '1px solid rgba(239,68,68,0.25)' }}>
               <p style={{ fontSize: '14px', color: '#f87171', margin: '0 0 12px', fontWeight: 600 }}>⚠️ Esta ação é permanente</p>
               <p style={{ fontSize: '13px', color: 'var(--text-2)', margin: '0 0 14px', lineHeight: 1.5 }}>
                 Todos os seus dados serão apagados: análises, histórico e configurações. Sua conta também será encerrada.
               </p>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => setDeleteConfirm(false)} style={{ flex: 1, padding: '11px', borderRadius: '9px', border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)', fontSize: '14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                <button onClick={() => setDeleteStep('idle')} style={{ flex: 1, padding: '11px', borderRadius: '9px', border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)', fontSize: '14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                   Cancelar
                 </button>
-                <button onClick={handleDeleteData} style={{ flex: 1, padding: '11px', borderRadius: '9px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  Confirmar exclusão
+                <button onClick={() => setDeleteStep('password')} style={{ flex: 1, padding: '11px', borderRadius: '9px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Continuar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {deleteStep === 'password' && (
+            <div style={{ padding: '14px', borderRadius: '12px', background: 'rgba(239,68,68,0.09)', border: '1px solid rgba(239,68,68,0.25)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <p style={{ fontSize: '14px', color: '#f87171', margin: 0, fontWeight: 600 }}>🔐 Confirme sua senha</p>
+              <p style={{ fontSize: '13px', color: 'var(--text-2)', margin: 0, lineHeight: 1.5 }}>
+                Para confirmar a exclusão, digite sua senha atual.
+              </p>
+              <input
+                type="password"
+                placeholder="Sua senha"
+                value={deletePassword}
+                onChange={e => { setDeletePassword(e.target.value); setDeletePasswordErr(''); }}
+                onKeyDown={e => e.key === 'Enter' && handleDeleteVerifyPassword()}
+                style={{ ...inputStyle, border: deletePasswordErr ? '1.5px solid #ef4444' : '1.5px solid var(--border-strong)' }}
+              />
+              {deletePasswordErr && (
+                <p style={{ fontSize: '12px', color: '#ef4444', margin: 0 }}>{deletePasswordErr}</p>
+              )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => { setDeleteStep('idle'); setDeletePassword(''); setDeletePasswordErr(''); }} style={{ flex: 1, padding: '11px', borderRadius: '9px', border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)', fontSize: '14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteVerifyPassword}
+                  disabled={deleteLoading}
+                  style={{ flex: 1, padding: '11px', borderRadius: '9px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: deleteLoading ? 'not-allowed' : 'pointer', opacity: deleteLoading ? 0.7 : 1, fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  {deleteLoading ? <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> : null}
+                  {deleteLoading ? 'Verificando...' : 'Excluir definitivamente'}
                 </button>
               </div>
             </div>

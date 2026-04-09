@@ -8,9 +8,10 @@ interface BottomNavProps {
   onTabChange: (tab: BottomNavTab) => void;
   isPremium: boolean;
   onCameraCapture?: (file: File) => void;
+  analyticsNotifCount?: number;
 }
 
-export function BottomNav({ activeTab, onTabChange, isPremium, onCameraCapture }: BottomNavProps) {
+export function BottomNav({ activeTab, onTabChange, isPremium, onCameraCapture, analyticsNotifCount = 0 }: BottomNavProps) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const tabs = [
@@ -80,6 +81,7 @@ export function BottomNav({ activeTab, onTabChange, isPremium, onCameraCapture }
             );
           }
 
+          const showBadge = id === 'analytics' && analyticsNotifCount > 0 && !isActive;
           return (
             <button
               key={id}
@@ -95,7 +97,22 @@ export function BottomNav({ activeTab, onTabChange, isPremium, onCameraCapture }
                 position: 'relative',
               }}
             >
-              <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
+              <div style={{ position: 'relative', display: 'inline-flex' }}>
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
+                {showBadge && (
+                  <span style={{
+                    position: 'absolute', top: '-5px', right: '-7px',
+                    minWidth: '16px', height: '16px', borderRadius: '99px',
+                    background: '#EF4444', color: '#fff',
+                    fontSize: '9px', fontWeight: 800,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '0 3px', lineHeight: 1,
+                    boxShadow: '0 1px 4px rgba(239,68,68,0.5)',
+                  }}>
+                    {analyticsNotifCount > 9 ? '9+' : analyticsNotifCount}
+                  </span>
+                )}
+              </div>
               <span style={{
                 fontSize: '10px', fontWeight: isActive ? 700 : 500,
                 lineHeight: 1,

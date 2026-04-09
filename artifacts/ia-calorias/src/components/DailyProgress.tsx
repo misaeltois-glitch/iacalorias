@@ -30,6 +30,8 @@ interface DailyProgressProps {
   onPeriodChange?: (p: Period) => void;
   onSetGoals: () => void;
   isPremium: boolean;
+  showAlerts?: boolean;
+  isCheatDay?: boolean;
 }
 
 function MacroRingComponent({ label, emoji, current, goal, unit, color, trackColor }: MacroRing) {
@@ -76,7 +78,7 @@ function MacroRingComponent({ label, emoji, current, goal, unit, color, trackCol
 
 const PERIOD_LABELS: Record<Period, string> = { day: 'Hoje', week: 'Semana', month: 'Mês' };
 
-export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount, period, onPeriodChange, onSetGoals, isPremium }: DailyProgressProps) {
+export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount, period, onPeriodChange, onSetGoals, isPremium, showAlerts = false, isCheatDay = false }: DailyProgressProps) {
   const [showSummary, setShowSummary] = useState(false);
 
   const macros: MacroRing[] = [
@@ -187,8 +189,29 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
         )}
       </div>
 
+      {/* Cheat day banner */}
+      {isCheatDay && period === 'day' && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{
+            borderRadius: '14px', padding: '12px 16px',
+            background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+            display: 'flex', alignItems: 'center', gap: '10px',
+          }}
+        >
+          <span style={{ fontSize: '22px' }}>🍕</span>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: '#F59E0B' }}>Dia do Lixo</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '1px' }}>
+              Tudo bem — amanhã é um novo dia. Continue firme!
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Deficit recovery feedback (day only) */}
-      {period === 'day' && goals?.calories && totals.calories > 0 && (() => {
+      {!isCheatDay && showAlerts && period === 'day' && goals?.calories && totals.calories > 0 && (() => {
         const pct = totals.calories / goals.calories;
         if (pct >= 0.8) return null; // within acceptable range
 
@@ -279,8 +302,8 @@ export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount,
         );
       })()}
 
-      {/* Alerts (day only) */}
-      {alerts.length > 0 && period === 'day' && (
+      {/* Alerts (day only) — only when showAlerts=true and not cheat day */}
+      {showAlerts && !isCheatDay && alerts.length > 0 && period === 'day' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {alerts.map((alert, i) => {
             const Icon = alertIcons[alert.type];

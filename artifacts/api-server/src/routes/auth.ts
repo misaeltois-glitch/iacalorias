@@ -223,6 +223,34 @@ router.post("/logout", (_req: Request, res: Response) => {
   res.json({ message: "Logout realizado." });
 });
 
+// ─── POST /api/auth/verify-password ──────────────────────────────────────────
+router.post("/verify-password", async (req: Request, res: Response) => {
+  const userId = req.user?.userId;
+  if (!userId) {
+    res.status(401).json({ error: "unauthorized", message: "Autenticação necessária." });
+    return;
+  }
+  const { password } = req.body as { password?: string };
+  if (!password) {
+    res.status(400).json({ error: "bad_request", message: "Senha é obrigatória." });
+    return;
+  }
+
+  const user = await db.query.usersTable.findFirst({ where: eq(usersTable.id, userId) });
+  if (!user) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) {
+    res.status(401).json({ error: "invalid_password", message: "Senha incorreta." });
+    return;
+  }
+
+  res.json({ ok: true });
+});
+
 // ─── Data migration helper ────────────────────────────────────────────────────
 const TIER_RANK: Record<string, number> = { free: 0, limited: 1, unlimited: 2 };
 

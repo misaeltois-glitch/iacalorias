@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, RefreshCw, ChevronDown, ChevronUp, Lock } from 'lucide-react';
+import { X, RefreshCw, ChevronDown, ChevronUp, Lock, Settings2 } from 'lucide-react';
 
 const BASE = import.meta.env.BASE_URL ?? '/';
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
@@ -33,6 +33,7 @@ interface MealPlanModalProps {
   sessionId: string;
   isPremium: boolean;
   onUpgrade: () => void;
+  onOpenFoodPrefs?: () => void;
 }
 
 const DAY_EMOJIS: Record<string, string> = {
@@ -189,7 +190,7 @@ function SkeletonDay() {
   );
 }
 
-export function MealPlanModal({ isOpen, onClose, sessionId, isPremium, onUpgrade }: MealPlanModalProps) {
+export function MealPlanModal({ isOpen, onClose, sessionId, isPremium, onUpgrade, onOpenFoodPrefs }: MealPlanModalProps) {
   const [weekPlan, setWeekPlan] = useState<DayPlan[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -269,16 +270,31 @@ export function MealPlanModal({ isOpen, onClose, sessionId, isPremium, onUpgrade
               Plano personalizado baseado nas suas metas
             </p>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              width: '32px', height: '32px', borderRadius: '50%',
-              background: 'var(--bg-3)', border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <X size={16} style={{ color: 'var(--text-2)' }} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {onOpenFoodPrefs && (
+              <button
+                onClick={onOpenFoodPrefs}
+                title="Preferências alimentares"
+                style={{
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  background: 'var(--bg-3)', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <Settings2 size={15} style={{ color: 'var(--text-2)' }} />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              style={{
+                width: '32px', height: '32px', borderRadius: '50%',
+                background: 'var(--bg-3)', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <X size={16} style={{ color: 'var(--text-2)' }} />
+            </button>
+          </div>
         </div>
 
         {/* Body */}

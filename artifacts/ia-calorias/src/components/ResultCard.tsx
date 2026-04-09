@@ -33,6 +33,8 @@ interface ResultCardProps {
   onReset: () => void;
   photoUrl?: string;
   sessionId?: string;
+  isCheatDay?: boolean;
+  onToggleCheatDay?: () => void;
 }
 
 const MACROS = [
@@ -75,7 +77,7 @@ function CountUpNumber({ value, suffix = '' }: { value: number; suffix?: string 
   return <>{displayed}{suffix}</>;
 }
 
-export function ResultCard({ result, onReset, photoUrl, sessionId }: ResultCardProps) {
+export function ResultCard({ result, onReset, photoUrl, sessionId, isCheatDay, onToggleCheatDay }: ResultCardProps) {
   const [sharing, setSharing] = useState(false);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -540,6 +542,27 @@ export function ResultCard({ result, onReset, photoUrl, sessionId }: ResultCardP
           </motion.p>
         )}
       </motion.div>
+
+      {/* Dia do Lixo Button */}
+      {onToggleCheatDay && (
+        <motion.div variants={item}>
+          <button
+            onClick={onToggleCheatDay}
+            style={{
+              width: '100%', padding: '13px',
+              borderRadius: '14px',
+              background: isCheatDay ? 'rgba(245,158,11,0.12)' : 'var(--bg-2)',
+              border: isCheatDay ? '1.5px solid rgba(245,158,11,0.35)' : '1px solid var(--border)',
+              color: isCheatDay ? '#F59E0B' : 'var(--text-2)',
+              fontSize: '14px', fontWeight: 600,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            }}
+          >
+            <span>🍕</span>
+            {isCheatDay ? 'Dia do Lixo ativo — remover' : 'Marcar como Dia do Lixo'}
+          </button>
+        </motion.div>
+      )}
 
       {/* Reset Button */}
       <motion.div variants={item}>
