@@ -1,5 +1,14 @@
 import { useEffect, useRef } from 'react';
-import { FOOD_PREFS_KEY, type MealFoodPrefs } from '@/components/MealFoodPrefsModal';
+
+// Duplicado aqui para evitar dependência circular hook → componente UI
+const FOOD_PREFS_KEY = 'ia-calorias-food-prefs';
+type MealFoodPrefs = {
+  breakfast?: string[];
+  morningSnack?: string[];
+  lunch?: string[];
+  afternoonSnack?: string[];
+  dinner?: string[];
+};
 
 export const REMINDERS_KEY = 'ia-calorias-reminders';
 const NOTIFIED_KEY = 'ia-calorias-reminder-last-notified';
