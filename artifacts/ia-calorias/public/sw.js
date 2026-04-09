@@ -1,12 +1,17 @@
 // IA Calorias — Service Worker
 // BUILD: 2026-04-08
 
-const SW_VERSION = '2026-04-08-2';
+const SW_VERSION = '2026-04-09-1';
 
 self.addEventListener('install', () => self.skipWaiting());
 
 self.addEventListener('activate', e =>
-  e.waitUntil(self.clients.claim())
+  e.waitUntil(
+    // Limpa todos os caches antigos e reivindica controle imediatamente
+    caches.keys()
+      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  )
 );
 
 // Força rede para navegação HTML — evita que o browser sirva versão em cache no PWA instalado
