@@ -1,7 +1,29 @@
 // IA Calorias — Service Worker
+// BUILD: 2026-04-08
+
+const SW_VERSION = '2026-04-08-1';
 
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+
+self.addEventListener('activate', e =>
+  e.waitUntil(
+    self.clients.claim().then(() =>
+      // Avisa todos os clients para recarregar após update do SW
+      self.clients.matchAll({ type: 'window' }).then(clients =>
+        clients.forEach(c => c.postMessage({ type: 'SW_UPDATED', version: SW_VERSION }))
+      )
+    )
+  )
+);
+
+// Força rede para navegação HTML — evita que o browser sirva versão em cache no PWA instalado
+self.addEventListener('fetch', e => {
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request, { cache: 'no-store' }).catch(() => fetch(e.request))
+    );
+  }
+});
 
 const ICON = '/icon-512.png';
 

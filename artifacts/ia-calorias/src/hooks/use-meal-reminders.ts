@@ -163,10 +163,24 @@ export function registerServiceWorker() {
         // Periodic Background Sync (Chrome Android — funciona mesmo com tab fechada)
         if ('periodicSync' in reg) {
           (reg as any).periodicSync.register('meal-reminder', { minInterval: 60 * 1000 })
-            .catch(() => {}); // Pode falhar se permissão não concedida
+            .catch(() => {});
         }
+
+        // Força o browser a checar por novo SW ao recuperar foco (garante atualização do PWA instalado)
+        const forceUpdate = () => reg.update().catch(() => {});
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') forceUpdate();
+        });
+        window.addEventListener('focus', forceUpdate);
       })
       .catch(() => {});
+
+    // Recarrega a página quando o SW avisa de update (garante que o usuário vê a versão nova)
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data?.type === 'SW_UPDATED') {
+        window.location.reload();
+      }
+    });
   }
 }
 
