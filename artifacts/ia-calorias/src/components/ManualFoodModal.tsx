@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, PenLine, Loader2 } from 'lucide-react';
-import type { AnalyzeFoodResponse } from '@workspace/api-zod';
+import type { AnalysisResult } from '@workspace/api-zod';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   sessionId: string;
   token?: string;
-  onResult: (result: AnalyzeFoodResponse) => void;
+  onResult: (result: AnalysisResult) => void;
   onUpgradeRequired?: () => void;
 }
 
@@ -45,7 +45,7 @@ export function ManualFoodModal({ isOpen, onClose, sessionId, token, onResult, o
       }
 
       setDescription('');
-      onResult(data as AnalyzeFoodResponse);
+      onResult(data as AnalysisResult);
       onClose();
     } catch {
       setError('Erro de conexão. Verifique sua internet e tente novamente.');
