@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Target } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Target, Download } from 'lucide-react';
 
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 const BASE = import.meta.env.BASE_URL ?? '/';
@@ -95,6 +95,49 @@ export function ProgressView({ sessionId, isPremium, refreshSignal, onUpgrade, o
   const [monthData, setMonthData] = useState<SummaryData | null>(null);
 
   const today = todayStr();
+  const [exporting, setExporting] = useState(false);
+
+  const exportCSV = useCallback(async () => {
+    if (!sessionId || !data) return;
+    setExporting(true);
+    try {
+      // Fetch all meals for the current period (up to 500)
+      const tzOffset = new Date().getTimezoneOffset();
+      const url = `${BASE}api/analytics/summary?sessionId=${sessionId}&period=${period}&date=${selectedDate}&pageSize=500&tzOffset=${tzOffset}`;
+      const r = await fetch(url, { headers: authHeaders() });
+      if (!r.ok) return;
+      const d: SummaryData = await r.json();
+
+      const rows = [
+        ['Data', 'Hora', 'Refeição', 'Calorias (kcal)', 'Proteína (g)', 'Carbs (g)', 'Gordura (g)', 'Fibra (g)', 'Score de saúde'],
+        ...d.meals.map(m => {
+          const dt = new Date(m.createdAt);
+          return [
+            dt.toLocaleDateString('pt-BR'),
+            dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            `"${m.dishName.replace(/"/g, '""')}"`,
+            m.calories,
+            m.protein.toFixed(1),
+            m.carbs.toFixed(1),
+            m.fat.toFixed(1),
+            m.fiber != null ? m.fiber.toFixed(1) : '',
+            m.healthScore ?? '',
+          ].join(';');
+        }),
+      ].join('\n');
+
+      const bom = '\uFEFF'; // UTF-8 BOM for Excel
+      const blob = new Blob([bom + rows], { type: 'text/csv;charset=utf-8;' });
+      const url2 = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url2;
+      a.download = `ia-calorias-${period}-${selectedDate}.csv`;
+      a.click();
+      URL.revokeObjectURL(url2);
+    } finally {
+      setExporting(false);
+    }
+  }, [sessionId, data, period, selectedDate]);
 
   const fetchData = useCallback(async (p: Period, date: string) => {
     if (!sessionId) return;
@@ -210,28 +253,45 @@ export function ProgressView({ sessionId, isPremium, refreshSignal, onUpgrade, o
       transition={freshNotif ? { type: 'spring', stiffness: 300, damping: 26 } : undefined}
       style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '4px' }}
     >
-      {/* Period pills */}
-      <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-3)', borderRadius: '12px', padding: '3px' }}>
-        {([
-          { key: 'day' as Period, label: 'Hoje' },
-          { key: 'week' as Period, label: 'Semana' },
-          { key: 'month' as Period, label: 'Mês' },
-        ] as const).map(({ key, label }) => (
+      {/* Period pills + export */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ flex: 1, display: 'flex', gap: '4px', background: 'var(--bg-3)', borderRadius: '12px', padding: '3px' }}>
+          {([
+            { key: 'day' as Period, label: 'Hoje' },
+            { key: 'week' as Period, label: 'Semana' },
+            { key: 'month' as Period, label: 'Mês' },
+          ] as const).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => handlePeriod(key)}
+              style={{
+                flex: 1, padding: '9px 6px', borderRadius: '10px',
+                border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+                transition: 'all 0.15s',
+                background: period === key ? 'var(--bg)' : 'transparent',
+                color: period === key ? 'var(--text-1)' : 'var(--text-3)',
+                boxShadow: period === key ? '0 1px 4px rgba(0,0,0,0.15)' : 'none',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {isPremium && data && data.meals.length > 0 && (
           <button
-            key={key}
-            onClick={() => handlePeriod(key)}
+            onClick={exportCSV}
+            disabled={exporting}
+            title="Exportar CSV"
             style={{
-              flex: 1, padding: '9px 6px', borderRadius: '10px',
-              border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
-              transition: 'all 0.15s',
-              background: period === key ? 'var(--bg)' : 'transparent',
-              color: period === key ? 'var(--text-1)' : 'var(--text-3)',
-              boxShadow: period === key ? '0 1px 4px rgba(0,0,0,0.15)' : 'none',
+              width: '38px', height: '38px', borderRadius: '10px', flexShrink: 0,
+              background: 'var(--bg-3)', border: '1px solid var(--border)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--text-2)', opacity: exporting ? 0.5 : 1,
             }}
           >
-            {label}
+            <Download size={15} />
           </button>
-        ))}
+        )}
       </div>
 
       {loading && (

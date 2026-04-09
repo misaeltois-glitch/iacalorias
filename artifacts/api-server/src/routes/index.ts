@@ -16,6 +16,7 @@ import mealPlanRouter from "./meal-plan";
 import referralRouter from "./referral";
 import recipeRouter from "./recipe";
 import mealFeedbackRouter from "./meal-feedback";
+import measurementsRouter from "./measurements";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use("/meal-plan", analysisRateLimit, mealPlanRouter);
 router.use("/referral", generalRateLimit, referralRouter);
 router.use("/recipe", analysisRateLimit, recipeRouter);
 router.use("/meal-feedback", analysisRateLimit, mealFeedbackRouter);
+router.use("/measurements", generalRateLimit, measurementsRouter);
 
 export default router;

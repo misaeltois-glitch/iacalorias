@@ -135,6 +135,21 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
 
   const [planHeaderExpanded, setPlanHeaderExpanded] = useState(false);
 
+  // done exercises tracking (localStorage per day)
+  const DONE_KEY = `ia-calorias-done-exercises-${getTodayKey()}`;
+  const [doneExercises, setDoneExercises] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(DONE_KEY) ?? '[]') as string[]); }
+    catch { return new Set(); }
+  });
+  const toggleDoneExercise = (id: string) => {
+    setDoneExercises(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      try { localStorage.setItem(DONE_KEY, JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
+
   // calorie dashboard state
   const [todayCalories, setTodayCalories] = useState<{ consumed: number } | null>(null);
 
@@ -1010,33 +1025,77 @@ export function WorkoutPanel({ isOpen, onClose, sessionId, isPremium, onUpgrade,
                   )}
 
                   {/* Exercises */}
-                  <div style={{ borderRadius: '20px', background: 'var(--bg-2)', border: `1.5px solid ${isCustomized ? 'rgba(13,159,110,0.25)' : 'var(--border)'}`, overflow: 'hidden' }}>
-                    <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
-                        💪 {displaySession.exercises.length} Exercícios
-                      </h3>
-                      {isCustomized && (
-                        <span style={{ fontSize: '11px', color: '#0D9F6E', fontWeight: 600 }}>Personalizado</span>
-                      )}
-                    </div>
-                    {displaySession.exercises.map((se, i) => (
-                      <div key={`${se.exercise.id}-${i}`} style={{ padding: '14px 18px', borderBottom: i < displaySession.exercises.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                        <div style={{ width: '26px', height: '26px', borderRadius: '8px', background: 'rgba(13,159,110,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontFamily: "'DM Mono', monospace", fontSize: '11px', fontWeight: 700, color: accent }}>
-                          {String(i + 1).padStart(2, '0')}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-1)', marginBottom: '4px' }}>{se.exercise.name}</div>
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            <Pill label={`${se.sets} séries`} />
-                            <Pill label={`${se.reps} reps`} />
-                            <Pill label={`${formatRest(se.restSeconds)} desc.`} />
-                            <Pill label={`RPE ${se.rpe}`} />
+                  {(() => {
+                    const doneCount = displaySession.exercises.filter((se, i) => doneExercises.has(`${selectedDayKey}-${i}`)).length;
+                    const total = displaySession.exercises.length;
+                    const allDone = doneCount === total;
+                    return (
+                      <div style={{ borderRadius: '20px', background: 'var(--bg-2)', border: `1.5px solid ${allDone ? '#0D9F6E' : isCustomized ? 'rgba(13,159,110,0.25)' : 'var(--border)'}`, overflow: 'hidden' }}>
+                        <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: doneCount > 0 ? '10px' : '0' }}>
+                            <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
+                              💪 {total} Exercícios
+                            </h3>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: allDone ? '#0D9F6E' : 'var(--text-3)' }}>
+                              {doneCount}/{total} feitos
+                            </span>
                           </div>
-                          {se.notes && <p style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '4px', lineHeight: 1.4 }}>💡 {se.notes}</p>}
+                          {doneCount > 0 && (
+                            <div style={{ height: '4px', borderRadius: '99px', background: 'var(--bg-3)', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${(doneCount / total) * 100}%`, background: '#0D9F6E', borderRadius: '99px', transition: 'width 0.3s ease' }} />
+                            </div>
+                          )}
                         </div>
+                        {displaySession.exercises.map((se, i) => {
+                          const doneKey = `${selectedDayKey}-${i}`;
+                          const done = doneExercises.has(doneKey);
+                          return (
+                            <div
+                              key={`${se.exercise.id}-${i}`}
+                              style={{
+                                padding: '14px 18px',
+                                borderBottom: i < displaySession.exercises.length - 1 ? '1px solid var(--border)' : 'none',
+                                display: 'flex', gap: '12px', alignItems: 'flex-start',
+                                background: done ? 'rgba(13,159,110,0.04)' : 'transparent',
+                                opacity: done ? 0.75 : 1,
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              <button
+                                onClick={() => toggleDoneExercise(doneKey)}
+                                style={{
+                                  width: '26px', height: '26px', borderRadius: '8px', flexShrink: 0,
+                                  background: done ? '#0D9F6E' : 'rgba(13,159,110,0.1)',
+                                  border: done ? 'none' : '1.5px solid rgba(13,159,110,0.3)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  cursor: 'pointer', transition: 'all 0.2s ease',
+                                  fontFamily: "'DM Mono', monospace", fontSize: '11px', fontWeight: 700,
+                                  color: done ? '#fff' : accent,
+                                }}
+                              >
+                                {done ? <Check size={13} /> : String(i + 1).padStart(2, '0')}
+                              </button>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-1)', marginBottom: '4px', textDecoration: done ? 'line-through' : 'none' }}>{se.exercise.name}</div>
+                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                  <Pill label={`${se.sets} séries`} />
+                                  <Pill label={`${se.reps} reps`} />
+                                  <Pill label={`${formatRest(se.restSeconds)} desc.`} />
+                                  <Pill label={`RPE ${se.rpe}`} />
+                                </div>
+                                {se.notes && <p style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '4px', lineHeight: 1.4 }}>💡 {se.notes}</p>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {allDone && (
+                          <div style={{ padding: '12px 18px', background: 'rgba(13,159,110,0.06)', textAlign: 'center', fontSize: '13px', fontWeight: 700, color: '#0D9F6E' }}>
+                            🎉 Treino completo! Excelente trabalho!
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
 
                   {/* Cooldown */}
                   {displaySession.cooldown.length > 0 && (

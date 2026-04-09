@@ -167,4 +167,65 @@ Inclua todos os 7 dias. Use alimentos brasileiros comuns, variados por dia. Os t
   }
 });
 
+// POST /api/meal-plan/shopping-list — generate consolidated ingredient list from a week plan
+router.post("/shopping-list", async (req: Request, res: Response) => {
+  const userId = req.user?.userId;
+  const { sessionId, weekPlan } = req.body as { sessionId?: string; weekPlan?: any[] };
+
+  if (!weekPlan || !Array.isArray(weekPlan) || weekPlan.length === 0) {
+    res.status(400).json({ error: "bad_request", message: "weekPlan é obrigatório" });
+    return;
+  }
+
+  const masterTier = getMasterTier(req.user?.email);
+  const tier = masterTier ?? await resolveSubTier(userId, sessionId);
+  if (tier === "free") {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+
+  // Flatten meal names for the prompt
+  const mealList = weekPlan.flatMap((day: any) =>
+    (day.meals ?? []).map((m: any) => m.name)
+  ).join('\n');
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      max_tokens: 800,
+      messages: [
+        {
+          role: "system",
+          content: `Você é um nutricionista. Com base nas refeições listadas, crie uma lista de compras consolidada para a semana. Agrupe os ingredientes por categoria. Retorne APENAS JSON neste formato:
+{
+  "categories": [
+    { "name": "Proteínas", "emoji": "🥩", "items": ["Frango (1kg)", "Ovos (1 dúzia)"] },
+    { "name": "Carboidratos", "emoji": "🍚", "items": ["Arroz integral (1kg)", "Aveia (500g)"] },
+    { "name": "Legumes e Verduras", "emoji": "🥦", "items": ["Brócolis", "Cenoura"] },
+    { "name": "Frutas", "emoji": "🍌", "items": ["Banana (cacho)", "Maçã (6 un)"] },
+    { "name": "Laticínios", "emoji": "🥛", "items": ["Leite desnatado (1L)", "Iogurte natural (400g)"] },
+    { "name": "Outros", "emoji": "🧴", "items": ["Azeite de oliva", "Sal, Pimenta"] }
+  ]
+}
+Inclua apenas itens necessários para as refeições. Consolide duplicatas. Estime quantidades para a semana toda.`,
+        },
+        { role: "user", content: `Refeições da semana:\n${mealList}` },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    let parsed: any;
+    try { parsed = JSON.parse(raw); } catch {
+      res.status(500).json({ error: "parse_error", message: "Erro ao processar a lista" });
+      return;
+    }
+
+    res.json({ categories: parsed.categories ?? [] });
+  } catch (err: any) {
+    req.log?.error?.({ err }, "shopping-list generation failed");
+    res.status(500).json({ error: "ai_error", message: "Erro ao gerar a lista de compras" });
+  }
+});
+
 export default router;

@@ -4,3 +4,4 @@ export * from "./subscriptions";
 export * from "./goals";
 export * from "./workout";
 export * from "./weight";
+export * from "./measurements";

@@ -212,6 +212,146 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
   }
 });
 
+// POST /api/analysis/text — manual food registration by text description
+router.post("/text", async (req: Request, res: Response) => {
+  const { foodDescription, sessionId } = req.body as { foodDescription?: string; sessionId?: string };
+  const userId = req.user?.userId;
+
+  if (!foodDescription?.trim()) {
+    res.status(400).json({ error: "bad_request", message: "foodDescription é obrigatório" });
+    return;
+  }
+  if (!sessionId && !userId) {
+    res.status(400).json({ error: "bad_request", message: "sessionId é obrigatório" });
+    return;
+  }
+
+  const sub = await resolveSub(userId, sessionId);
+  if (!sub) {
+    res.status(400).json({ error: "bad_request", message: "sessionId é obrigatório" });
+    return;
+  }
+
+  const masterTier = getMasterTier(req.user?.email);
+  const isDevAccount = !!masterTier;
+  const tier = masterTier ?? (sub.tier as "free" | "limited" | "unlimited");
+
+  if (!isDevAccount && tier === "free") {
+    const trialStartMs = sub.createdAt?.getTime() ?? Date.now();
+    const daysSinceStart = (Date.now() - trialStartMs) / (24 * 60 * 60 * 1000);
+    if (daysSinceStart >= FREE_TRIAL_DAYS) {
+      res.status(402).json({ error: "payment_required", message: "Seu período de teste gratuito expirou.", requiresUpgrade: true });
+      return;
+    }
+  }
+  if (!isDevAccount && tier === "limited" && sub.analysisCount >= LIMITED_PLAN_LIMIT) {
+    res.status(402).json({ error: "payment_required", message: "Você atingiu o limite mensal.", requiresUpgrade: true });
+    return;
+  }
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `Você é um nutricionista especialista em análise nutricional. O usuário vai descrever um alimento ou refeição em texto. Estime os valores nutricionais e retorne APENAS JSON válido com esta estrutura exata:
+{
+  "dishName": "string (nome do prato em português, limpo e curto)",
+  "servingSize": "string (porção estimada, ex: '1 porção (~300g)')",
+  "calories": number (kcal totais como inteiro),
+  "protein": number (gramas, uma casa decimal),
+  "carbs": number (gramas, uma casa decimal),
+  "fat": number (gramas, uma casa decimal),
+  "fiber": number (gramas, uma casa decimal),
+  "healthScore": number (pontuação de 1 a 10, sendo 10 o mais saudável),
+  "nutritionTip": "string (dica nutricional curta em português, máximo 100 caracteres)",
+  "substitutionTip": "string (1 substituição saudável, máximo 110 caracteres, em português)",
+  "confidence": "string ('Alta confiança', 'Média confiança', ou 'Baixa confiança')"
+}
+Se a descrição for vaga, use 'Baixa confiança' e estime com base em porção padrão. Nunca deixe campos nulos.`,
+        },
+        {
+          role: "user",
+          content: `Alimento/refeição: ${foodDescription.trim()}`,
+        },
+      ],
+      max_tokens: 400,
+    });
+
+    const raw = response.choices[0]?.message?.content?.trim() ?? "";
+    let parsed: {
+      dishName?: string; servingSize?: string; calories?: number;
+      protein?: number; carbs?: number; fat?: number; fiber?: number;
+      healthScore?: number; nutritionTip?: string; substitutionTip?: string; confidence?: string;
+    };
+
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      res.status(422).json({ error: "parse_error", message: "Não foi possível estimar os nutrientes. Tente descrever de forma mais detalhada." });
+      return;
+    }
+
+    if (!parsed.dishName || parsed.calories == null || parsed.protein == null || parsed.carbs == null || parsed.fat == null) {
+      res.status(422).json({ error: "incomplete_analysis", message: "Não foi possível obter todos os dados nutricionais." });
+      return;
+    }
+
+    const analysisId = randomUUID();
+    const effectiveSessionId = sub.sessionId ?? sessionId!;
+
+    await db.insert(analysesTable).values({
+      id: analysisId,
+      sessionId: effectiveSessionId,
+      userId: userId ?? null,
+      dishName: parsed.dishName,
+      calories: Math.round(parsed.calories),
+      protein: parsed.protein,
+      carbs: parsed.carbs,
+      fat: parsed.fat,
+      fiber: parsed.fiber ?? null,
+      healthScore: parsed.healthScore ? Math.round(parsed.healthScore) : null,
+      nutritionTip: parsed.nutritionTip ?? null,
+      substitutionTip: parsed.substitutionTip ?? null,
+      servingSize: parsed.servingSize ?? null,
+      confidence: parsed.confidence ?? null,
+    });
+
+    if (!isDevAccount) {
+      await db.update(subscriptionsTable)
+        .set({ analysisCount: sub.analysisCount + 1, updatedAt: new Date() })
+        .where(eq(subscriptionsTable.sessionId, sub.sessionId));
+    }
+
+    const result = AnalyzeFoodResponse.parse({
+      id: analysisId,
+      sessionId: effectiveSessionId,
+      dishName: parsed.dishName,
+      calories: Math.round(parsed.calories),
+      macros: { protein: parsed.protein, carbs: parsed.carbs, fat: parsed.fat },
+      fiber: parsed.fiber ?? null,
+      healthScore: parsed.healthScore ? Math.round(parsed.healthScore) : null,
+      nutritionTip: parsed.nutritionTip ?? null,
+      substitutionTip: parsed.substitutionTip ?? null,
+      servingSize: parsed.servingSize ?? null,
+      confidence: parsed.confidence ?? null,
+      imageUrl: null,
+      createdAt: new Date(),
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    req.log.error({ err }, "Error analyzing text food");
+    if (err?.status === 429) {
+      res.status(503).json({ error: "rate_limited", message: "Muitas requisições simultâneas. Aguarde e tente novamente." });
+      return;
+    }
+    res.status(500).json({ error: "internal_error", message: "Ocorreu um erro inesperado. Tente novamente." });
+  }
+});
+
 // PATCH /api/analysis/:id — edit analysis fields
 router.patch("/:id", async (req: Request, res: Response) => {
   const { id } = req.params;

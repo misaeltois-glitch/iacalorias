@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, RefreshCw, ChevronDown, ChevronUp, Lock, Settings2 } from 'lucide-react';
+import { X, RefreshCw, ChevronDown, ChevronUp, Lock, Settings2, ShoppingCart, Copy, Check, Loader2 } from 'lucide-react';
 
 const BASE = import.meta.env.BASE_URL ?? '/';
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
@@ -190,11 +190,48 @@ function SkeletonDay() {
   );
 }
 
+interface ShoppingCategory {
+  name: string;
+  emoji: string;
+  items: string[];
+}
+
+interface HistoryEntry {
+  id: string;
+  createdAt: string; // ISO
+  weekPlan: DayPlan[];
+}
+
+const MEAL_PLAN_HISTORY_KEY = 'ia-calorias-meal-plan-history';
+const MAX_HISTORY = 5;
+
+function loadHistory(): HistoryEntry[] {
+  try { return JSON.parse(localStorage.getItem(MEAL_PLAN_HISTORY_KEY) ?? '[]'); }
+  catch { return []; }
+}
+
+function saveToHistory(plan: DayPlan[]) {
+  try {
+    const history = loadHistory();
+    const entry: HistoryEntry = { id: Date.now().toString(), createdAt: new Date().toISOString(), weekPlan: plan };
+    const next = [entry, ...history].slice(0, MAX_HISTORY);
+    localStorage.setItem(MEAL_PLAN_HISTORY_KEY, JSON.stringify(next));
+    return next;
+  } catch { return []; }
+}
+
 export function MealPlanModal({ isOpen, onClose, sessionId, isPremium, onUpgrade, onOpenFoodPrefs }: MealPlanModalProps) {
   const [weekPlan, setWeekPlan] = useState<DayPlan[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generated, setGenerated] = useState(false);
+  const [showShopping, setShowShopping] = useState(false);
+  const [shoppingList, setShoppingList] = useState<ShoppingCategory[]>([]);
+  const [shoppingLoading, setShoppingLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
+  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
+  const [historySelected, setHistorySelected] = useState<HistoryEntry | null>(null);
 
   const generate = useCallback(async () => {
     setLoading(true);
@@ -214,14 +251,46 @@ export function MealPlanModal({ isOpen, onClose, sessionId, isPremium, onUpgrade
       }
       if (!r.ok) throw new Error('failed');
       const data = await r.json();
-      setWeekPlan(data.weekPlan ?? []);
+      const plan = data.weekPlan ?? [];
+      setWeekPlan(plan);
       setGenerated(true);
+      if (plan.length > 0) {
+        setHistory(saveToHistory(plan));
+      }
     } catch {
       setError('Erro ao gerar o cardápio. Tente novamente.');
     } finally {
       setLoading(false);
     }
   }, [sessionId]);
+
+  const generateShoppingList = useCallback(async () => {
+    if (weekPlan.length === 0) return;
+    setShoppingLoading(true);
+    try {
+      const r = await fetch(`${BASE}api/meal-plan/shopping-list`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ sessionId, weekPlan }),
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      setShoppingList(data.categories ?? []);
+      setShowShopping(true);
+    } finally {
+      setShoppingLoading(false);
+    }
+  }, [weekPlan, sessionId]);
+
+  const handleCopyList = useCallback(() => {
+    const text = shoppingList
+      .map(cat => `${cat.emoji} ${cat.name}\n${cat.items.map(i => `• ${i}`).join('\n')}`)
+      .join('\n\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [shoppingList]);
 
   // Auto-generate when modal opens and not yet generated
   React.useEffect(() => {
@@ -297,9 +366,82 @@ export function MealPlanModal({ isOpen, onClose, sessionId, isPremium, onUpgrade
           </div>
         </div>
 
+        {/* Tabs */}
+        {isPremium && (generated || history.length > 0) && (
+          <div style={{ display: 'flex', padding: '8px 20px', borderBottom: '1px solid var(--border)', gap: '4px', flexShrink: 0 }}>
+            {(['current', 'history'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => { setActiveTab(tab); setHistorySelected(null); }}
+                style={{
+                  padding: '6px 14px', borderRadius: '10px', fontSize: '12px', fontWeight: 700,
+                  border: 'none', cursor: 'pointer',
+                  background: activeTab === tab ? 'rgba(13,159,110,0.12)' : 'transparent',
+                  color: activeTab === tab ? '#0D9F6E' : 'var(--text-3)',
+                }}
+              >
+                {tab === 'current' ? '📋 Cardápio atual' : `🕐 Histórico (${history.length})`}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
 
+          {/* History tab */}
+          {activeTab === 'history' ? (
+            historySelected ? (
+              <div>
+                <button
+                  onClick={() => setHistorySelected(null)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: '13px', fontWeight: 600, marginBottom: '14px', padding: '0' }}
+                >
+                  ← Voltar
+                </button>
+                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: '12px' }}>
+                  Gerado em {new Date(historySelected.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </div>
+                {historySelected.weekPlan.map((day, i) => (
+                  <DayCard key={i} plan={day} />
+                ))}
+              </div>
+            ) : (
+              <div>
+                {history.length === 0 ? (
+                  <p style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: '13px', padding: '32px 0' }}>
+                    Nenhum cardápio gerado ainda. Gere seu primeiro cardápio!
+                  </p>
+                ) : (
+                  history.map(entry => (
+                    <button
+                      key={entry.id}
+                      onClick={() => setHistorySelected(entry)}
+                      style={{
+                        width: '100%', padding: '14px 16px', borderRadius: '14px',
+                        background: 'var(--bg-2)', border: '1px solid var(--border)',
+                        cursor: 'pointer', textAlign: 'left', marginBottom: '8px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)' }}>
+                          🥗 Cardápio de {entry.weekPlan.length} dias
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
+                          {new Date(entry.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </div>
+                      </div>
+                      <ChevronDown size={14} style={{ color: 'var(--text-3)', transform: 'rotate(-90deg)' }} />
+                    </button>
+                  ))
+                )}
+              </div>
+            )
+          ) : null}
+
+          {activeTab === 'current' && (
+          <>
           {/* Paywall state */}
           {!isPremium || error === 'forbidden' ? (
             <div style={{
@@ -377,23 +519,98 @@ export function MealPlanModal({ isOpen, onClose, sessionId, isPremium, onUpgrade
               ))}
             </div>
           )}
+          </>
+          )}
         </div>
 
-        {/* Footer — regenerate button */}
+        {/* Shopping list panel */}
+        <AnimatePresence>
+          {showShopping && shoppingList.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              style={{ overflow: 'hidden', borderTop: '1px solid var(--border)', flexShrink: 0 }}
+            >
+              <div style={{ padding: '16px 20px', maxHeight: '280px', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)' }}>🛒 Lista de compras</div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={handleCopyList}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '5px',
+                        padding: '5px 10px', borderRadius: '8px',
+                        background: copied ? 'rgba(13,159,110,0.15)' : 'var(--bg-3)',
+                        border: 'none', cursor: 'pointer',
+                        fontSize: '12px', fontWeight: 600,
+                        color: copied ? '#0D9F6E' : 'var(--text-2)',
+                      }}
+                    >
+                      {copied ? <Check size={12} /> : <Copy size={12} />}
+                      {copied ? 'Copiado!' : 'Copiar'}
+                    </button>
+                    <button
+                      onClick={() => setShowShopping(false)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '4px' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+                {shoppingList.map(cat => (
+                  <div key={cat.name} style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', marginBottom: '4px' }}>
+                      {cat.emoji} {cat.name}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {cat.items.map(item => (
+                        <span key={item} style={{
+                          fontSize: '11px', padding: '3px 9px', borderRadius: '99px',
+                          background: 'var(--bg-3)', color: 'var(--text-2)',
+                          border: '1px solid var(--border)',
+                        }}>{item}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Footer — regenerate + shopping list buttons */}
         {isPremium && generated && !loading && (
-          <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+          <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => showShopping ? setShowShopping(false) : generateShoppingList()}
+              disabled={shoppingLoading}
+              style={{
+                flex: 1, padding: '12px',
+                borderRadius: '12px', border: '1.5px solid var(--border)',
+                background: showShopping ? 'rgba(13,159,110,0.08)' : 'var(--bg-2)',
+                color: showShopping ? '#0D9F6E' : 'var(--text-1)',
+                fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              }}
+            >
+              {shoppingLoading
+                ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Gerando...</>
+                : <><ShoppingCart size={14} /> Lista de compras</>}
+            </button>
             <button
               onClick={generate}
               style={{
-                width: '100%', padding: '12px',
+                flex: 1, padding: '12px',
                 borderRadius: '12px', border: '1.5px solid var(--border)',
                 background: 'var(--bg-2)', color: 'var(--text-1)',
-                fontWeight: 600, fontSize: '14px', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
               }}
             >
-              <RefreshCw size={15} style={{ color: 'var(--text-2)' }} />
-              Gerar novo cardápio
+              <RefreshCw size={14} style={{ color: 'var(--text-2)' }} />
+              Novo cardápio
             </button>
           </div>
         )}

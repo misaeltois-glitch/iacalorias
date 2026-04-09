@@ -26,6 +26,7 @@ import { useTour } from '@/hooks/use-tour';
 import { GoalCelebration, hasCelebratedToday, markCelebratedToday } from '@/components/GoalCelebration';
 import { NutritionistChat } from '@/components/NutritionistChat';
 import { WeightTracker } from '@/components/WeightTracker';
+import { BodyMeasurements } from '@/components/BodyMeasurements';
 import { OnboardingAuthPrompt } from '@/components/OnboardingAuthPrompt';
 import { MealPlanModal } from '@/components/MealPlanModal';
 import { CardapioChoiceModal } from '@/components/CardapioChoiceModal';
@@ -37,6 +38,7 @@ import { useMealReminders, loadReminders } from '@/hooks/use-meal-reminders';
 import { useCheatDays } from '@/hooks/use-cheat-days';
 import { RecipeSuggestor } from '@/components/RecipeSuggestor';
 import { MealFoodPrefsModal } from '@/components/MealFoodPrefsModal';
+import { ManualFoodModal } from '@/components/ManualFoodModal';
 import { SupportChat } from '@/components/SupportChat';
 import { trackEvent } from '@/lib/tracking';
 
@@ -253,6 +255,7 @@ export default function Home() {
   const [pendingNotifCount, setPendingNotifCount] = useState(0);
   const [freshAnalyticsNotif, setFreshAnalyticsNotif] = useState(false);
   const [showMissedMealAlert, setShowMissedMealAlert] = useState(false);
+  const [showManualFood, setShowManualFood] = useState(false);
 
   const prevTrialRemaining = useRef<number | null>(null);
 
@@ -1104,6 +1107,20 @@ export default function Home() {
                     usageLabel={undefined}
                   />
                 </div>
+
+                {/* Registrar manualmente */}
+                <button
+                  onClick={() => setShowManualFood(true)}
+                  style={{
+                    width: '100%', padding: '11px', borderRadius: '14px',
+                    background: 'var(--bg-2)', border: '1px solid var(--border)',
+                    color: 'var(--text-2)', fontSize: '13px', fontWeight: 600,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', gap: '8px',
+                  }}
+                >
+                  <span>✏️</span> Registrar manualmente
+                </button>
               </div>
 
               {/* Profile setup banner */}
@@ -1248,6 +1265,9 @@ export default function Home() {
 
               {/* Weight Tracker */}
               <WeightTracker sessionId={sessionId} />
+
+              {/* Body Measurements */}
+              <BodyMeasurements sessionId={sessionId} />
 
               {/* Referral Card — authenticated users only */}
               {isAuthenticated && <ReferralCard />}
@@ -1605,6 +1625,21 @@ export default function Home() {
 
       {showFoodPrefs && (
         <MealFoodPrefsModal onClose={() => setShowFoodPrefs(false)} />
+      )}
+
+      {showManualFood && sessionId && (
+        <ManualFoodModal
+          isOpen={showManualFood}
+          onClose={() => setShowManualFood(false)}
+          sessionId={sessionId}
+          token={localStorage.getItem(AUTH_TOKEN_KEY) ?? undefined}
+          onResult={async (data) => {
+            setCurrentResult(data as any);
+            refetchStatus();
+            if (isPremium) await refreshSummary();
+          }}
+          onUpgradeRequired={() => { setPaywallDisableClose(false); setShowPaywall(true); }}
+        />
       )}
 
       {/* Alerta motivacional de foto esquecida */}
