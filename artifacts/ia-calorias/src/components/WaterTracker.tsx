@@ -11,8 +11,8 @@ function todayKey(): string {
   return `${WATER_KEY_PREFIX}${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function generateWaterSlots(intervalHours: number) {
-  const slots = [];
+function generateWaterSlots(intervalHours: number): Array<{ key: string; label: string; emoji: string; time: string; enabled: boolean }> {
+  const slots: Array<{ key: string; label: string; emoji: string; time: string; enabled: boolean }> = [];
   for (let h = 8; h <= 20; h += intervalHours) {
     const hh = String(h).padStart(2, '0');
     slots.push({
