@@ -1,7 +1,7 @@
 // IA Calorias — Service Worker
-// BUILD: 2026-04-08
+// BUILD: 2026-04-09
 
-const SW_VERSION = '2026-04-09-1';
+const SW_VERSION = '2026-04-09-2';
 
 self.addEventListener('install', () => self.skipWaiting());
 
