@@ -164,10 +164,6 @@ export default function Home() {
   useMealReminders();
   const { isCheatDay, toggleCheatDay } = useCheatDays();
 
-  // Alerta motivacional: verifica se há lembretes disparados nas últimas 2h sem análise
-  const todaySummaryRef = useRef<any>(null);
-  todaySummaryRef.current = todaySummary;
-
   useEffect(() => {
     const checkMissed = () => {
       const settings = loadReminders();
@@ -256,6 +252,10 @@ export default function Home() {
   const [freshAnalyticsNotif, setFreshAnalyticsNotif] = useState(false);
   const [showMissedMealAlert, setShowMissedMealAlert] = useState(false);
   const [showManualFood, setShowManualFood] = useState(false);
+
+  // Ref para usar todaySummary dentro do useEffect sem criar nova dep (evita TDZ)
+  const todaySummaryRef = useRef<any>(null);
+  todaySummaryRef.current = todaySummary;
 
   const prevTrialRemaining = useRef<number | null>(null);
 
