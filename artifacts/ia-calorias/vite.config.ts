@@ -35,10 +35,14 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    target: 'es2015',
     rollupOptions: {
+      output: {
+        // Use var instead of const/let in output — eliminates TDZ from circular dep ordering
+        generatedCode: { constBindings: false },
+      },
       onwarn(warning, warn) {
         if (warning.code === 'CIRCULAR_DEPENDENCY') {
-          // Log all circular deps to stdout so they appear in Railway build logs
           console.error('CIRCULAR DEP DETECTED:', warning.message);
         }
         warn(warning);
