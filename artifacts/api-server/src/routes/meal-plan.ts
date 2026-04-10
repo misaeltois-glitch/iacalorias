@@ -26,9 +26,15 @@ async function resolveSubTier(userId?: string, sessionId?: string): Promise<"fre
 router.post("/", async (req: Request, res: Response) => {
   const userId = req.user?.userId;
   const userEmail = req.user?.email;
-  const { sessionId, foodPrefs } = req.body as {
+  const { sessionId, foodPrefs, weightTrend } = req.body as {
     sessionId?: string;
     foodPrefs?: Record<string, string[]>;
+    weightTrend?: {
+      currentKg: number;
+      goalKg: number | null;
+      weeklyChangeKg: number; // positive = gaining, negative = losing
+      objective: string | null; // 'lose_weight' | 'gain_weight' | 'maintain'
+    };
   };
 
   if (!sessionId && !userId) {
@@ -101,10 +107,48 @@ router.post("/", async (req: Request, res: Response) => {
     ? `\nPreferências alimentares do usuário (priorize esses alimentos no cardápio): ${foodPrefsLine}.`
     : "";
 
+  // Weight progress context
+  let weightProgressPrompt = "";
+  if (weightTrend) {
+    const { currentKg, goalKg, weeklyChangeKg, objective } = weightTrend;
+    const direction = weeklyChangeKg > 0.1 ? "ganhando" : weeklyChangeKg < -0.1 ? "perdendo" : "estável";
+    const changeAbs = Math.abs(weeklyChangeKg).toFixed(1);
+
+    if (objective === "lose_weight") {
+      if (weeklyChangeKg > 0.2) {
+        // Gaining weight when trying to lose → reduce calories
+        const adjustedCal = Math.max(1200, calGoal - 150);
+        weightProgressPrompt = `\n⚠️ AJUSTE NECESSÁRIO: O usuário quer emagrecer mas está ganhando ${changeAbs}kg/semana. Reduza as calorias para ~${adjustedCal} kcal/dia, priorizando proteínas e reduzindo carboidratos simples e gorduras.`;
+      } else if (weeklyChangeKg < -1.2) {
+        // Losing too fast → slightly increase to avoid muscle loss
+        const adjustedCal = Math.min(calGoal + 200, 2500);
+        weightProgressPrompt = `\n⚠️ AJUSTE NECESSÁRIO: O usuário está perdendo peso muito rápido (${changeAbs}kg/semana). Aumente levemente para ~${adjustedCal} kcal/dia para preservar massa muscular.`;
+      } else if (weeklyChangeKg < -0.1) {
+        weightProgressPrompt = `\n✅ Progresso no caminho certo: usuário está perdendo ${changeAbs}kg/semana. Mantenha o plano atual.`;
+      }
+    } else if (objective === "gain_weight" || objective === "gain_muscle") {
+      if (weeklyChangeKg < 0.1) {
+        const adjustedCal = Math.min(calGoal + 200, 4000);
+        weightProgressPrompt = `\n⚠️ AJUSTE NECESSÁRIO: O usuário quer ganhar massa mas está perdendo peso ou estagnado. Aumente para ~${adjustedCal} kcal/dia com mais proteínas e carboidratos complexos.`;
+      } else {
+        weightProgressPrompt = `\n✅ Progresso no caminho certo: usuário está ganhando ${changeAbs}kg/semana. Mantenha superávit calórico.`;
+      }
+    } else {
+      // maintain
+      if (Math.abs(weeklyChangeKg) > 0.5) {
+        weightProgressPrompt = `\n⚠️ AJUSTE NECESSÁRIO: Usuário quer manter o peso mas está ${direction} ${changeAbs}kg/semana. Ajuste as calorias para manter peso estável em ~${currentKg}kg.`;
+      }
+    }
+
+    if (goalKg) {
+      weightProgressPrompt += ` Peso atual: ${currentKg}kg. Meta: ${goalKg}kg.`;
+    }
+  }
+
   const prompt = `Você é uma nutricionista brasileira chamada Sofia. Crie um plano de refeições para 7 dias (segunda a domingo) em JSON, com culinária brasileira variada, saudável e gostosa.
 
 Metas nutricionais diárias: ${macroLine}.
-${restrictionLine}${foodPrefsPrompt}
+${restrictionLine}${foodPrefsPrompt}${weightProgressPrompt}
 Refeições por dia: ${mealNames.join(", ")}.
 
 Retorne APENAS o JSON no seguinte formato (sem markdown, sem explicações):

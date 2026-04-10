@@ -3,10 +3,11 @@
  * To add/remove access, edit this file and redeploy.
  */
 export const MASTER_ACCOUNTS: Record<string, "limited" | "unlimited"> = {
-  "dev@iacalorias.com.br":    "unlimited",
-  "evellyngibulo@gmail.com":  "unlimited",
-  "brunogibulo@gmail.com":    "unlimited",
-  "misaeltois@gmail.com":     "limited",
+  "dev@iacalorias.com.br":          "unlimited",
+  "evellyngibulo@gmail.com":        "unlimited",
+  "brunogibulo@gmail.com":          "unlimited",
+  "misaeltois@gmail.com":           "limited",
+  "comercial@comercial.com.br":     "unlimited",
 };
 
 export function getMasterTier(email?: string | null): "limited" | "unlimited" | null {

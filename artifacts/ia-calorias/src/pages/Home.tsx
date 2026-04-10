@@ -18,6 +18,7 @@ import { SplashScreen } from '@/components/SplashScreen';
 import { OnboardingCarousel } from '@/components/OnboardingCarousel';
 import { BottomNav, type BottomNavTab } from '@/components/BottomNav';
 import { WaterTracker } from '@/components/WaterTracker';
+import { NutritionCalendar } from '@/components/NutritionCalendar';
 import { AppTour } from '@/components/AppTour';
 import { useTour } from '@/hooks/use-tour';
 import { GoalCelebration, hasCelebratedToday, markCelebratedToday } from '@/components/GoalCelebration';
@@ -1285,6 +1286,17 @@ export default function Home() {
 
               {/* Meal Reminders */}
               <MealReminders />
+
+              {/* Nutrition Calendar */}
+              <NutritionCalendar
+                sessionId={sessionId}
+                goals={savedGoals ? {
+                  calories: savedGoals.calories ?? null,
+                  protein: savedGoals.protein ?? null,
+                  carbs: savedGoals.carbs ?? null,
+                  fat: savedGoals.fat ?? null,
+                } : null}
+              />
 
               {/* Water Tracker */}
               <WaterTracker weightKg={savedGoals?.weight ?? null} />
