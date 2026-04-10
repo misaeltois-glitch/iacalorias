@@ -35,6 +35,15 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      onwarn(warning, warn) {
+        if (warning.code === 'CIRCULAR_DEPENDENCY') {
+          // Log all circular deps to stdout so they appear in Railway build logs
+          console.error('CIRCULAR DEP DETECTED:', warning.message);
+        }
+        warn(warning);
+      },
+    },
   },
   server: {
     port,
