@@ -16,7 +16,6 @@ const FEATURES = [
   { icon: Zap, title: 'Metas inteligentes', desc: 'Defina objetivos e receba alertas quando estiver no caminho certo.' },
 ];
 
-const BASE = import.meta.env.BASE_URL ?? '/';
 const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)
   || '210315717128-1htdab52e5eateekrbeieuvi6gtt53rg.apps.googleusercontent.com';
 

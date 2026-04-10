@@ -4,14 +4,9 @@ import { X, ChevronLeft, ChevronRight, Dumbbell, Clock, Flame, Target, Apple, Pl
 import { useAuth } from '@/hooks/use-auth';
 import { generateWorkoutPlan, calculateNutrition, getGoalLabel, getLevelLabel, formatRest, getTodayKey, type WorkoutProfile, type WorkoutPlan, type WorkoutSession, type SessionExercise, type WorkoutGoal, type ExperienceLevel, type GymType } from '@/lib/workout-engine';
 import { getExercisesByMuscle, filterByInjuries, type MuscleGroup, type InjuryKey } from '@/lib/exercise-database';
+import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
 
-const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
-const BASE = import.meta.env.BASE_URL ?? '/';
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 interface WorkoutPanelProps {
   isOpen: boolean;

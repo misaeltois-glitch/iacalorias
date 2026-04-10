@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChefHat, Loader2, RotateCcw, ChevronDown } from 'lucide-react';
+import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
 
 interface FoodSubcategory {
   name: string;
@@ -94,8 +95,6 @@ const FOOD_CATALOG: FoodCategory[] = [
   },
 ];
 
-const BASE = import.meta.env.BASE_URL ?? '/';
-const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 
 interface RecipeMacros {
   calories: number;

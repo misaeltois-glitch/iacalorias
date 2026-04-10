@@ -1,14 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, RefreshCw, ChevronDown, ChevronUp, Lock, Settings2, ShoppingCart, Copy, Check, Loader2 } from 'lucide-react';
+import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
 
-const BASE = import.meta.env.BASE_URL ?? '/';
-const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 
-function authHeaders(): HeadersInit {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 interface MealItem {
   name: string;

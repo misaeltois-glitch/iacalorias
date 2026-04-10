@@ -1,14 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Target, Download } from 'lucide-react';
+import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
 
-const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
-const BASE = import.meta.env.BASE_URL ?? '/';
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 type Period = 'day' | 'week' | 'month';
 

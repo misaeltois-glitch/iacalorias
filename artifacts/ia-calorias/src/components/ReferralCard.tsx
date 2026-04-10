@@ -1,15 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Copy, Check, Share2 } from 'lucide-react';
+import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
 
-const BASE = import.meta.env.BASE_URL ?? '/';
-const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 export const REFERRAL_CODE_KEY = 'ia-calorias-ref';
 export const REFERRAL_APPLIED_KEY = 'ia-calorias-ref-applied';
 
-function authHeaders(): HeadersInit {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 interface ReferralStats {
   code: string;

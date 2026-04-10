@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Barcode, Loader2, Search, ChevronRight, AlertCircle } from 'lucide-react';
 import type { AnalysisResult } from '@workspace/api-client-react/src/generated/api.schemas';
+import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
 
 interface Props {
   isOpen: boolean;
@@ -25,14 +26,6 @@ interface OFFProduct {
   };
   serving_size?: string;
   image_front_small_url?: string;
-}
-
-const BASE = import.meta.env.BASE_URL ?? '/';
-const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
-
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function lookupBarcode(barcode: string): Promise<OFFProduct | null> {

@@ -3,15 +3,10 @@ import { useLocation } from 'wouter';
 import { ArrowLeft, Camera, Check, Eye, EyeOff, LogOut, Trash2, User, Lock, Activity, AlertTriangle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useSession } from '@/hooks/use-session';
+import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
 
 const ACCENT = '#0D9F6E';
-const BASE = import.meta.env.BASE_URL ?? '/';
-const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 
-function authHeaders(): HeadersInit {
-  const t = localStorage.getItem(AUTH_TOKEN_KEY);
-  return t ? { Authorization: `Bearer ${t}` } : {};
-}
 
 async function resizeImageToBase64(file: File, maxDim = 256): Promise<string> {
   return new Promise((resolve, reject) => {

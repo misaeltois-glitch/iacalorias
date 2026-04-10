@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, MessageCircle, Mail } from 'lucide-react';
+import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -15,8 +16,6 @@ interface SupportChatProps {
   sessionId: string;
 }
 
-const BASE = import.meta.env.BASE_URL ?? '/';
-const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 const WHATSAPP_NUMBER = '5511956538845';
 const SUPPORT_EMAIL = 'atendimento.iacalorias@hotmail.com';
 
@@ -63,10 +62,6 @@ Regras:
 - Para cancelamento, reembolso ou problemas de cobrança: SEMPRE encaminhe para o suporte humano
 - Não invente funcionalidades que não existem`;
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 function detectsEscalation(text: string): boolean {
   const lower = text.toLowerCase();

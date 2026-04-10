@@ -6,6 +6,7 @@ import {
   type TooltipProps,
 } from 'recharts';
 import { type ValueType, type NameType } from 'recharts/types/component/DefaultTooltipContent';
+import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
 
 type Period = 'day' | 'week' | 'month';
 
@@ -76,13 +77,7 @@ interface AnalyticsPanelProps {
   onUpgrade: () => void;
 }
 
-const BASE = import.meta.env.BASE_URL ?? '/';
-const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 
-function authHeaders(): HeadersInit {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 const DAY_LABELS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MONTH_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];

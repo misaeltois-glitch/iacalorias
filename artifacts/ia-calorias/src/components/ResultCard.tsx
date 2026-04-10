@@ -3,9 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Sparkles, Share2, Pencil, Check, X, Loader2 } from 'lucide-react';
 import type { AnalysisResult } from '@workspace/api-client-react/src/generated/api.schemas';
 import { shareResult } from '@/lib/share-card';
+import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
 
-const BASE = import.meta.env.BASE_URL ?? '/';
-const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 
 const MEAL_TYPES = [
   { key: 'breakfast',       label: '☀️ Café da manhã' },

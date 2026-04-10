@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Moon, Sun, PieChart, Settings, LogIn, LogOut, User, BarChart2, Crown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -12,23 +12,18 @@ import { PaywallModal } from '@/components/PaywallModal';
 import { OnboardingModal, type CalculatedGoals } from '@/components/OnboardingModal';
 import { GoalsPanel } from '@/components/GoalsPanel';
 import { DailyProgress } from '@/components/DailyProgress';
-import { AnalyticsPanel } from '@/components/AnalyticsPanel';
 import { AuthModal } from '@/components/AuthModal';
 import { LGPDConsentPopup, useLGPDConsent } from '@/components/LGPDConsentPopup';
 import { SplashScreen } from '@/components/SplashScreen';
 import { OnboardingCarousel } from '@/components/OnboardingCarousel';
 import { BottomNav, type BottomNavTab } from '@/components/BottomNav';
-import { WorkoutPanel } from '@/components/WorkoutPanel';
-import { ProgressView } from '@/components/ProgressView';
 import { WaterTracker } from '@/components/WaterTracker';
 import { AppTour } from '@/components/AppTour';
 import { useTour } from '@/hooks/use-tour';
 import { GoalCelebration, hasCelebratedToday, markCelebratedToday } from '@/components/GoalCelebration';
-import { NutritionistChat } from '@/components/NutritionistChat';
 import { WeightTracker } from '@/components/WeightTracker';
 import { BodyMeasurements } from '@/components/BodyMeasurements';
 import { OnboardingAuthPrompt } from '@/components/OnboardingAuthPrompt';
-import { MealPlanModal } from '@/components/MealPlanModal';
 import { CardapioChoiceModal } from '@/components/CardapioChoiceModal';
 import { ProfileSetupBanner } from '@/components/ProfileSetupBanner';
 import { InstallPrompt, OpenInAppBanner } from '@/components/InstallPrompt';
@@ -36,12 +31,27 @@ import { ReferralCard, applyPendingReferral, REFERRAL_CODE_KEY } from '@/compone
 import { MealReminders } from '@/components/MealReminders';
 import { useMealReminders, loadReminders, incrementDailyAnalysesCount } from '@/hooks/use-meal-reminders';
 import { useCheatDays } from '@/hooks/use-cheat-days';
-import { RecipeSuggestor } from '@/components/RecipeSuggestor';
 import { MealFoodPrefsModal } from '@/components/MealFoodPrefsModal';
 import { ManualFoodModal } from '@/components/ManualFoodModal';
 import { BarcodeScanModal } from '@/components/BarcodeScanModal';
 import { SupportChat } from '@/components/SupportChat';
 import { trackEvent } from '@/lib/tracking';
+
+// Lazy-loaded: carregados apenas quando a aba é aberta pela primeira vez (~40% menos JS inicial)
+const WorkoutPanel = lazy(() => import('@/components/WorkoutPanel').then(m => ({ default: m.WorkoutPanel })));
+const AnalyticsPanel = lazy(() => import('@/components/AnalyticsPanel').then(m => ({ default: m.AnalyticsPanel })));
+const ProgressView = lazy(() => import('@/components/ProgressView').then(m => ({ default: m.ProgressView })));
+const NutritionistChat = lazy(() => import('@/components/NutritionistChat').then(m => ({ default: m.NutritionistChat })));
+const MealPlanModal = lazy(() => import('@/components/MealPlanModal').then(m => ({ default: m.MealPlanModal })));
+const RecipeSuggestor = lazy(() => import('@/components/RecipeSuggestor').then(m => ({ default: m.RecipeSuggestor })));
+
+function TabFallback() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, color: 'var(--text-3)', fontSize: 13 }}>
+      <div style={{ width: 24, height: 24, border: '2px solid var(--border)', borderTopColor: '#10B981', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+    </div>
+  );
+}
 
 import {
   useAnalyzeFood,
@@ -49,11 +59,10 @@ import {
 } from '@workspace/api-client-react';
 
 import type { AnalysisResult } from '@workspace/api-client-react/src/generated/api.schemas';
+import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
 
 type Period = 'day' | 'week' | 'month';
 
-const BASE = import.meta.env.BASE_URL ?? '/';
-const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 const ONBOARDED_KEY = 'ia-calorias-onboarded';
 const MANDATORY_ONBOARDING_KEY = 'ia-calorias-mandatory-done';
 const FIRST_USE_TS_KEY = 'ia-calorias-first-use-ts';
@@ -62,10 +71,6 @@ const FREE_PERIOD_MS = FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000;
 const WORKOUT_TRIAL_START_KEY = 'ia-calorias-workout-trial-ts';
 const WORKOUT_TRIAL_MS = FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000;
 
-function authHeaders(): HeadersInit {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 // Cookie helpers — cookies persist longer than localStorage on iOS Safari
 const ONBOARDED_COOKIE = 'iac_onboarded';
@@ -996,14 +1001,16 @@ export default function Home() {
                   <Settings size={13} /> Metas
                 </button>
               </div>
-              <ProgressView
-                sessionId={sessionId}
-                isPremium={isPremium || trialRemaining > 0}
-                refreshSignal={goalsRefreshKey}
-                onUpgrade={() => { setPaywallDisableClose(false); setShowPaywall(true); }}
-                onSetGoals={() => setShowGoalsPanel(true)}
-                freshNotif={freshAnalyticsNotif}
-              />
+              <Suspense fallback={<TabFallback />}>
+                <ProgressView
+                  sessionId={sessionId}
+                  isPremium={isPremium || trialRemaining > 0}
+                  refreshSignal={goalsRefreshKey}
+                  onUpgrade={() => { setPaywallDisableClose(false); setShowPaywall(true); }}
+                  onSetGoals={() => setShowGoalsPanel(true)}
+                  freshNotif={freshAnalyticsNotif}
+                />
+              </Suspense>
             </motion.div>
           ) : !currentResult ? (
             <motion.div
@@ -1521,31 +1528,35 @@ export default function Home() {
       />
 
       {/* Panels / Modals */}
-      <AnalyticsPanel
-        isOpen={showAnalytics}
-        onClose={() => { setShowAnalytics(false); setActiveTab('home'); }}
-        sessionId={sessionId}
-        isPremium={isPremium || trialRemaining > 0}
-        onUpgrade={() => { setShowAnalytics(false); setPaywallDisableClose(false); setShowPaywall(true); }}
-      />
+      <Suspense fallback={null}>
+        <AnalyticsPanel
+          isOpen={showAnalytics}
+          onClose={() => { setShowAnalytics(false); setActiveTab('home'); }}
+          sessionId={sessionId}
+          isPremium={isPremium || trialRemaining > 0}
+          onUpgrade={() => { setShowAnalytics(false); setPaywallDisableClose(false); setShowPaywall(true); }}
+        />
+      </Suspense>
 
-      <WorkoutPanel
-        isOpen={showWorkout}
-        onClose={() => {
-          setShowWorkout(false);
-          setActiveTab('home');
-          setHasWorkoutPlan(true);
-          if (mandatoryStep === 'workout') handleMandatoryWorkoutDone();
-        }}
-        sessionId={sessionId}
-        isPremium={isPremium}
-        onUpgrade={() => { setShowWorkout(false); setPaywallDisableClose(false); setShowPaywall(true); }}
-        onNutritionTargets={handleWorkoutNutrition}
-        onboardingMode={mandatoryStep === 'workout'}
-        onOnboardingComplete={handleMandatoryWorkoutDone}
-        biometrics={savedGoals ? { age: savedGoals.age, weight: savedGoals.weight, height: savedGoals.height, sex: savedGoals.sex } : undefined}
-        workoutTrialDaysRemaining={workoutTrialDaysRemaining}
-      />
+      <Suspense fallback={null}>
+        <WorkoutPanel
+          isOpen={showWorkout}
+          onClose={() => {
+            setShowWorkout(false);
+            setActiveTab('home');
+            setHasWorkoutPlan(true);
+            if (mandatoryStep === 'workout') handleMandatoryWorkoutDone();
+          }}
+          sessionId={sessionId}
+          isPremium={isPremium}
+          onUpgrade={() => { setShowWorkout(false); setPaywallDisableClose(false); setShowPaywall(true); }}
+          onNutritionTargets={handleWorkoutNutrition}
+          onboardingMode={mandatoryStep === 'workout'}
+          onOnboardingComplete={handleMandatoryWorkoutDone}
+          biometrics={savedGoals ? { age: savedGoals.age, weight: savedGoals.weight, height: savedGoals.height, sex: savedGoals.sex } : undefined}
+          workoutTrialDaysRemaining={workoutTrialDaysRemaining}
+        />
+      </Suspense>
 
       <SupportChat
         isOpen={showSupport}
@@ -1607,13 +1618,15 @@ export default function Home() {
 
 
       {sessionId && (
-        <NutritionistChat
-          isOpen={showChat}
-          onClose={() => setShowChat(false)}
-          sessionId={sessionId}
-          isPremium={isPremium}
-          onUpgrade={() => { setShowChat(false); setPaywallDisableClose(false); setShowPaywall(true); }}
-        />
+        <Suspense fallback={null}>
+          <NutritionistChat
+            isOpen={showChat}
+            onClose={() => setShowChat(false)}
+            sessionId={sessionId}
+            isPremium={isPremium}
+            onUpgrade={() => { setShowChat(false); setPaywallDisableClose(false); setShowPaywall(true); }}
+          />
+        </Suspense>
       )}
 
       <CardapioChoiceModal
@@ -1626,21 +1639,25 @@ export default function Home() {
       />
 
       {sessionId && (
-        <MealPlanModal
-          isOpen={showMealPlan}
-          onClose={() => setShowMealPlan(false)}
-          sessionId={sessionId}
-          isPremium={isPremium}
-          onUpgrade={() => { setShowMealPlan(false); setPaywallDisableClose(false); setShowPaywall(true); }}
-          onOpenFoodPrefs={() => setShowFoodPrefs(true)}
-        />
+        <Suspense fallback={null}>
+          <MealPlanModal
+            isOpen={showMealPlan}
+            onClose={() => setShowMealPlan(false)}
+            sessionId={sessionId}
+            isPremium={isPremium}
+            onUpgrade={() => { setShowMealPlan(false); setPaywallDisableClose(false); setShowPaywall(true); }}
+            onOpenFoodPrefs={() => setShowFoodPrefs(true)}
+          />
+        </Suspense>
       )}
 
       {showRecipeSuggestor && sessionId && (
-        <RecipeSuggestor
-          onClose={() => setShowRecipeSuggestor(false)}
-          sessionId={sessionId}
-        />
+        <Suspense fallback={null}>
+          <RecipeSuggestor
+            onClose={() => setShowRecipeSuggestor(false)}
+            sessionId={sessionId}
+          />
+        </Suspense>
       )}
 
       {showFoodPrefs && (
