@@ -1267,22 +1267,21 @@ export default function Home() {
               )}
 
               {/* Daily progress */}
-              {goalsLoaded && (
-                <div data-tour="daily-progress">
-                  <DailyProgress
-                    totals={todaySummary?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, meals: 0 }}
-                    goals={savedGoals}
-                    alerts={todaySummary?.alerts ?? []}
-                    aiSummary={todaySummary?.aiSummary ?? null}
-                    analysesCount={todaySummary?.analysesCount ?? 0}
-                    period={'day'}
-                    onPeriodChange={undefined}
-                    onSetGoals={() => setShowGoalsPanel(true)}
-                    isPremium={isPremium}
-                    isCheatDay={isCheatDay}
-                  />
-                </div>
-              )}
+              <div data-tour="daily-progress">
+                <DailyProgress
+                  loading={!goalsLoaded || todaySummary === null}
+                  totals={todaySummary?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, meals: 0 }}
+                  goals={savedGoals}
+                  alerts={todaySummary?.alerts ?? []}
+                  aiSummary={todaySummary?.aiSummary ?? null}
+                  analysesCount={todaySummary?.analysesCount ?? 0}
+                  period={'day'}
+                  onPeriodChange={undefined}
+                  onSetGoals={() => setShowGoalsPanel(true)}
+                  isPremium={isPremium}
+                  isCheatDay={isCheatDay}
+                />
+              </div>
 
               {/* Meal Reminders */}
               <MealReminders />

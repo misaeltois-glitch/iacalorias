@@ -253,11 +253,12 @@ export async function generateShareCard(result: AnalysisResult): Promise<Blob> {
   });
 }
 
-export async function shareResult(result: AnalysisResult): Promise<'shared' | 'downloaded' | 'error'> {
+export async function shareResult(result: AnalysisResult): Promise<'shared' | 'copied' | 'downloaded' | 'error'> {
   try {
     const blob = await generateShareCard(result);
     const file = new File([blob], `iacalorias-${result.dishName.replace(/\s+/g, '-')}.png`, { type: 'image/png' });
 
+    // 1st choice: native share (mobile / desktop Safari 17+)
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({
         files: [file],
@@ -267,7 +268,17 @@ export async function shareResult(result: AnalysisResult): Promise<'shared' | 'd
       return 'shared';
     }
 
-    // Fallback: download
+    // 2nd choice: copy image to clipboard (Chrome desktop, Edge)
+    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        return 'copied';
+      } catch {
+        // clipboard write may be denied by permissions — fall through to download
+      }
+    }
+
+    // 3rd choice: download
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

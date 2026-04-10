@@ -32,6 +32,7 @@ interface DailyProgressProps {
   isPremium: boolean;
   showAlerts?: boolean;
   isCheatDay?: boolean;
+  loading?: boolean;
 }
 
 function MacroRingComponent({ label, emoji, current, goal, unit, color, trackColor }: MacroRing) {
@@ -78,7 +79,28 @@ function MacroRingComponent({ label, emoji, current, goal, unit, color, trackCol
 
 const PERIOD_LABELS: Record<Period, string> = { day: 'Hoje', week: 'Semana', month: 'Mês' };
 
-export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount, period, onPeriodChange, onSetGoals, isPremium, showAlerts = false, isCheatDay = false }: DailyProgressProps) {
+function SkeletonRing() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+      <div style={{ width: 58, height: 58, borderRadius: '50%', background: 'var(--bg-3)', animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
+      <div style={{ width: 36, height: 8, borderRadius: 4, background: 'var(--bg-3)', animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
+    </div>
+  );
+}
+
+export function DailyProgress({ totals, goals, alerts, aiSummary, analysesCount, period, onPeriodChange, onSetGoals, isPremium, showAlerts = false, isCheatDay = false, loading = false }: DailyProgressProps) {
+  if (loading) {
+    return (
+      <div style={{ borderRadius: '20px', background: 'var(--bg-2)', border: '1px solid var(--border)', padding: '18px 16px' }}>
+        <style>{`@keyframes skeleton-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'space-around', marginBottom: 16 }}>
+          {[0,1,2,3].map(i => <SkeletonRing key={i} />)}
+        </div>
+        <div style={{ height: 12, borderRadius: 6, background: 'var(--bg-3)', animation: 'skeleton-pulse 1.5s ease-in-out infinite', marginBottom: 8 }} />
+        <div style={{ height: 12, borderRadius: 6, background: 'var(--bg-3)', animation: 'skeleton-pulse 1.5s ease-in-out infinite', width: '70%' }} />
+      </div>
+    );
+  }
   const [showSummary, setShowSummary] = useState(false);
 
   const macros: MacroRing[] = [

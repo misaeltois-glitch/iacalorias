@@ -126,9 +126,10 @@ export function ResultCard({ result, onReset, photoUrl, sessionId, isCheatDay, o
     setShareMsg(null);
     const outcome = await shareResult(result);
     setSharing(false);
+    if (outcome === 'copied') setShareMsg('Imagem copiada! Cole no Instagram ou WhatsApp 📋');
     if (outcome === 'downloaded') setShareMsg('Imagem salva! Compartilhe no Instagram Stories 🌿');
     if (outcome === 'error') setShareMsg('Não foi possível compartilhar. Tente novamente.');
-    if (outcome === 'shared' || outcome === 'downloaded') {
+    if (outcome !== 'error') {
       setTimeout(() => setShareMsg(null), 4000);
     }
   }, [result]);
