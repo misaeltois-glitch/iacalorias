@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, PenLine, Loader2 } from 'lucide-react';
-import type { AnalysisResult } from '@workspace/api-zod';
+import type { AnalysisResult } from '@workspace/api-client-react/src/generated/api.schemas';
 
 interface Props {
   isOpen: boolean;
