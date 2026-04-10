@@ -5,6 +5,22 @@ const WATER_KEY_PREFIX = 'ia-calorias-water-';
 const DEFAULT_GOAL = 8;
 const WATER_REMINDER_PREFIX = 'water-hydration-';
 const REMINDERS_KEY = 'ia-calorias-reminders';
+const GOALS_KEY = 'ia-calorias-goals'; // mesmo localStorage usado pelo GoalsPanel
+
+// Calcula meta de água baseada no peso (35ml/kg), em copos de 250ml
+function calcWaterGoal(): number {
+  try {
+    const raw = localStorage.getItem(GOALS_KEY);
+    if (raw) {
+      const goals = JSON.parse(raw);
+      const weight = goals?.weight;
+      if (weight && weight > 0) {
+        return Math.max(6, Math.min(16, Math.round((weight * 35) / 250)));
+      }
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_GOAL;
+}
 
 function todayKey(): string {
   const d = new Date();
@@ -59,9 +75,16 @@ function disableWaterReminders() {
   writeSettings({ ...s, customSlots: s.customSlots.filter(c => !c.key.startsWith(WATER_REMINDER_PREFIX)) });
 }
 
-export function WaterTracker() {
+interface WaterTrackerProps {
+  weightKg?: number | null;
+}
+
+export function WaterTracker({ weightKg }: WaterTrackerProps = {}) {
   const [count, setCount] = useState(0);
-  const goal = DEFAULT_GOAL;
+
+  const goal = weightKg && weightKg > 0
+    ? Math.max(6, Math.min(16, Math.round((weightKg * 35) / 250)))
+    : calcWaterGoal();
   const [waterReminders, setWaterReminders] = useState(() => isWaterRemindersEnabled());
   const [reminderInterval, setReminderInterval] = useState(2);
   const [showReminderConfig, setShowReminderConfig] = useState(false);
@@ -117,6 +140,9 @@ export function WaterTracker() {
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '1px' }}>
               {done ? '🎉 Meta atingida!' : `${goal - count} copo${goal - count !== 1 ? 's' : ''} restante${goal - count !== 1 ? 's' : ''}`}
+              {weightKg && weightKg > 0 && (
+                <span style={{ color: '#3B82F6', marginLeft: 4 }}>· {weightKg}kg</span>
+              )}
             </div>
           </div>
         </div>

@@ -129,17 +129,76 @@ function showNotification(slot: MealSlot) {
   }
 }
 
+const DAILY_ANALYSES_KEY = 'ia-calorias-daily-analyses-count';
+
+/** Salvar contagem de análises do dia (chamado após cada análise registrada) */
+export function incrementDailyAnalysesCount() {
+  try {
+    const today = todayDateStr();
+    const raw = localStorage.getItem(DAILY_ANALYSES_KEY);
+    const data = raw ? JSON.parse(raw) : {};
+    data[today] = (data[today] ?? 0) + 1;
+    // Manter só os últimos 7 dias
+    const keys = Object.keys(data).sort().slice(-7);
+    const trimmed: Record<string, number> = {};
+    keys.forEach(k => { trimmed[k] = data[k]; });
+    localStorage.setItem(DAILY_ANALYSES_KEY, JSON.stringify(trimmed));
+  } catch {}
+}
+
+function getTodayAnalysesCount(): number {
+  try {
+    const raw = localStorage.getItem(DAILY_ANALYSES_KEY);
+    if (!raw) return 0;
+    return JSON.parse(raw)[todayDateStr()] ?? 0;
+  } catch { return 0; }
+}
+
+/** Notificação de streak em risco: dispara às 20h se nenhuma análise foi feita no dia */
+function checkStreakRisk(windowMinutes: number) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const now = new Date();
+  const today = todayDateStr();
+  const notifiedKey = `${today}-streak-risk-20:00`;
+  if (alreadyNotified(notifiedKey)) return;
+
+  const target = new Date(now);
+  target.setHours(20, 0, 0, 0);
+  const diffMs = now.getTime() - target.getTime();
+  const diffMin = diffMs / 60000;
+  if (diffMin < 0 || diffMin >= windowMinutes) return;
+
+  if (getTodayAnalysesCount() > 0) return; // já registrou algo hoje
+
+  markNotified(notifiedKey);
+
+  const title = '🔥 Seu streak está em risco!';
+  const body = 'Você ainda não registrou nenhuma refeição hoje. Fotografe agora e mantenha sua sequência! 📸';
+
+  if (navigator.serviceWorker?.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'SHOW_NOTIFICATION', title, body, tag: 'streak-risk',
+    });
+  } else {
+    new Notification(title, { body, icon: '/icon-512.png', tag: 'streak-risk' });
+  }
+}
+
 /**
  * Verifica se algum lembrete foi perdido enquanto o tab estava em background.
  * windowMinutes = janela de tempo para trás (ex: 30 = checar últimos 30 min).
  */
 function checkReminders(windowMinutes = 1) {
   const settings = loadReminders();
-  if (!settings.globalEnabled) return;
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
   const now = new Date();
   const today = todayDateStr();
+
+  // Streak risk check — independente de globalEnabled (é uma notificação separada)
+  checkStreakRisk(windowMinutes);
+
+  if (!settings.globalEnabled) return;
 
   const allSlots: Array<{ key: string; label: string; emoji: string; time: string; enabled: boolean }> = [
     ...settings.slots,

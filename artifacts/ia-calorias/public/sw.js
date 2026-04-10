@@ -1,7 +1,7 @@
 // IA Calorias — Service Worker
 // BUILD: 2026-04-09
 
-const SW_VERSION = '2026-04-09-2';
+const SW_VERSION = '2026-04-10-1';
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -77,10 +77,18 @@ async function checkAndNotify() {
   const m = now.getMinutes();
   const hhmm = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
+  // Streak risk às 20h
+  if (h === 20 && m < 5) {
+    return self.registration.showNotification('🔥 Seu streak está em risco!', {
+      body: 'Você ainda não registrou nenhuma refeição hoje. Fotografe agora! 📸',
+      icon: ICON, badge: ICON, tag: 'streak-risk', renotify: true,
+    });
+  }
+
   const mealNames = {
     '08:00': 'café da manhã', '09:00': 'lanche da manhã',
     '12:00': 'almoço', '13:00': 'almoço',
-    '15:00': 'lanche da tarde', '19:00': 'jantar', '20:00': 'jantar', '21:00': 'ceia',
+    '15:00': 'lanche da tarde', '19:00': 'jantar', '21:00': 'ceia',
   };
 
   const meal = mealNames[hhmm];
