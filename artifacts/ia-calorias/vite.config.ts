@@ -35,15 +35,12 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
-    target: 'es2015',
+    minify: false,
+    sourcemap: false,
     rollupOptions: {
-      output: {
-        // Use var instead of const/let in output — eliminates TDZ from circular dep ordering
-        generatedCode: { constBindings: false },
-      },
       onwarn(warning, warn) {
         if (warning.code === 'CIRCULAR_DEPENDENCY') {
-          console.error('CIRCULAR DEP DETECTED:', warning.message);
+          console.error('CIRCULAR DEP:', warning.message);
         }
         warn(warning);
       },
