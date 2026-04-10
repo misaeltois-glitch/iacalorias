@@ -1704,7 +1704,7 @@ export default function Home() {
             exit={{ y: 80, opacity: 0 }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
             style={{
-              position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
+              position: 'fixed', bottom: '80px', left: 0, right: 0, margin: '0 auto',
               width: 'calc(100% - 32px)', maxWidth: '440px',
               zIndex: 500,
               borderRadius: '20px',
