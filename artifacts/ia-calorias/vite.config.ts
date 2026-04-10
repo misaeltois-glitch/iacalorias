@@ -35,16 +35,6 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
-    minify: false,
-    sourcemap: false,
-    rollupOptions: {
-      onwarn(warning, warn) {
-        if (warning.code === 'CIRCULAR_DEPENDENCY') {
-          console.error('CIRCULAR DEP:', warning.message);
-        }
-        warn(warning);
-      },
-    },
   },
   server: {
     port,
