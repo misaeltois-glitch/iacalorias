@@ -21,6 +21,9 @@ export interface WeeklyReportData {
   streak: number;
   topMeals: string[];
   aiSummary: string | null;
+  prevWeekAvgCalories?: number | null;
+  prevWeekDaysWithData?: number | null;
+  prevWeekTotalMeals?: number | null;
 }
 
 export async function sendWeeklyReport(email: string, data: WeeklyReportData, logger?: any): Promise<void> {
@@ -106,6 +109,35 @@ export async function sendWeeklyReport(email: string, data: WeeklyReportData, lo
         </div>
       </div>
 
+      ${data.prevWeekAvgCalories != null ? (() => {
+        const diff = Math.round(data.avgCalories - data.prevWeekAvgCalories!);
+        const isUp = diff > 0;
+        const diffColor = isUp ? '#EF4444' : '#10B981';
+        const diffLabel = isUp ? `+${diff} kcal/dia a mais` : `${diff} kcal/dia a menos`;
+        const daysUp = (data.prevWeekDaysWithData ?? 0);
+        const daysDiff = data.daysWithData - daysUp;
+        return `
+      <!-- Comparativo semana anterior -->
+      <div style="background:#111e18;border:1px solid #1e3028;border-radius:14px;padding:16px">
+        <div style="font-size:11px;color:#666;font-weight:700;letter-spacing:0.5px;margin-bottom:12px">VS. SEMANA ANTERIOR</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+          <div>
+            <div style="font-size:11px;color:#555;margin-bottom:4px">Kcal/dia</div>
+            <div style="font-size:15px;font-weight:800;color:${diffColor}">${diff > 0 ? '+' : ''}${diff}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:#555;margin-bottom:4px">Dias ativos</div>
+            <div style="font-size:15px;font-weight:800;color:${daysDiff >= 0 ? '#10B981' : '#EF4444'}">${daysDiff >= 0 ? '+' : ''}${daysDiff}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:#555;margin-bottom:4px">Refeições</div>
+            <div style="font-size:15px;font-weight:800;color:${(data.totalMeals - (data.prevWeekTotalMeals ?? 0)) >= 0 ? '#10B981' : '#EF4444'}">${(data.totalMeals - (data.prevWeekTotalMeals ?? 0)) >= 0 ? '+' : ''}${data.totalMeals - (data.prevWeekTotalMeals ?? 0)}</div>
+          </div>
+        </div>
+        <div style="margin-top:10px;font-size:12px;color:#555;text-align:center">${diffLabel} em relação à semana anterior</div>
+      </div>`;
+      })() : ''}
+
       ${data.topMeals.length > 0 ? `
       <!-- Top meals -->
       <div style="background:#111e18;border:1px solid #1e3028;border-radius:14px;padding:16px">
@@ -149,6 +181,111 @@ export async function sendWeeklyReport(email: string, data: WeeklyReportData, lo
     from: FROM_EMAIL,
     to: email,
     subject: `Seu relatório da semana de ${data.weekLabel} — IA Calorias 🥗`,
+    html,
+  });
+}
+
+export interface FreeWeeklyReportData {
+  userName: string;
+  weekLabel: string;
+  totalMeals: number;
+  daysWithData: number;
+  avgCalories: number;
+  streak: number;
+  topMeals: string[];
+}
+
+export async function sendFreeWeeklyReport(email: string, data: FreeWeeklyReportData, logger?: any): Promise<void> {
+  const streakEmoji = data.streak >= 14 ? '🏆' : data.streak >= 7 ? '🔥🔥' : data.streak >= 3 ? '🔥' : '⚡';
+  const consistency = data.daysWithData >= 5 ? 'excelente' : data.daysWithData >= 3 ? 'boa' : 'em início';
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0a0f0d;font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif">
+  <div style="max-width:560px;margin:32px auto;background:#0f1a16;border-radius:20px;border:1px solid #1e3028;overflow:hidden">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#0D9F6E,#057A55);padding:32px 32px 28px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+        <div style="width:36px;height:36px;background:rgba(255,255,255,0.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px">🥗</div>
+        <span style="font-size:16px;font-weight:700;color:#fff">IA Calorias</span>
+      </div>
+      <h1 style="color:#fff;font-size:24px;font-weight:800;margin:0 0 6px;letter-spacing:-0.5px">Sua semana em resumo</h1>
+      <p style="color:rgba(255,255,255,0.75);font-size:14px;margin:0">Semana de ${data.weekLabel}</p>
+    </div>
+
+    <!-- Greeting -->
+    <div style="padding:24px 32px 0">
+      <p style="color:#ccc;font-size:15px;line-height:1.6;margin:0">
+        Olá, <strong style="color:#fff">${data.userName}</strong>! Você teve uma semana de consistência <strong style="color:#0D9F6E">${consistency}</strong> — ${data.daysWithData} de 7 dias registrados. Continue assim! 💪
+      </p>
+    </div>
+
+    <!-- Quick stats -->
+    <div style="padding:20px 32px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div style="background:#111e18;border:1px solid #1e3028;border-radius:12px;padding:14px;text-align:center">
+        <div style="font-size:20px;margin-bottom:6px">🍽️</div>
+        <div style="font-size:22px;font-weight:800;color:#3B82F6">${data.totalMeals}</div>
+        <div style="font-size:10px;color:#555;margin-top:2px">refeições</div>
+      </div>
+      <div style="background:#111e18;border:1px solid #1e3028;border-radius:12px;padding:14px;text-align:center">
+        <div style="font-size:20px;margin-bottom:6px">${streakEmoji}</div>
+        <div style="font-size:22px;font-weight:800;color:#F97316">${data.streak}</div>
+        <div style="font-size:10px;color:#555;margin-top:2px">sequência</div>
+      </div>
+      <div style="background:#111e18;border:1px solid #1e3028;border-radius:12px;padding:14px;text-align:center">
+        <div style="font-size:20px;margin-bottom:6px">📅</div>
+        <div style="font-size:22px;font-weight:800;color:#0D9F6E">${data.daysWithData}/7</div>
+        <div style="font-size:10px;color:#555;margin-top:2px">dias ativos</div>
+      </div>
+    </div>
+
+    ${data.topMeals.length > 0 ? `
+    <!-- Top meals preview (blurred) -->
+    <div style="padding:0 32px 20px">
+      <div style="background:#111e18;border:1px solid #1e3028;border-radius:14px;padding:16px">
+        <div style="font-size:11px;color:#666;font-weight:700;letter-spacing:0.5px;margin-bottom:10px">SUAS REFEIÇÕES DA SEMANA</div>
+        <div style="font-size:13px;color:#aaa;padding:4px 0;border-bottom:1px solid #1a2a22">• ${data.topMeals[0]}</div>
+        ${data.topMeals.length > 1 ? `<div style="filter:blur(4px);font-size:13px;color:#777;padding:6px 0;pointer-events:none">• ██████████ · • ████████ · • ██████</div>` : ''}
+        ${data.topMeals.length > 1 ? `<div style="margin-top:8px;font-size:11px;color:#0D9F6E;font-weight:600">+ ${data.topMeals.length - 1} mais refeição${data.topMeals.length - 1 > 1 ? 's' : ''} — desbloqueie para ver</div>` : ''}
+      </div>
+    </div>` : ''}
+
+    <!-- Upgrade CTA -->
+    <div style="padding:0 32px 24px">
+      <div style="background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(239,68,68,0.08));border:1.5px solid rgba(245,158,11,0.25);border-radius:16px;padding:20px;text-align:center">
+        <div style="font-size:22px;margin-bottom:8px">👑</div>
+        <div style="font-size:15px;font-weight:800;color:#fff;margin-bottom:8px">Relatório completo no Premium</div>
+        <p style="color:#999;font-size:13px;line-height:1.5;margin:0 0 16px">
+          Veja análise de macros, balanço calórico, comparativo com semana anterior, análise personalizada da Evellyn e muito mais.
+        </p>
+        <a href="${APP_URL}?utm_source=email&utm_medium=weekly&utm_campaign=free_upgrade" style="display:inline-block;background:linear-gradient(135deg,#F59E0B,#EF4444);color:#fff;font-size:14px;font-weight:700;padding:13px 32px;border-radius:12px;text-decoration:none">
+          Ver planos →
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:16px 32px;border-top:1px solid #1e3028;text-align:center">
+      <p style="color:#444;font-size:12px;margin:0">IA Calorias · Relatório automático enviado todo domingo ·
+        <a href="${APP_URL}" style="color:#555">Abrir app</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  if (!resend) {
+    const log = logger || console;
+    log.warn?.({ email, weekLabel: data.weekLabel }, "RESEND_API_KEY not set — free weekly report skipped (dev)");
+    return;
+  }
+
+  await resend.emails.send({
+    from: FROM_EMAIL,
+    to: email,
+    subject: `Sua semana de ${data.weekLabel} — ${data.totalMeals} refeições registradas 🥗`,
     html,
   });
 }

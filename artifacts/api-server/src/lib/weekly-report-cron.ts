@@ -1,6 +1,6 @@
 import { db, usersTable, subscriptionsTable, analysesTable, goalsTable } from "@workspace/db";
-import { eq, and, gte, lt, ne, desc, or, inArray } from "drizzle-orm";
-import { sendWeeklyReport, type WeeklyReportData } from "./email.js";
+import { eq, and, gte, lt, ne, desc, inArray } from "drizzle-orm";
+import { sendWeeklyReport, sendFreeWeeklyReport, type WeeklyReportData, type FreeWeeklyReportData } from "./email.js";
 import OpenAI from "openai";
 import { logger } from "./logger.js";
 
@@ -81,6 +81,30 @@ export async function sendWeeklyReportForUser(
       } else break;
     }
 
+    // Previous week data for comparison
+    const prevMon = new Date(lastMon.getTime() - 7 * 24 * 60 * 60 * 1000);
+    let prevWeekAvgCalories: number | null = null;
+    let prevWeekDaysWithData: number | null = null;
+    let prevWeekTotalMeals: number | null = null;
+    try {
+      const prevAnalyses = await db.query.analysesTable.findMany({
+        where: and(
+          eq(analysesTable.userId, userId),
+          gte(analysesTable.createdAt, prevMon),
+          lt(analysesTable.createdAt, lastMon),
+        ),
+        columns: { calories: true, createdAt: true },
+        limit: 300,
+      });
+      if (prevAnalyses.length > 0) {
+        const prevDays = new Set(prevAnalyses.map((a: any) => a.createdAt.toISOString().slice(0, 10))).size;
+        const prevTotal = prevAnalyses.reduce((s: number, a: any) => s + a.calories, 0);
+        prevWeekAvgCalories = prevDays > 0 ? prevTotal / prevDays : null;
+        prevWeekDaysWithData = prevDays;
+        prevWeekTotalMeals = prevAnalyses.length;
+      }
+    } catch {}
+
     // AI summary
     let aiSummary: string | null = null;
     try {
@@ -115,6 +139,9 @@ Dados: média ${Math.round(avgCalories)} kcal/dia${goals?.calories ? ` (meta ${g
       streak,
       topMeals,
       aiSummary,
+      prevWeekAvgCalories,
+      prevWeekDaysWithData,
+      prevWeekTotalMeals,
     };
 
     await sendWeeklyReport(userEmail, reportData);
@@ -146,32 +173,97 @@ export async function maybeRunWeeklyReportCron(): Promise<void> {
 
   logger.info("weekly report cron: starting batch send");
 
-  // Find all premium users (limited or unlimited)
+  const { lastMon, thisMon } = lastWeekWindow();
+
+  // ── Premium users ──────────────────────────────────────────────────────────
   const premiumSubs = await db.query.subscriptionsTable.findMany({
     where: ne(subscriptionsTable.tier, "free"),
     columns: { userId: true },
   });
+  const premiumUserIds = [...new Set(premiumSubs.map((s: any) => s.userId).filter(Boolean) as string[])];
 
-  const userIds = [...new Set(premiumSubs.map(s => s.userId).filter(Boolean) as string[])];
-  if (userIds.length === 0) return;
+  if (premiumUserIds.length > 0) {
+    const premiumUsers = await db.query.usersTable.findMany({
+      where: inArray(usersTable.id, premiumUserIds),
+      columns: { id: true, email: true, name: true },
+    });
 
-  const users = await db.query.usersTable.findMany({
-    where: inArray(usersTable.id, userIds),
+    for (let i = 0; i < premiumUsers.length; i += 5) {
+      const batch = premiumUsers.slice(i, i + 5);
+      await Promise.allSettled(
+        batch.map((u: any) => sendWeeklyReportForUser(u.id, u.email, u.name, lastMon, thisMon))
+      );
+      if (i + 5 < premiumUsers.length) await new Promise<void>(r => { (globalThis as any).setTimeout(r, 2000); });
+    }
+    logger.info({ total: premiumUsers.length }, "weekly report cron: premium batch complete");
+  }
+
+  // ── Free users (have email + logged at least 1 meal last week) ────────────
+  const allUsers = await db.query.usersTable.findMany({
+    where: premiumUserIds.length > 0
+      ? (t: any, { notInArray: notIn }: any) => notIn(t.id, premiumUserIds)
+      : undefined,
     columns: { id: true, email: true, name: true },
   });
 
-  const { lastMon, thisMon } = lastWeekWindow();
+  let freeSent = 0;
+  for (let i = 0; i < allUsers.length; i += 10) {
+    const batch = allUsers.slice(i, i + 10);
+    await Promise.allSettled(batch.map(async (u: any) => {
+      try {
+        const analyses = await db.query.analysesTable.findMany({
+          where: and(
+            eq(analysesTable.userId, u.id),
+            gte(analysesTable.createdAt, lastMon),
+            lt(analysesTable.createdAt, thisMon),
+          ),
+          columns: { dishName: true, calories: true, createdAt: true },
+          limit: 50,
+        });
+        if (analyses.length === 0) return; // no activity last week → skip
 
-  // Send in batches of 5 to avoid rate limiting Resend/OpenAI
-  for (let i = 0; i < users.length; i += 5) {
-    const batch = users.slice(i, i + 5);
-    await Promise.allSettled(
-      batch.map(u => sendWeeklyReportForUser(u.id, u.email, u.name, lastMon, thisMon))
-    );
-    if (i + 5 < users.length) {
-      await new Promise(r => setTimeout(r, 2000)); // 2s between batches
-    }
+        const weekLabel = buildWeekLabel(lastMon, thisMon);
+        const dedupeKey = `free:${u.id}:${weekLabel}`;
+        if (sentThisWeek.has(dedupeKey)) return;
+
+        const daysWithData = new Set(analyses.map((a: any) => a.createdAt.toISOString().slice(0, 10))).size;
+        const avgCalories = analyses.reduce((s: number, a: any) => s + a.calories, 0) / Math.max(daysWithData, 1);
+
+        const mealFreq = new Map<string, number>();
+        for (const a of analyses) mealFreq.set(a.dishName, (mealFreq.get(a.dishName) ?? 0) + 1);
+        const topMeals = [...mealFreq.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([name, count]) => count > 1 ? `${name} (×${count})` : name);
+
+        // Simple streak from analyses
+        const daySet = new Set(analyses.map((a: any) => a.createdAt.toISOString().slice(0, 10)));
+        let streak = 0;
+        const checkFrom = new Date(thisMon.getTime() - 86400000);
+        for (let d = 0; d < 90; d++) {
+          if (daySet.has(checkFrom.toISOString().slice(0, 10))) { streak++; checkFrom.setUTCDate(checkFrom.getUTCDate() - 1); }
+          else break;
+        }
+
+        const reportData: FreeWeeklyReportData = {
+          userName: u.name || u.email.split("@")[0],
+          weekLabel,
+          totalMeals: analyses.length,
+          daysWithData,
+          avgCalories,
+          streak,
+          topMeals,
+        };
+
+        await sendFreeWeeklyReport(u.email, reportData, logger);
+        sentThisWeek.add(dedupeKey);
+        freeSent++;
+      } catch (err) {
+        logger.error({ err, userId: u.id }, "free weekly report failed for user");
+      }
+    }));
+    if (i + 10 < allUsers.length) await new Promise<void>(r => { (globalThis as any).setTimeout(r, 1000); });
   }
 
-  logger.info({ total: users.length }, "weekly report cron: batch complete");
+  logger.info({ freeSent }, "weekly report cron: free batch complete");
 }
