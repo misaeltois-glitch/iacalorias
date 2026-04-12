@@ -3,6 +3,50 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Target, Download } from 'lucide-react';
 import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
 
+// ── Body Measurement types (local) ────────────────────────────────────────────
+interface MeasLog {
+  id: string;
+  logDate: string;
+  waist?: number | null;
+  hip?: number | null;
+  arm?: number | null;
+  chest?: number | null;
+  thigh?: number | null;
+}
+
+const MEAS_METRICS = [
+  { key: 'waist' as const, label: 'Cintura', color: '#EF4444', reduceIsGood: true },
+  { key: 'hip'   as const, label: 'Quadril',  color: '#F59E0B', reduceIsGood: true },
+  { key: 'chest' as const, label: 'Peito',    color: '#3B82F6', reduceIsGood: false },
+  { key: 'arm'   as const, label: 'Braço',    color: '#8B5CF6', reduceIsGood: false },
+  { key: 'thigh' as const, label: 'Coxa',     color: '#0D9F6E', reduceIsGood: false },
+] as const;
+type MeasKey = typeof MEAS_METRICS[number]['key'];
+
+function MiniSparkline({ values, color }: { values: number[]; color: string }) {
+  if (values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const W = 64, H = 28;
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * W;
+    const y = H - ((v - min) / range) * H;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return (
+    <svg width={W} height={H} style={{ display: 'block', flexShrink: 0 }}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      {values.map((v, i) => {
+        if (i !== values.length - 1) return null;
+        const x = (i / (values.length - 1)) * W;
+        const y = H - ((v - min) / range) * H;
+        return <circle key={i} cx={x} cy={y} r={3} fill={color} />;
+      })}
+    </svg>
+  );
+}
+
 
 
 type Period = 'day' | 'week' | 'month';
@@ -91,6 +135,19 @@ export function ProgressView({ sessionId, isPremium, refreshSignal, onUpgrade, o
 
   const today = todayStr();
   const [exporting, setExporting] = useState(false);
+  const [measLogs, setMeasLogs] = useState<MeasLog[]>([]);
+
+  const fetchMeasurements = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      const r = await fetch(`${BASE}api/measurements?sessionId=${sessionId}`, { headers: authHeaders() });
+      if (!r.ok) return;
+      const d = await r.json();
+      setMeasLogs(d.logs ?? []);
+    } catch {}
+  }, [sessionId]);
+
+  useEffect(() => { fetchMeasurements(); }, [fetchMeasurements, refreshSignal]);
 
   const exportCSV = useCallback(async () => {
     if (!sessionId || !data) return;
@@ -472,6 +529,81 @@ export function ProgressView({ sessionId, isPremium, refreshSignal, onUpgrade, o
               );
             })}
           </div>
+
+          {/* ─── Medidas Corporais ─── */}
+          {(() => {
+            const latest = measLogs[measLogs.length - 1];
+            const prev   = measLogs[measLogs.length - 2];
+            const hasData = measLogs.length > 0;
+            const metricsWithData = MEAS_METRICS.filter(m => latest?.[m.key] != null);
+
+            return (
+              <div style={{ background: 'var(--bg-2)', borderRadius: '18px', border: '1.5px solid var(--border)', padding: '14px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasData ? '12px' : '0' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)' }}>📏 Medidas Corporais</span>
+                  {measLogs.length > 0 && (
+                    <span style={{ fontSize: '10px', color: 'var(--text-3)' }}>
+                      {measLogs.length} registro{measLogs.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+
+                {!hasData ? (
+                  <p style={{ fontSize: '12px', color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
+                    Nenhum registro ainda. Adicione suas medidas na aba Início para acompanhar a evolução aqui.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {metricsWithData.map(m => {
+                      const cur = latest[m.key]!;
+                      const old = prev?.[m.key];
+                      const diff = old != null ? +(cur - old).toFixed(1) : null;
+                      const isGood = diff !== null && (m.reduceIsGood ? diff < 0 : diff > 0);
+                      const isBad  = diff !== null && (m.reduceIsGood ? diff > 0 : diff < 0);
+                      const diffColor = isGood ? '#0D9F6E' : isBad ? '#EF4444' : 'var(--text-3)';
+                      const sparkValues = measLogs
+                        .map(l => l[m.key])
+                        .filter((v): v is number => v != null)
+                        .slice(-6);
+
+                      return (
+                        <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: m.color, flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px' }}>
+                              <span style={{ fontSize: '12px', color: 'var(--text-2)', fontWeight: 500 }}>{m.label}</span>
+                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums' }}>{cur}cm</span>
+                                {diff !== null && (
+                                  <span style={{ fontSize: '10px', fontWeight: 700, color: diffColor }}>
+                                    {diff > 0 ? '+' : ''}{diff}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{ height: '3px', borderRadius: '99px', background: 'var(--bg-3)', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: '100%', borderRadius: '99px', background: `${m.color}40` }} />
+                            </div>
+                          </div>
+                          <MiniSparkline values={sparkValues} color={m.color} />
+                        </div>
+                      );
+                    })}
+
+                    {measLogs.length >= 2 && (
+                      <div style={{
+                        marginTop: '4px', padding: '8px 10px', borderRadius: '10px',
+                        background: 'var(--bg-3)', fontSize: '11px', color: 'var(--text-2)', lineHeight: 1.5,
+                      }}>
+                        🔻 = redução &nbsp;·&nbsp; 🔺 = aumento &nbsp;·&nbsp; Comparado ao registro anterior de{' '}
+                        <strong>{new Date(prev?.logDate + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</strong>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* ─── Calendário ─── */}
           <div style={{ background: 'var(--bg-2)', borderRadius: '18px', border: '1.5px solid var(--border)', padding: '14px 16px' }}>
