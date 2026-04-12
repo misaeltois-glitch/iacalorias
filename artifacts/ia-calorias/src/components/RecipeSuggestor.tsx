@@ -396,13 +396,13 @@ export function RecipeSuggestor({ onClose, sessionId }: RecipeSuggestorProps) {
                                                 {sub.items.map(item => (
                                                   <button
                                                     key={item}
-                                                    onClick={() => { if (!tags.includes(item)) setTags(prev => [...prev, item]); }}
+                                                    onClick={() => setTags(prev => prev.includes(item) ? prev.filter(t => t !== item) : [...prev, item])}
                                                     style={{
                                                       padding: '4px 10px', borderRadius: 99,
                                                       background: tags.includes(item) ? 'rgba(245,158,11,0.15)' : 'var(--bg-2)',
                                                       border: `1px solid ${tags.includes(item) ? 'rgba(245,158,11,0.4)' : 'var(--border)'}`,
                                                       fontSize: 12, color: tags.includes(item) ? '#D97706' : 'var(--text-2)',
-                                                      cursor: tags.includes(item) ? 'default' : 'pointer',
+                                                      cursor: 'pointer',
                                                       fontWeight: 500, transition: 'all 0.12s',
                                                     }}
                                                   >

@@ -26,6 +26,7 @@ import { WeightTracker } from '@/components/WeightTracker';
 import { BodyMeasurements } from '@/components/BodyMeasurements';
 import { OnboardingAuthPrompt } from '@/components/OnboardingAuthPrompt';
 import { CardapioChoiceModal } from '@/components/CardapioChoiceModal';
+import { PantryPlanModal } from '@/components/PantryPlanModal';
 import { ProfileSetupBanner } from '@/components/ProfileSetupBanner';
 import { InstallPrompt, OpenInAppBanner } from '@/components/InstallPrompt';
 import { ReferralCard, applyPendingReferral, REFERRAL_CODE_KEY } from '@/components/ReferralCard';
@@ -221,6 +222,7 @@ export default function Home() {
   const [showMealPlan, setShowMealPlan] = useState(false);
   const [showCardapioChoice, setShowCardapioChoice] = useState(false);
   const [showRecipeSuggestor, setShowRecipeSuggestor] = useState(false);
+  const [showPantryPlan, setShowPantryPlan] = useState(false);
   const [showFoodPrefs, setShowFoodPrefs] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
   const [logoutStep, setLogoutStep] = useState<0 | 1>(0);
@@ -1645,6 +1647,7 @@ export default function Home() {
         onClose={() => setShowCardapioChoice(false)}
         isPremium={isPremium}
         onSelectAI={() => setShowMealPlan(true)}
+        onSelectPantry={() => setShowPantryPlan(true)}
         onSelectRecipe={() => setShowRecipeSuggestor(true)}
         onUpgrade={() => { setPaywallDisableClose(false); setShowPaywall(true); }}
       />
@@ -1669,6 +1672,14 @@ export default function Home() {
             sessionId={sessionId}
           />
         </Suspense>
+      )}
+
+      {showPantryPlan && (
+        <PantryPlanModal
+          isOpen={showPantryPlan}
+          onClose={() => setShowPantryPlan(false)}
+          sessionId={sessionId}
+        />
       )}
 
       {showFoodPrefs && (

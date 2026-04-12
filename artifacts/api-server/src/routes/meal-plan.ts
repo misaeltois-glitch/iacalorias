@@ -26,15 +26,16 @@ async function resolveSubTier(userId?: string, sessionId?: string): Promise<"fre
 router.post("/", async (req: Request, res: Response) => {
   const userId = req.user?.userId;
   const userEmail = req.user?.email;
-  const { sessionId, foodPrefs, weightTrend } = req.body as {
+  const { sessionId, foodPrefs, weightTrend, pantryIngredients } = req.body as {
     sessionId?: string;
     foodPrefs?: Record<string, string[]>;
     weightTrend?: {
       currentKg: number;
       goalKg: number | null;
-      weeklyChangeKg: number; // positive = gaining, negative = losing
-      objective: string | null; // 'lose_weight' | 'gain_weight' | 'maintain'
+      weeklyChangeKg: number;
+      objective: string | null;
     };
+    pantryIngredients?: string[]; // when set: generate plan using ONLY these ingredients (free tier allowed)
   };
 
   if (!sessionId && !userId) {
@@ -45,7 +46,9 @@ router.post("/", async (req: Request, res: Response) => {
   const masterTier = getMasterTier(req.user?.email);
   const isDevAccount = !!masterTier;
   const tier = masterTier ?? await resolveSubTier(userId, sessionId);
-  if (tier === "free") {
+  // Pantry-based plans are free — tier check only applies to AI goal-based plans
+  const isPantryMode = Array.isArray(pantryIngredients) && pantryIngredients.length > 0;
+  if (!isPantryMode && tier === "free") {
     res.status(403).json({ error: "forbidden", message: "Planejamento semanal disponível apenas no plano pago" });
     return;
   }
@@ -145,10 +148,15 @@ router.post("/", async (req: Request, res: Response) => {
     }
   }
 
+  // Pantry mode: hard constraint on ingredients
+  const pantryPrompt = isPantryMode
+    ? `\n⚠️ RESTRIÇÃO OBRIGATÓRIA — DESPENSA DO USUÁRIO: Crie TODAS as refeições usando EXCLUSIVAMENTE estes ingredientes disponíveis: ${pantryIngredients!.join(", ")}. Você pode usar temperos básicos (sal, pimenta-do-reino, alho, cebola, azeite/óleo) mesmo que não listados. NÃO use nenhum ingrediente fora desta lista.`
+    : "";
+
   const prompt = `Você é uma nutricionista brasileira chamada Sofia. Crie um plano de refeições para 7 dias (segunda a domingo) em JSON, com culinária brasileira variada, saudável e gostosa.
 
 Metas nutricionais diárias: ${macroLine}.
-${restrictionLine}${foodPrefsPrompt}${weightProgressPrompt}
+${restrictionLine}${foodPrefsPrompt}${weightProgressPrompt}${pantryPrompt}
 Refeições por dia: ${mealNames.join(", ")}.
 
 Retorne APENAS o JSON no seguinte formato (sem markdown, sem explicações):

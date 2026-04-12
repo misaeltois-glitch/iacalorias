@@ -1,12 +1,13 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, ChefHat } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { X, Sparkles, ChefHat, ShoppingBag } from 'lucide-react';
 
 interface CardapioChoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   isPremium: boolean;
   onSelectAI: () => void;
+  onSelectPantry: () => void;
   onSelectRecipe: () => void;
   onUpgrade: () => void;
 }
@@ -16,6 +17,7 @@ export function CardapioChoiceModal({
   onClose,
   isPremium,
   onSelectAI,
+  onSelectPantry,
   onSelectRecipe,
   onUpgrade,
 }: CardapioChoiceModalProps) {
@@ -25,6 +27,11 @@ export function CardapioChoiceModal({
     onClose();
     if (!isPremium) { setTimeout(onUpgrade, 50); return; }
     setTimeout(onSelectAI, 50);
+  };
+
+  const handleSelectPantry = () => {
+    onClose();
+    setTimeout(onSelectPantry, 50);
   };
 
   const handleSelectRecipe = () => {
@@ -57,7 +64,7 @@ export function CardapioChoiceModal({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px' }}>
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>
-              🥗 Cardápio Semanal
+              🥗 Planejar Refeições
             </h2>
             <p style={{ fontSize: '12px', color: 'var(--text-2)', margin: '3px 0 0' }}>
               Como você quer montar seu plano?
@@ -76,34 +83,35 @@ export function CardapioChoiceModal({
         </div>
 
         {/* Options */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {/* Gerar com IA */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+          {/* 1. Gerar com IA (premium) */}
           <button
             onClick={handleSelectAI}
             style={{
-              width: '100%', padding: '20px',
-              borderRadius: '20px', border: 'none', cursor: 'pointer', textAlign: 'left',
+              width: '100%', padding: '18px',
+              borderRadius: '18px', border: 'none', cursor: 'pointer', textAlign: 'left',
               background: isPremium
                 ? 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(239,68,68,0.08))'
                 : 'var(--bg-2)',
               border: `1.5px solid ${isPremium ? 'rgba(245,158,11,0.3)' : 'var(--border)'}` as any,
-              display: 'flex', alignItems: 'center', gap: '16px',
+              display: 'flex', alignItems: 'center', gap: '14px',
             }}
           >
             <div style={{
-              width: '52px', height: '52px', borderRadius: '16px', flexShrink: 0,
+              width: '48px', height: '48px', borderRadius: '14px', flexShrink: 0,
               background: 'linear-gradient(135deg, #F59E0B, #EF4444)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 16px rgba(245,158,11,0.35)',
+              boxShadow: '0 4px 14px rgba(245,158,11,0.3)',
             }}>
-              <Sparkles size={24} color="#fff" />
+              <Sparkles size={22} color="#fff" />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-1)', marginBottom: '3px' }}>
-                Gerar com IA
+              <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-1)', marginBottom: '2px' }}>
+                Cardápio personalizado IA
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.5 }}>
-                Sofia monta 7 dias de refeições variadas baseadas nas suas metas e preferências
+                Sofia monta 7 dias baseado nas suas metas e progresso de peso
               </div>
             </div>
             <span style={{
@@ -116,31 +124,31 @@ export function CardapioChoiceModal({
             </span>
           </button>
 
-          {/* Usar o que tenho */}
+          {/* 2. Plano semanal da despensa (free) */}
           <button
-            onClick={handleSelectRecipe}
+            onClick={handleSelectPantry}
             style={{
-              width: '100%', padding: '20px',
-              borderRadius: '20px', cursor: 'pointer', textAlign: 'left',
+              width: '100%', padding: '18px',
+              borderRadius: '18px', cursor: 'pointer', textAlign: 'left',
               background: 'linear-gradient(135deg, rgba(13,159,110,0.1), rgba(59,130,246,0.07))',
               border: '1.5px solid rgba(13,159,110,0.25)' as any,
-              display: 'flex', alignItems: 'center', gap: '16px',
+              display: 'flex', alignItems: 'center', gap: '14px',
             }}
           >
             <div style={{
-              width: '52px', height: '52px', borderRadius: '16px', flexShrink: 0,
+              width: '48px', height: '48px', borderRadius: '14px', flexShrink: 0,
               background: 'linear-gradient(135deg, #0D9F6E, #3B82F6)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 16px rgba(13,159,110,0.3)',
+              boxShadow: '0 4px 14px rgba(13,159,110,0.3)',
             }}>
-              <ChefHat size={24} color="#fff" />
+              <ShoppingBag size={22} color="#fff" />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-1)', marginBottom: '3px' }}>
-                Usar o que tenho
+              <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-1)', marginBottom: '2px' }}>
+                Plano semanal da despensa
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.5 }}>
-                Informe os ingredientes que você tem em casa e a IA cria uma receita saudável
+                Informe o que você tem em casa — a IA monta seg. a dom. com esses ingredientes
               </div>
             </div>
             <span style={{
@@ -151,6 +159,43 @@ export function CardapioChoiceModal({
               Grátis →
             </span>
           </button>
+
+          {/* 3. Receita rápida (free) */}
+          <button
+            onClick={handleSelectRecipe}
+            style={{
+              width: '100%', padding: '18px',
+              borderRadius: '18px', cursor: 'pointer', textAlign: 'left',
+              background: 'var(--bg-2)',
+              border: '1.5px solid var(--border)' as any,
+              display: 'flex', alignItems: 'center', gap: '14px',
+            }}
+          >
+            <div style={{
+              width: '48px', height: '48px', borderRadius: '14px', flexShrink: 0,
+              background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(139,92,246,0.25)',
+            }}>
+              <ChefHat size={22} color="#fff" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-1)', marginBottom: '2px' }}>
+                Receita rápida
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.5 }}>
+                Informe alguns ingredientes e receba uma receita saudável na hora
+              </div>
+            </div>
+            <span style={{
+              fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: 99, flexShrink: 0,
+              background: 'rgba(139,92,246,0.1)', color: '#8B5CF6',
+              border: '1px solid rgba(139,92,246,0.2)',
+            }}>
+              Grátis →
+            </span>
+          </button>
+
         </div>
       </motion.div>
     </div>
