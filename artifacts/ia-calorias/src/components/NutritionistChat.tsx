@@ -20,7 +20,7 @@ interface NutritionistChatProps {
 
 const WELCOME: Message = {
   role: 'assistant',
-  content: 'Olá! Sou a Sofia, sua nutricionista IA. 🌿\n\nPosso ajudar com dúvidas sobre sua alimentação de hoje, sugestões de refeições, substituições saudáveis ou qualquer outra questão nutricional. Como posso te ajudar?',
+  content: 'Olá! Sou a Evellyn, sua nutricionista IA. 🌿\n\nPosso ajudar com dúvidas sobre sua alimentação de hoje, sugestões de refeições, substituições saudáveis ou qualquer outra questão nutricional. Como posso te ajudar?',
   ts: Date.now(),
 };
 
@@ -162,7 +162,7 @@ export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgr
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-0.2px' }}>
-                  Sofia — Nutricionista IA
+                  Evellyn — Nutricionista IA
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '1px' }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#0D9F6E', display: 'inline-block' }} />
@@ -264,7 +264,7 @@ export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgr
                   textAlign: 'center',
                 }}>
                   <div style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.5 }}>
-                    Você usou suas <strong style={{ color: 'var(--text-1)' }}>3 perguntas gratuitas</strong> para a Sofia.<br />
+                    Você usou suas <strong style={{ color: 'var(--text-1)' }}>3 perguntas gratuitas</strong> para a Evellyn.<br />
                     Faça upgrade para continuar conversando.
                   </div>
                   <button

@@ -326,7 +326,7 @@ export default function Home() {
       if (!localStorage.getItem(todayKey)) {
         localStorage.setItem(todayKey, '1');
         setTimeout(() => {
-          toast({ title: "Sofia diz:", description: "Ontem ficou faltando um pouco — hoje é a sua chance de recuperar. Você consegue! 💪" });
+          toast({ title: "Evellyn diz:", description: "Ontem ficou faltando um pouco — hoje é a sua chance de recuperar. Você consegue! 💪" });
         }, 3000);
       }
     }
@@ -1201,7 +1201,7 @@ export default function Home() {
                   <span style={{ fontSize: '22px', flexShrink: 0 }}>💡</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>
-                      Sabia que você pode perguntar para a Sofia?
+                      Sabia que você pode perguntar para a Evellyn?
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
                       "O que comer antes do treino?" · "Como bater minha meta de proteína?" — grátis no teste
@@ -1381,7 +1381,7 @@ export default function Home() {
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)' }}>
 
-                        {/* Sofia */}
+                        {/* Evellyn */}
                         <button
                           onClick={() => setShowChat(true)}
                           style={{
@@ -1392,7 +1392,7 @@ export default function Home() {
                         >
                           <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #0D9F6E, #057A55)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🩺</div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>Sofia — Nutricionista IA</div>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>Evellyn — Nutricionista IA</div>
                             <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>Tire dúvidas sobre sua alimentação</div>
                           </div>
                           <span style={{ fontSize: '11px', fontWeight: 700, color: '#0D9F6E', padding: '3px 9px', borderRadius: 99, background: 'rgba(13,159,110,0.1)', border: '1px solid rgba(13,159,110,0.2)', flexShrink: 0 }}>
@@ -1743,9 +1743,9 @@ export default function Home() {
                 🩺
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '4px' }}>Sofia lembra de você</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '4px' }}>Evellyn lembra de você</div>
                 <p style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.6, margin: 0 }}>
-                  Sei que é difícil conciliar trabalho e disciplina alimentar — e é por isso que a Sofia existe. Em segundos, fotografe seu prato e eu cuido do resto. 📸
+                  Sei que é difícil conciliar trabalho e disciplina alimentar — e é por isso que a Evellyn existe. Em segundos, fotografe seu prato e eu cuido do resto. 📸
                 </p>
               </div>
               <button

@@ -111,7 +111,7 @@ export function CardapioChoiceModal({
                 Cardápio personalizado IA
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.5 }}>
-                Sofia monta 7 dias baseado nas suas metas e progresso de peso
+                Evellyn monta 7 dias baseado nas suas metas e progresso de peso
               </div>
             </div>
             <span style={{

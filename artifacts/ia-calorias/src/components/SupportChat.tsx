@@ -27,7 +27,7 @@ const ESCALATION_KEYWORDS = [
 
 const WELCOME: Message = {
   role: 'assistant',
-  content: 'Olá! Sou a Sofia, assistente de suporte do IA Calorias. 🛟\n\nPosso ajudar com dúvidas sobre como usar o app, sua assinatura, funcionalidades e muito mais. Como posso te ajudar?',
+  content: 'Olá! Sou a Evellyn, assistente de suporte do IA Calorias. 🛟\n\nPosso ajudar com dúvidas sobre como usar o app, sua assinatura, funcionalidades e muito mais. Como posso te ajudar?',
   ts: Date.now(),
 };
 
@@ -38,19 +38,19 @@ const SUGGESTIONS = [
   'Como alterar minhas metas?',
 ];
 
-const SYSTEM_PROMPT = `Você é Sofia, assistente de suporte do app IA Calorias. Responda em português brasileiro.
+const SYSTEM_PROMPT = `Você é Evellyn, assistente de suporte do app IA Calorias. Responda em português brasileiro.
 
 Sobre o IA Calorias:
 - App de nutrição com IA que analisa refeições por foto
 - Plano Grátis: 7 dias de teste ilimitado
 - Plano Limitado: R$19,90/mês — 20 análises/mês
-- Plano Ilimitado: R$29,90/mês — análises ilimitadas, cardápio semanal, treinos IA, Sofia ilimitada
+- Plano Ilimitado: R$29,90/mês — análises ilimitadas, cardápio semanal, treinos IA, Evellyn ilimitada
 - Pagamento via Stripe (cartão de crédito), PIX em breve
 - Para cancelar: o usuário deve acessar Perfil → Assinatura ou contatar o suporte
 
 Funcionalidades principais:
 - Análise de refeição por foto (IA identifica macros e calorias)
-- Chat com nutricionista Sofia (plano pago)
+- Chat com nutricionista Evellyn (plano pago)
 - Cardápio semanal gerado por IA (plano Ilimitado)
 - Tracker de água, peso, streak de dias
 - Treino do Dia personalizado por IA
@@ -250,7 +250,7 @@ export function SupportChat({ isOpen, onClose, sessionId }: SupportChatProps) {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '1px' }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-                  <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>Sofia · assistente de suporte</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>Evellyn · assistente de suporte</span>
                 </div>
               </div>
               <button

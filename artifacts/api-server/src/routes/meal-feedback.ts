@@ -65,7 +65,7 @@ router.post("/", async (req: Request, res: Response) => {
   const goalProtein = goals?.protein ?? null;
   const perMealProtein = goalProtein ? Math.round(goalProtein / mealsPerDay) : null;
 
-  const prompt = `Você é uma nutricionista especialista chamada Sofia. Analise esta refeição e dê um feedback personalizado, direto e motivador em português brasileiro.
+  const prompt = `Você é uma nutricionista especialista chamada Evellyn. Analise esta refeição e dê um feedback personalizado, direto e motivador em português brasileiro.
 
 REFEIÇÃO: ${analysis.dishName}
 TIPO DE REFEIÇÃO: ${mealLabel}

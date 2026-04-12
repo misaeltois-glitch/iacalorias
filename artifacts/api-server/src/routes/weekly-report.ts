@@ -124,7 +124,7 @@ router.post("/", async (req: Request, res: Response) => {
   let aiSummary: string | null = null;
   try {
     if (analyses.length > 0) {
-      const summaryPrompt = `Você é uma nutricionista chamada Sofia. Escreva um parágrafo curto (2-3 frases, máx 120 palavras) de análise nutricional da semana de ${buildWeekLabel(lastMon, thisMon)} do usuário ${userName || "usuário"}, em tom encorajador e prático.
+      const summaryPrompt = `Você é uma nutricionista chamada Evellyn. Escreva um parágrafo curto (2-3 frases, máx 120 palavras) de análise nutricional da semana de ${buildWeekLabel(lastMon, thisMon)} do usuário ${userName || "usuário"}, em tom encorajador e prático.
 
 Dados da semana:
 - Média de calorias: ${Math.round(avgCalories)} kcal/dia${goals?.calories ? ` (meta: ${goals.calories})` : ''}

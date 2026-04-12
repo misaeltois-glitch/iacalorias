@@ -89,7 +89,7 @@ export async function sendWeeklyReportForUser(
         model: "gpt-4o-mini",
         messages: [{
           role: "user",
-          content: `Você é Sofia, nutricionista do app IA Calorias. Escreva 2-3 frases de análise da semana de ${weekLabel} para ${displayName}, em tom encorajador e prático.
+          content: `Você é Evellyn, nutricionista do app IA Calorias. Escreva 2-3 frases de análise da semana de ${weekLabel} para ${displayName}, em tom encorajador e prático.
 
 Dados: média ${Math.round(avgCalories)} kcal/dia${goals?.calories ? ` (meta ${goals.calories})` : ''}, proteína ${(totals.protein/7).toFixed(0)}g/dia${goals?.protein ? ` (meta ${goals.protein}g)` : ''}, ${daysWithData}/7 dias com registro, ${analyses.length} refeições. Destaque 1 ponto positivo e 1 sugestão. Sem markdown.`,
         }],

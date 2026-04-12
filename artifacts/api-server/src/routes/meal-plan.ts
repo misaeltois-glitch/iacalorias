@@ -153,7 +153,7 @@ router.post("/", async (req: Request, res: Response) => {
     ? `\n⚠️ RESTRIÇÃO OBRIGATÓRIA — DESPENSA DO USUÁRIO: Crie TODAS as refeições usando EXCLUSIVAMENTE estes ingredientes disponíveis: ${pantryIngredients!.join(", ")}. Você pode usar temperos básicos (sal, pimenta-do-reino, alho, cebola, azeite/óleo) mesmo que não listados. NÃO use nenhum ingrediente fora desta lista.`
     : "";
 
-  const prompt = `Você é uma nutricionista brasileira chamada Sofia. Crie um plano de refeições para 7 dias (segunda a domingo) em JSON, com culinária brasileira variada, saudável e gostosa.
+  const prompt = `Você é uma nutricionista brasileira chamada Evellyn. Crie um plano de refeições para 7 dias (segunda a domingo) em JSON, com culinária brasileira variada, saudável e gostosa.
 
 Metas nutricionais diárias: ${macroLine}.
 ${restrictionLine}${foodPrefsPrompt}${weightProgressPrompt}${pantryPrompt}

@@ -642,7 +642,7 @@ export function MealPlanModal({ isOpen, onClose, sessionId, isPremium, onUpgrade
                   <div>
                     <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '8px' }}>Cardápio semanal personalizado</div>
                     <div style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.6, maxWidth: '300px', margin: '0 auto' }}>
-                      Sofia monta um plano de 7 dias com culinária brasileira, respeitando suas metas e progresso de peso.
+                      Evellyn monta um plano de 7 dias com culinária brasileira, respeitando suas metas e progresso de peso.
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '280px' }}>
@@ -662,7 +662,7 @@ export function MealPlanModal({ isOpen, onClose, sessionId, isPremium, onUpgrade
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderRadius: '14px', background: 'rgba(13,159,110,0.08)', border: '1px solid rgba(13,159,110,0.15)', marginBottom: '16px' }}>
                     <div style={{ fontSize: '20px', animation: 'spin 2s linear infinite', display: 'inline-block' }}>🌀</div>
                     <div>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#0D9F6E' }}>Sofia está preparando seu cardápio...</div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#0D9F6E' }}>Evellyn está preparando seu cardápio...</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>Analisando seu progresso e metas</div>
                     </div>
                   </div>

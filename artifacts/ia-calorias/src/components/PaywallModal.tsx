@@ -41,8 +41,8 @@ const FEATURES: FeatureRow[] = [
   { label: 'Evolução de peso com gráfico',             free: '7 dias teste',   limited: true,           unlimited: true },
   { label: 'Contador de água diário',                  free: '7 dias teste',   limited: true,           unlimited: true },
   // ── IA ──
-  { label: 'Chat com Sofia IA',                        free: '7 dias teste',   limited: 'Ilimitado',    unlimited: 'Ilimitado',    highlight: true },
-  { label: 'Cardápio semanal com Sofia',               free: false,            limited: false,          unlimited: true,           highlight: true },
+  { label: 'Chat com Evellyn IA',                        free: '7 dias teste',   limited: 'Ilimitado',    unlimited: 'Ilimitado',    highlight: true },
+  { label: 'Cardápio semanal com Evellyn',               free: false,            limited: false,          unlimited: true,           highlight: true },
   { label: 'Relatório semanal inteligente',            free: false,            limited: false,          unlimited: true },
   // ── Treino ──
   { label: 'Treino do Dia gerado por IA',              free: '7 dias teste',   limited: '5/mês',        unlimited: 'Ilimitado',    highlight: true },
