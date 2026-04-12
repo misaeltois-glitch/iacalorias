@@ -26,7 +26,6 @@ import { WeightTracker } from '@/components/WeightTracker';
 import { BodyMeasurements } from '@/components/BodyMeasurements';
 import { OnboardingAuthPrompt } from '@/components/OnboardingAuthPrompt';
 import { CardapioChoiceModal } from '@/components/CardapioChoiceModal';
-import { PantryPlanModal } from '@/components/PantryPlanModal';
 import { ProfileSetupBanner } from '@/components/ProfileSetupBanner';
 import { InstallPrompt, OpenInAppBanner } from '@/components/InstallPrompt';
 import { ReferralCard, applyPendingReferral, REFERRAL_CODE_KEY } from '@/components/ReferralCard';
@@ -46,6 +45,7 @@ const ProgressView = lazy(() => import('@/components/ProgressView').then(m => ({
 const NutritionistChat = lazy(() => import('@/components/NutritionistChat').then(m => ({ default: m.NutritionistChat })));
 const MealPlanModal = lazy(() => import('@/components/MealPlanModal').then(m => ({ default: m.MealPlanModal })));
 const RecipeSuggestor = lazy(() => import('@/components/RecipeSuggestor').then(m => ({ default: m.RecipeSuggestor })));
+const PantryPlanModal = lazy(() => import('@/components/PantryPlanModal').then(m => ({ default: m.PantryPlanModal })));
 
 function TabFallback() {
   return (
@@ -1292,6 +1292,14 @@ export default function Home() {
               {/* Nutrition Calendar */}
               <NutritionCalendar
                 sessionId={sessionId}
+                isPremium={isPremium}
+                onGoToAITools={() => {
+                  setShowAITools(true);
+                  localStorage.setItem('iac-ai-tools-expanded', 'true');
+                  setTimeout(() => {
+                    document.getElementById('ai-tools-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 150);
+                }}
                 goals={savedGoals ? {
                   calories: savedGoals.calories ?? null,
                   protein: savedGoals.protein ?? null,
@@ -1313,7 +1321,7 @@ export default function Home() {
               {isAuthenticated && <ReferralCard />}
 
               {/* Ferramentas IA — bloco recolhível */}
-              <div style={{ borderRadius: '18px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+              <div id="ai-tools-section" style={{ borderRadius: '18px', border: '1px solid var(--border)', overflow: 'hidden' }}>
                 <style>{`
                   @keyframes iac-pulse-ring {
                     0% { box-shadow: 0 0 0 0 rgba(13,159,110,0.55); }
@@ -1675,11 +1683,17 @@ export default function Home() {
       )}
 
       {showPantryPlan && (
-        <PantryPlanModal
-          isOpen={showPantryPlan}
-          onClose={() => setShowPantryPlan(false)}
-          sessionId={sessionId}
-        />
+        <Suspense fallback={null}>
+          <AnimatePresence>
+            <PantryPlanModal
+              isOpen={showPantryPlan}
+              onClose={() => setShowPantryPlan(false)}
+              sessionId={sessionId}
+              isPremium={isPremium}
+              onUpgrade={() => { setPaywallDisableClose(false); setShowPaywall(true); }}
+            />
+          </AnimatePresence>
+        </Suspense>
       )}
 
       {showFoodPrefs && (

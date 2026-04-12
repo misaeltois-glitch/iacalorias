@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronDown, ChevronUp, RefreshCw, Loader2, ArrowLeft, ShoppingBag } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, RefreshCw, Loader2, ArrowLeft, ShoppingBag, Lock } from 'lucide-react';
 import { BASE, authHeaders } from '@/lib/api';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -72,6 +72,44 @@ const DAY_EMOJIS: Record<string, string> = {
 
 const PANTRY_KEY = 'ia-calorias-pantry';
 const PANTRY_PLAN_KEY = 'ia-calorias-pantry-plan';
+const PANTRY_PLAN_DATE_KEY = 'ia-calorias-pantry-plan-date'; // YYYY-MM-DD (Monday of the plan week)
+
+// ── Date helpers ───────────────────────────────────────────────────────────────
+
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function todayLocalStr(): string {
+  return localDateStr(new Date());
+}
+
+/** Returns YYYY-MM-DD for the Monday of the given date's week */
+function getMondayOfWeek(d: Date): string {
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const daysFromMon = (day + 6) % 7;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - daysFromMon);
+  mon.setHours(0, 0, 0, 0);
+  return localDateStr(mon);
+}
+
+type DayStatus = 'current' | 'past' | 'future';
+
+function getDayStatus(planMonday: string, dayIndex: number): { status: DayStatus; dayDateStr: string; daysUntil: number } {
+  const planStart = new Date(planMonday + 'T00:00:00');
+  const dayDate = new Date(planStart);
+  dayDate.setDate(planStart.getDate() + dayIndex);
+  const dayDateStr = localDateStr(dayDate);
+  const today = todayLocalStr();
+
+  const todayMidnight = new Date(today + 'T00:00:00').getTime();
+  const dayMidnight = dayDate.getTime();
+  const daysUntil = Math.round((dayMidnight - todayMidnight) / 86400000);
+
+  const status: DayStatus = dayDateStr === today ? 'current' : dayDateStr < today ? 'past' : 'future';
+  return { status, dayDateStr, daysUntil };
+}
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -107,27 +145,55 @@ function MealRow({ meal }: { meal: MealItem }) {
   );
 }
 
-function WeekStrip({ weekPlan, activeIndex, onSelect }: { weekPlan: DayPlan[]; activeIndex: number; onSelect: (i: number) => void }) {
+function WeekStrip({ weekPlan, activeIndex, onSelect, isPremium, onUpgrade, planMonday, justGenerated }: {
+  weekPlan: DayPlan[];
+  activeIndex: number;
+  onSelect: (i: number) => void;
+  isPremium: boolean;
+  onUpgrade: () => void;
+  planMonday: string;
+  justGenerated: boolean;
+}) {
   return (
     <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', padding: '0 20px 0', scrollbarWidth: 'none' }}>
       {weekPlan.map((day, i) => {
         const label = DAY_LABELS[day.day] ?? day.day.slice(0, 3).toUpperCase();
         const isSelected = i === activeIndex;
+        const { status, daysUntil } = planMonday ? getDayStatus(planMonday, i) : { status: 'current' as DayStatus, daysUntil: 0 };
+        // justGenerated = one-time full preview: no locks, no future blocks
+        const isLockedPast = !justGenerated && status === 'past' && !isPremium;
+        const isFuture = !justGenerated && status === 'future';
+
+        const handleClick = () => {
+          if (isLockedPast) { onUpgrade(); return; }
+          if (isFuture) return; // not clickable yet
+          onSelect(i);
+        };
+
         return (
           <button
             key={i}
-            onClick={() => onSelect(i)}
+            onClick={handleClick}
             style={{
               flexShrink: 0, minWidth: '46px', padding: '8px 4px',
-              borderRadius: '12px', border: `1.5px solid ${isSelected ? '#0D9F6E' : 'var(--border)'}`,
-              background: isSelected ? 'rgba(13,159,110,0.12)' : 'var(--bg-2)',
-              cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+              borderRadius: '12px',
+              border: `1.5px solid ${isSelected && !isLockedPast && !isFuture ? '#0D9F6E' : 'var(--border)'}`,
+              background: isSelected && !isLockedPast && !isFuture ? 'rgba(13,159,110,0.12)' : 'var(--bg-2)',
+              cursor: isLockedPast ? 'pointer' : isFuture ? 'default' : 'pointer',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+              opacity: isFuture ? 0.45 : isLockedPast ? 0.55 : 1,
             }}
           >
-            <span style={{ fontSize: '10px', fontWeight: 700, color: isSelected ? '#0D9F6E' : 'var(--text-3)' }}>{label}</span>
-            <span style={{ fontSize: '14px', lineHeight: 1 }}>{DAY_EMOJIS[day.day] ?? '📅'}</span>
-            <span style={{ fontSize: '9px', color: isSelected ? '#0D9F6E' : 'var(--text-2)', fontWeight: 600 }}>
-              {Math.round(day.totalCalories / 100) / 10}k
+            <span style={{ fontSize: '10px', fontWeight: 700, color: isSelected && !isLockedPast && !isFuture ? '#0D9F6E' : 'var(--text-3)' }}>
+              {label}
+            </span>
+            {isLockedPast
+              ? <Lock size={13} style={{ color: '#8B5CF6' }} />
+              : isFuture
+              ? <span style={{ fontSize: '11px', lineHeight: 1 }}>⏳</span>
+              : <span style={{ fontSize: '14px', lineHeight: 1 }}>{DAY_EMOJIS[day.day] ?? '📅'}</span>}
+            <span style={{ fontSize: '9px', fontWeight: 600, color: isLockedPast ? '#8B5CF6' : isFuture ? 'var(--text-3)' : isSelected ? '#0D9F6E' : 'var(--text-2)' }}>
+              {isLockedPast ? 'upgrade' : isFuture ? (daysUntil === 1 ? 'amanhã' : `+${daysUntil}d`) : `${Math.round(day.totalCalories / 100) / 10}k`}
             </span>
           </button>
         );
@@ -142,9 +208,11 @@ interface PantryPlanModalProps {
   isOpen: boolean;
   onClose: () => void;
   sessionId: string;
+  isPremium: boolean;
+  onUpgrade: () => void;
 }
 
-export function PantryPlanModal({ isOpen, onClose, sessionId }: PantryPlanModalProps) {
+export function PantryPlanModal({ isOpen, onClose, sessionId, isPremium, onUpgrade }: PantryPlanModalProps) {
   const [view, setView] = useState<'pantry' | 'plan'>('pantry');
   const [selected, setSelected] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem(PANTRY_KEY) ?? '[]'); } catch { return []; }
@@ -152,10 +220,15 @@ export function PantryPlanModal({ isOpen, onClose, sessionId }: PantryPlanModalP
   const [weekPlan, setWeekPlan] = useState<DayPlan[]>(() => {
     try { return JSON.parse(localStorage.getItem(PANTRY_PLAN_KEY) ?? '[]'); } catch { return []; }
   });
+  const [planMonday, setPlanMonday] = useState<string>(() => {
+    return localStorage.getItem(PANTRY_PLAN_DATE_KEY) ?? getMondayOfWeek(new Date());
+  });
   const [openCategory, setOpenCategory] = useState<string>('protein'); // first open by default
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeDayIndex, setActiveDayIndex] = useState(0);
+  // Full preview: true only in the same session right after generation (one-time view of all 7 days)
+  const [justGenerated, setJustGenerated] = useState(false);
 
   // Persist pantry selection
   useEffect(() => {
@@ -166,6 +239,8 @@ export function PantryPlanModal({ isOpen, onClose, sessionId }: PantryPlanModalP
   useEffect(() => {
     if (isOpen && weekPlan.length > 0) setView('plan');
     else if (isOpen) setView('pantry');
+    // Reset justGenerated when modal closes — next open uses lock logic
+    if (!isOpen) setJustGenerated(false);
   }, [isOpen]);
 
   const toggle = useCallback((item: string) => {
@@ -200,9 +275,15 @@ export function PantryPlanModal({ isOpen, onClose, sessionId }: PantryPlanModalP
       if (!r.ok) throw new Error('failed');
       const data = await r.json();
       const plan: DayPlan[] = data.weekPlan ?? [];
+      const monday = getMondayOfWeek(new Date());
       setWeekPlan(plan);
-      setActiveDayIndex(0);
-      try { localStorage.setItem(PANTRY_PLAN_KEY, JSON.stringify(plan)); } catch {}
+      setPlanMonday(monday);
+      setJustGenerated(true); // one-time full preview
+      setActiveDayIndex(0); // start at Monday for the preview
+      try {
+        localStorage.setItem(PANTRY_PLAN_KEY, JSON.stringify(plan));
+        localStorage.setItem(PANTRY_PLAN_DATE_KEY, monday);
+      } catch {}
       setView('plan');
     } catch {
       setError('Erro ao gerar o plano. Tente novamente.');
@@ -285,7 +366,7 @@ export function PantryPlanModal({ isOpen, onClose, sessionId }: PantryPlanModalP
         {/* Week strip (plan view) */}
         {view === 'plan' && weekPlan.length > 0 && (
           <div style={{ padding: '12px 0 10px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-            <WeekStrip weekPlan={weekPlan} activeIndex={activeDayIndex} onSelect={setActiveDayIndex} />
+            <WeekStrip weekPlan={weekPlan} activeIndex={activeDayIndex} onSelect={setActiveDayIndex} isPremium={isPremium} onUpgrade={onUpgrade} planMonday={planMonday} justGenerated={justGenerated} />
           </div>
         )}
 
@@ -369,7 +450,52 @@ export function PantryPlanModal({ isOpen, onClose, sessionId }: PantryPlanModalP
                   </button>
                 </div>
               ) : weekPlan[activeDayIndex] ? (
-                <DayDetail plan={weekPlan[activeDayIndex]} />
+                (() => {
+                  const { status, daysUntil, dayDateStr } = planMonday
+                    ? getDayStatus(planMonday, activeDayIndex)
+                    : { status: 'current' as DayStatus, daysUntil: 0, dayDateStr: '' };
+                  const isLockedPast = !justGenerated && status === 'past' && !isPremium;
+                  const isFuture = !justGenerated && status === 'future';
+
+                  if (isLockedPast) {
+                    return (
+                      <div style={{ padding: '32px 16px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '32px', marginBottom: '10px' }}>🔒</div>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px' }}>
+                          {weekPlan[activeDayIndex].day}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-2)', marginBottom: '16px', lineHeight: 1.5 }}>
+                          Este dia já passou. Acesse o histórico completo com o plano Premium.
+                        </div>
+                        <button onClick={onUpgrade} style={{ padding: '10px 24px', borderRadius: '12px', background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', color: '#fff', border: 'none', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>
+                          👑 Desbloquear histórico
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  if (isFuture) {
+                    const dayName = weekPlan[activeDayIndex].day;
+                    const dateLabel = dayDateStr
+                      ? new Date(dayDateStr + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short' })
+                      : dayName;
+                    return (
+                      <div style={{ padding: '32px 16px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '32px', marginBottom: '10px' }}>⏳</div>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px' }}>
+                          {dayName}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.5 }}>
+                          {daysUntil === 1
+                            ? 'Disponível amanhã 🌅'
+                            : `Disponível em ${daysUntil} dias · ${dateLabel}`}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return <DayDetail plan={weekPlan[activeDayIndex]} />;
+                })()
               ) : null}
             </div>
           )}

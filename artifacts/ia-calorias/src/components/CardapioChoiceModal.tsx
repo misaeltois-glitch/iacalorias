@@ -111,7 +111,12 @@ export function CardapioChoiceModal({
                 Cardápio personalizado IA
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.5 }}>
-                Evellyn monta 7 dias baseado nas suas metas e progresso de peso
+                Baseado nas suas <strong style={{ color: 'var(--text-1)' }}>metas nutricionais e progresso de peso</strong> — a Evellyn escolhe os ingredientes
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                {['🎯 Metas', '⚖️ Progresso peso', '🍽️ Preferências'].map(tag => (
+                  <span key={tag} style={{ fontSize: '10px', padding: '2px 7px', borderRadius: 99, background: 'rgba(245,158,11,0.1)', color: '#D97706', border: '1px solid rgba(245,158,11,0.2)', fontWeight: 600 }}>{tag}</span>
+                ))}
               </div>
             </div>
             <span style={{
@@ -148,7 +153,12 @@ export function CardapioChoiceModal({
                 Plano semanal da despensa
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.5 }}>
-                Informe o que você tem em casa — a IA monta seg. a dom. com esses ingredientes
+                Você informa o que tem em casa — a IA monta seg. a dom. usando <strong style={{ color: 'var(--text-1)' }}>somente esses ingredientes</strong>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                {['🛒 Sua despensa', '♻️ Sem desperdício', '🏠 O que tem em casa'].map(tag => (
+                  <span key={tag} style={{ fontSize: '10px', padding: '2px 7px', borderRadius: 99, background: 'rgba(13,159,110,0.1)', color: '#0D9F6E', border: '1px solid rgba(13,159,110,0.2)', fontWeight: 600 }}>{tag}</span>
+                ))}
               </div>
             </div>
             <span style={{

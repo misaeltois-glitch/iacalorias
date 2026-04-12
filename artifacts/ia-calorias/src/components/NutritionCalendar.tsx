@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Flame, Beef, Wheat, Droplets } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Flame, Beef, Wheat, Droplets, Lock } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 interface DayData {
@@ -34,6 +34,8 @@ interface Goals {
 interface NutritionCalendarProps {
   sessionId: string;
   goals: Goals | null;
+  isPremium?: boolean;
+  onGoToAITools?: () => void;
 }
 
 const DAY_LABELS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -87,7 +89,7 @@ function Ring({ pct, color, size = 36, stroke = 3.5, children }: {
   );
 }
 
-export function NutritionCalendar({ sessionId, goals }: NutritionCalendarProps) {
+export function NutritionCalendar({ sessionId, goals, isPremium = false, onGoToAITools }: NutritionCalendarProps) {
   const today = todayStr();
   const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = last week
   const [weekDays, setWeekDays] = useState<DayData[]>([]);
@@ -188,12 +190,15 @@ export function NutritionCalendar({ sessionId, goals }: NutritionCalendarProps) 
           <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)' }}>Calendário Nutricional</div>
           <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '1px' }}>{weekLabel}</div>
         </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           <button
-            onClick={() => setWeekOffset(v => v - 1)}
+            onClick={() => isPremium ? setWeekOffset(v => v - 1) : onGoToAITools?.()}
+            title={isPremium ? 'Semana anterior' : 'Histórico disponível no Premium'}
             style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--bg-3)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            <ChevronLeft size={14} style={{ color: 'var(--text-2)' }} />
+            {isPremium
+              ? <ChevronLeft size={14} style={{ color: 'var(--text-2)' }} />
+              : <Lock size={12} style={{ color: 'var(--text-3)' }} />}
           </button>
           {weekOffset < 0 && (
             <button
@@ -361,11 +366,24 @@ export function NutritionCalendar({ sessionId, goals }: NutritionCalendarProps) 
               <div style={{ fontSize: '24px', marginBottom: '6px' }}>
                 {selectedDate > today ? '📅' : '🍽️'}
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-3)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-3)', marginBottom: selectedDate <= today && onGoToAITools ? '12px' : '0' }}>
                 {selectedDate > today
                   ? toLocalDate(selectedDate).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
                   : `Nenhuma refeição registrada em ${toLocalDate(selectedDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`}
               </div>
+              {selectedDate <= today && onGoToAITools && (
+                <button
+                  onClick={onGoToAITools}
+                  style={{
+                    padding: '8px 18px', borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #0D9F6E, #057A55)',
+                    color: '#fff', border: 'none', fontWeight: 700, fontSize: '12px', cursor: 'pointer',
+                    boxShadow: '0 3px 12px rgba(13,159,110,0.3)',
+                  }}
+                >
+                  🥗 Criar cardápio agora
+                </button>
+              )}
             </div>
           )}
         </motion.div>
