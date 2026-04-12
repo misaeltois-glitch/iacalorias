@@ -23,13 +23,13 @@ export function CardapioChoiceModal({
 
   const handleSelectAI = () => {
     onClose();
-    if (!isPremium) { onUpgrade(); return; }
-    onSelectAI();
+    if (!isPremium) { setTimeout(onUpgrade, 50); return; }
+    setTimeout(onSelectAI, 50);
   };
 
   const handleSelectRecipe = () => {
     onClose();
-    onSelectRecipe();
+    setTimeout(onSelectRecipe, 50);
   };
 
   return (

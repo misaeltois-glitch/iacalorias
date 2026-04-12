@@ -1662,7 +1662,7 @@ export default function Home() {
         </Suspense>
       )}
 
-      {showRecipeSuggestor && sessionId && (
+      {showRecipeSuggestor && (
         <Suspense fallback={null}>
           <RecipeSuggestor
             onClose={() => setShowRecipeSuggestor(false)}
