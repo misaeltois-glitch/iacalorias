@@ -3,7 +3,7 @@ import { Resend } from "resend";
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 const FROM_EMAIL = "IA Calorias <noreply@iacalorias.com.br>";
-const APP_URL = process.env.APP_URL || "https://iaicalorias.replit.app";
+const APP_URL = process.env.APP_URL || "https://iacalorias.com.br";
 
 export interface WeeklyReportData {
   userName: string;
