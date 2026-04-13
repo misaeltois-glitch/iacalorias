@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, workoutProfilesTable, workoutLogsTable, subscriptionsTable } from "@workspace/db";
-import { eq, and, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import OpenAI from "openai";
 import { getMasterTier } from "../lib/master-emails.js";
@@ -137,13 +137,15 @@ router.post("/ai-quick", async (req: Request, res: Response) => {
   // ── Tier enforcement ──────────────────────────────────────────────────────
   const masterTier = getMasterTier(req.user?.email);
   const isDevAccount = !!masterTier;
+  let enforcedSub: Awaited<ReturnType<typeof resolveSub>> = null;
+  let enforcedTier: "free" | "limited" | "unlimited" = "free";
 
   if (!isDevAccount) {
-    const sub = await resolveSub(userId, sessionId);
-    const tier = (sub?.tier ?? "free") as "free" | "limited" | "unlimited";
+    enforcedSub = await resolveSub(userId, sessionId);
+    enforcedTier = (enforcedSub?.tier ?? "free") as "free" | "limited" | "unlimited";
 
-    if (tier === "free") {
-      const trialStartMs = sub?.createdAt?.getTime() ?? Date.now();
+    if (enforcedTier === "free") {
+      const trialStartMs = enforcedSub?.createdAt?.getTime() ?? Date.now();
       const daysSinceStart = (Date.now() - trialStartMs) / (24 * 60 * 60 * 1000);
       if (daysSinceStart >= FREE_TRIAL_DAYS) {
         res.status(402).json({ error: "payment_required", message: "Seu período de teste gratuito expirou.", requiresUpgrade: true });
@@ -151,8 +153,8 @@ router.post("/ai-quick", async (req: Request, res: Response) => {
       }
     }
 
-    if (tier === "limited") {
-      const workoutCount = (sub as any)?.workoutCount ?? 0;
+    if (enforcedTier === "limited") {
+      const workoutCount = enforcedSub?.workoutCount ?? 0;
       if (workoutCount >= LIMITED_WORKOUT_LIMIT) {
         res.status(402).json({
           error: "payment_required",
@@ -278,14 +280,11 @@ Responda APENAS com JSON válido neste formato exato:
     }));
 
     // Increment workoutCount for limited tier users
-    if (!isDevAccount && userId) {
+    if (!isDevAccount && enforcedTier === "limited" && enforcedSub) {
       try {
-        const sub = await resolveSub(userId, sessionId);
-        if (sub && (sub as any).tier === "limited") {
-          await db.update(subscriptionsTable)
-            .set({ workoutCount: ((sub as any).workoutCount ?? 0) + 1, updatedAt: new Date() } as any)
-            .where(eq(subscriptionsTable.sessionId, sub.sessionId));
-        }
+        await db.update(subscriptionsTable)
+          .set({ workoutCount: (enforcedSub.workoutCount ?? 0) + 1, updatedAt: new Date() })
+          .where(eq(subscriptionsTable.sessionId, enforcedSub.sessionId));
       } catch {}
     }
 
