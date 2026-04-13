@@ -53,8 +53,8 @@ router.post("/", async (req: Request, res: Response) => {
   const masterTier = getMasterTier(req.user?.email);
   const isDevAccount = !!masterTier;
   const tier = masterTier ?? await resolveSubTier(userId, sessionId);
-  if (tier === "free") {
-    res.status(403).json({ error: "forbidden", message: "Relatório semanal disponível apenas no plano pago" });
+  if (!isDevAccount && tier !== "unlimited") {
+    res.status(403).json({ error: "forbidden", message: "Relatório semanal disponível apenas no plano Ilimitado" });
     return;
   }
 

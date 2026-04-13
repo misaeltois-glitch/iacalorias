@@ -46,10 +46,10 @@ router.post("/", async (req: Request, res: Response) => {
   const masterTier = getMasterTier(req.user?.email);
   const isDevAccount = !!masterTier;
   const tier = masterTier ?? await resolveSubTier(userId, sessionId);
-  // Pantry-based plans are free — tier check only applies to AI goal-based plans
+  // Pantry-based plans: free + limited allowed. AI goal-based plans: unlimited only.
   const isPantryMode = Array.isArray(pantryIngredients) && pantryIngredients.length > 0;
-  if (!isPantryMode && tier === "free") {
-    res.status(403).json({ error: "forbidden", message: "Planejamento semanal disponível apenas no plano pago" });
+  if (!isPantryMode && tier !== "unlimited" && !isDevAccount) {
+    res.status(403).json({ error: "forbidden", message: "Cardápio semanal com IA disponível apenas no plano Ilimitado" });
     return;
   }
 

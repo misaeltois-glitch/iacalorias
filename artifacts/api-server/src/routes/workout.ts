@@ -1,8 +1,27 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, workoutProfilesTable, workoutLogsTable } from "@workspace/db";
+import { db, workoutProfilesTable, workoutLogsTable, subscriptionsTable } from "@workspace/db";
 import { eq, and, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import OpenAI from "openai";
+import { getMasterTier } from "../lib/master-emails.js";
+
+const FREE_TRIAL_DAYS = 7;
+const LIMITED_WORKOUT_LIMIT = 5;
+
+async function resolveSub(userId?: string, sessionId?: string) {
+  if (userId) {
+    const sub = await db.query.subscriptionsTable.findFirst({
+      where: eq(subscriptionsTable.userId, userId),
+      orderBy: (t, { desc }) => [desc(t.updatedAt)],
+    });
+    if (sub) return sub;
+  }
+  const effectiveSessionId = sessionId ?? (userId ? `user-${userId}` : undefined);
+  if (!effectiveSessionId) return null;
+  return db.query.subscriptionsTable.findFirst({
+    where: eq(subscriptionsTable.sessionId, effectiveSessionId),
+  });
+}
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -115,6 +134,39 @@ router.post("/ai-quick", async (req: Request, res: Response) => {
 
   if (!muscleGroup) { res.status(400).json({ error: "muscleGroup required" }); return; }
 
+  // ── Tier enforcement ──────────────────────────────────────────────────────
+  const masterTier = getMasterTier(req.user?.email);
+  const isDevAccount = !!masterTier;
+
+  if (!isDevAccount) {
+    const sub = await resolveSub(userId, sessionId);
+    const tier = (sub?.tier ?? "free") as "free" | "limited" | "unlimited";
+
+    if (tier === "free") {
+      const trialStartMs = sub?.createdAt?.getTime() ?? Date.now();
+      const daysSinceStart = (Date.now() - trialStartMs) / (24 * 60 * 60 * 1000);
+      if (daysSinceStart >= FREE_TRIAL_DAYS) {
+        res.status(402).json({ error: "payment_required", message: "Seu período de teste gratuito expirou.", requiresUpgrade: true });
+        return;
+      }
+    }
+
+    if (tier === "limited") {
+      const workoutCount = (sub as any)?.workoutCount ?? 0;
+      if (workoutCount >= LIMITED_WORKOUT_LIMIT) {
+        res.status(402).json({
+          error: "payment_required",
+          message: `Você atingiu o limite de ${LIMITED_WORKOUT_LIMIT} treinos IA por mês.`,
+          requiresUpgrade: true,
+          trialUsed: workoutCount,
+          trialLimit: LIMITED_WORKOUT_LIMIT,
+        });
+        return;
+      }
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   // Load saved profile for context
   const savedProfile = await findProfile(userId, sessionId).catch(() => null);
 
@@ -224,6 +276,18 @@ Responda APENAS com JSON válido neste formato exato:
     const cooldown = (data.desaquecimento ?? [{ nome: "Alongamento geral", duracao: "3 min" }]).map((c: any) => ({
       name: c.nome, duration: c.duracao,
     }));
+
+    // Increment workoutCount for limited tier users
+    if (!isDevAccount && userId) {
+      try {
+        const sub = await resolveSub(userId, sessionId);
+        if (sub && (sub as any).tier === "limited") {
+          await db.update(subscriptionsTable)
+            .set({ workoutCount: ((sub as any).workoutCount ?? 0) + 1, updatedAt: new Date() } as any)
+            .where(eq(subscriptionsTable.sessionId, sub.sessionId));
+        }
+      } catch {}
+    }
 
     res.json({
       dayKey: "today",

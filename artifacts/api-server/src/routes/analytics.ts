@@ -63,6 +63,7 @@ router.get("/summary", async (req: Request, res: Response) => {
   const masterTier = getMasterTier(userEmail);
   const tier = masterTier ?? await resolveSubTier(userId, sessionId);
   const isPremium = tier !== "free";
+  const isUnlimited = tier === "unlimited";
 
   const goals = await findGoals(userId, sessionId);
 
@@ -91,10 +92,11 @@ router.get("/summary", async (req: Request, res: Response) => {
     daysInPeriod = 7;
   }
 
-  // For free users: cap history at last 7 days, but never expand beyond the requested period
-  const effectiveStart = isPremium ? periodStart : (() => {
-    const sevenDaysAgo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 6, 0, 0, 0, 0) + tzOffsetMs);
-    return sevenDaysAgo > periodStart ? sevenDaysAgo : periodStart;
+  // Cap history by tier: unlimited=full, limited=30 days, free=7 days
+  const effectiveStart = isUnlimited ? periodStart : (() => {
+    const daysBack = tier === "limited" ? 29 : 6; // 30-day or 7-day cap
+    const capDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysBack, 0, 0, 0, 0) + tzOffsetMs);
+    return capDate > periodStart ? capDate : periodStart;
   })();
 
   // Collect all session IDs linked to this userId (to find analyses from before login)
@@ -126,7 +128,7 @@ router.get("/summary", async (req: Request, res: Response) => {
         lt(analysesTable.createdAt, periodEnd),
       ),
       orderBy: [desc(analysesTable.createdAt)],
-      limit: isPremium ? 200 : 50,
+      limit: isUnlimited ? 500 : isPremium ? 100 : 50,
     });
   } else {
     analyses = await db.query.analysesTable.findMany({
@@ -136,7 +138,7 @@ router.get("/summary", async (req: Request, res: Response) => {
         lt(analysesTable.createdAt, periodEnd),
       ),
       orderBy: [desc(analysesTable.createdAt)],
-      limit: isPremium ? 200 : 50,
+      limit: isUnlimited ? 500 : isPremium ? 100 : 50,
     });
   }
 
@@ -251,12 +253,12 @@ router.get("/summary", async (req: Request, res: Response) => {
     }
   }
 
-  // Pagination for meals list
+  // Pagination for meals list — limited tier gets pagination but capped to their history window
   const pageSize = Math.min(Math.max(1, parseInt((req.query.pageSize as string) ?? "20")), 50);
   const page = Math.max(1, parseInt((req.query.page as string) ?? "1"));
-  const freeMealsLimit = isPremium ? pageSize : 10;
+  const freeMealsLimit = 10;
   const totalMeals = analyses.length;
-  const effectiveTotal = isPremium ? totalMeals : Math.min(totalMeals, freeMealsLimit);
+  const effectiveTotal = isUnlimited ? totalMeals : isPremium ? totalMeals : Math.min(totalMeals, freeMealsLimit);
   const offset = isPremium ? (page - 1) * pageSize : 0;
   const effectivePageSize = isPremium ? pageSize : freeMealsLimit;
 
@@ -278,6 +280,7 @@ router.get("/summary", async (req: Request, res: Response) => {
     total: effectiveTotal,
     totalPages: Math.ceil(effectiveTotal / effectivePageSize),
     hasMore: isPremium ? offset + effectivePageSize < effectiveTotal : false,
+    historyDays: isUnlimited ? null : isPremium ? 30 : 7,
   };
 
   const dailyGoals = goals ? {

@@ -223,7 +223,7 @@ router.post("/webhook", async (req: Request, res: Response) => {
         if (paymentType === "one_time") {
           const currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
           await db.update(subscriptionsTable)
-            .set({ tier: plan, analysisCount: 0, paymentType: "one_time", currentPeriodEnd, updatedAt: new Date() })
+            .set({ tier: plan, analysisCount: 0, workoutCount: 0, paymentType: "one_time", currentPeriodEnd, updatedAt: new Date() } as any)
             .where(eq(subscriptionsTable.sessionId, sessionId));
         } else {
           const stripeSubscriptionId = typeof session.subscription === "string"
@@ -237,7 +237,7 @@ router.post("/webhook", async (req: Request, res: Response) => {
           }
 
           await db.update(subscriptionsTable)
-            .set({ tier: plan, analysisCount: 0, paymentType: "subscription", stripeSubscriptionId: stripeSubscriptionId ?? undefined, currentPeriodEnd: currentPeriodEnd ?? undefined, updatedAt: new Date() })
+            .set({ tier: plan, analysisCount: 0, workoutCount: 0, paymentType: "subscription", stripeSubscriptionId: stripeSubscriptionId ?? undefined, currentPeriodEnd: currentPeriodEnd ?? undefined, updatedAt: new Date() } as any)
             .where(eq(subscriptionsTable.sessionId, sessionId));
         }
 
@@ -267,7 +267,7 @@ router.post("/webhook", async (req: Request, res: Response) => {
 
         if (sessionId) {
           await db.update(subscriptionsTable)
-            .set({ analysisCount: 0, tier: plan ?? "limited", currentPeriodEnd: new Date(stripeSub.current_period_end * 1000), updatedAt: new Date() })
+            .set({ analysisCount: 0, workoutCount: 0, tier: plan ?? "limited", currentPeriodEnd: new Date(stripeSub.current_period_end * 1000), updatedAt: new Date() } as any)
             .where(eq(subscriptionsTable.sessionId, sessionId));
         }
       }

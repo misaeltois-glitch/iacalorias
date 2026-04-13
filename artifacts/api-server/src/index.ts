@@ -55,6 +55,10 @@ async function runMigrations() {
       ADD COLUMN IF NOT EXISTS referral_bonus_days integer DEFAULT 0
     `);
     await pool.query(`
+      ALTER TABLE subscriptions
+      ADD COLUMN IF NOT EXISTS workout_count integer NOT NULL DEFAULT 0
+    `);
+    await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals (referrer_user_id)
     `);
     await pool.query(`

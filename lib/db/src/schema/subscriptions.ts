@@ -9,6 +9,7 @@ export const subscriptionsTable = pgTable("subscriptions", {
   userId: text("user_id"),
   tier: text("tier").notNull().default("free"),
   analysisCount: integer("analysis_count").notNull().default(0),
+  workoutCount: integer("workout_count").notNull().default(0),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   paymentType: text("payment_type").default("subscription"),

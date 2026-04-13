@@ -1,5 +1,5 @@
 import { db, usersTable, subscriptionsTable, analysesTable, goalsTable } from "@workspace/db";
-import { eq, and, gte, lt, ne, desc, inArray } from "drizzle-orm";
+import { eq, and, gte, lt, desc, inArray } from "drizzle-orm";
 import { sendWeeklyReport, sendFreeWeeklyReport, type WeeklyReportData, type FreeWeeklyReportData } from "./email.js";
 import OpenAI from "openai";
 import { logger } from "./logger.js";
@@ -175,9 +175,9 @@ export async function maybeRunWeeklyReportCron(): Promise<void> {
 
   const { lastMon, thisMon } = lastWeekWindow();
 
-  // ── Premium users ──────────────────────────────────────────────────────────
+  // ── Unlimited users only — premium weekly report ───────────────────────────
   const premiumSubs = await db.query.subscriptionsTable.findMany({
-    where: ne(subscriptionsTable.tier, "free"),
+    where: eq(subscriptionsTable.tier, "unlimited"),
     columns: { userId: true },
   });
   const premiumUserIds = [...new Set(premiumSubs.map((s: any) => s.userId).filter(Boolean) as string[])];
@@ -198,7 +198,7 @@ export async function maybeRunWeeklyReportCron(): Promise<void> {
     logger.info({ total: premiumUsers.length }, "weekly report cron: premium batch complete");
   }
 
-  // ── Free users (have email + logged at least 1 meal last week) ────────────
+  // ── Free + Limited users (simplified report with upgrade CTA) ────────────
   const allUsers = await db.query.usersTable.findMany({
     where: premiumUserIds.length > 0
       ? (t: any, { notInArray: notIn }: any) => notIn(t.id, premiumUserIds)
