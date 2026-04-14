@@ -496,8 +496,7 @@ export default function Home() {
     if (!sessionId) return;
     if (check24hExpiry()) return;
     if (subStatus?.tier === 'free' && subStatus.trialRemaining <= 0) {
-      setPaywallDisableClose(true);
-      setShowPaywall(true);
+      setShowPaywall(true); // allow closing — user can return home
       return;
     }
     analyzeMutation.mutate({ data: { image: file, sessionId } }, {
@@ -511,8 +510,7 @@ export default function Home() {
         const status = error?.response?.status ?? error?.status;
         const body = error?.response?.data ?? error?.data ?? {};
         if (status === 402 || body?.requiresUpgrade) {
-          setPaywallDisableClose(true);
-          setShowPaywall(true);
+          setShowPaywall(true); // allow closing — user can return home
           return;
         }
         const { title, description } = getErrorMessage(error);
@@ -666,8 +664,7 @@ export default function Home() {
     if (!ts) return false;
     const elapsed = Date.now() - parseInt(ts, 10);
     if (elapsed > FREE_PERIOD_MS) {
-      setPaywallDisableClose(true);
-      setShowPaywall(true);
+      setShowPaywall(true); // allow closing — user can return home
       return true;
     }
     return false;
@@ -1590,7 +1587,7 @@ export default function Home() {
         onClose={() => { setShowPaywall(false); setPaywallDisableClose(false); }}
         sessionId={sessionId}
         disableClose={paywallDisableClose}
-        onShowAuth={paywallDisableClose ? () => { setShowPaywall(false); setPaywallDisableClose(false); navigate('/login'); } : undefined}
+        onShowAuth={() => { setShowPaywall(false); setPaywallDisableClose(false); navigate('/login'); }}
         retrospective={!isPremium && trialRemaining === 0 && subStatus ? { mealCount: subStatus.analysisCount, daysUsed: FREE_TRIAL_DAYS } : undefined}
         userObjective={savedGoals?.objective ?? undefined}
       />

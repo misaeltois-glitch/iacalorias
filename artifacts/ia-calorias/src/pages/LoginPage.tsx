@@ -4,6 +4,7 @@ import { Eye, EyeOff, ArrowLeft, CheckCircle2, Leaf, Dumbbell, BarChart2, Zap } 
 import { useAuth } from '@/hooks/use-auth';
 import { useSession } from '@/hooks/use-session';
 import { trackEvent } from '@/lib/tracking';
+import { BASE } from '@/lib/api';
 
 type Tab = 'login' | 'register' | 'forgot';
 
