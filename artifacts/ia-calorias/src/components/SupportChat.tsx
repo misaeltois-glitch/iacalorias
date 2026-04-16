@@ -52,7 +52,7 @@ Funcionalidades principais:
 - Análise de refeição por foto (IA identifica macros e calorias)
 - Chat com nutricionista Evellyn (plano pago)
 - Cardápio semanal gerado por IA (plano Ilimitado)
-- Tracker de água, peso, streak de dias
+- Tracker de água, peso, dias seguidos
 - Treino do Dia personalizado por IA
 - Relatório semanal por email (plano Ilimitado)
 

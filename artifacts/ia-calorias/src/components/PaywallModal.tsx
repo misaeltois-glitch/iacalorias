@@ -36,7 +36,7 @@ const FEATURES: FeatureRow[] = [
   { label: 'Metas nutricionais personalizadas',        free: '7 dias teste',   limited: true,           unlimited: true },
   { label: 'Painel de progresso diário',               free: '7 dias teste',   limited: true,           unlimited: true },
   { label: 'Analytics semanal e mensal',               free: '7 dias teste',   limited: true,           unlimited: true },
-  { label: 'Streak e metas gamificadas',               free: '7 dias teste',   limited: true,           unlimited: true },
+  { label: 'Dias seguidos e metas gamificadas',         free: '7 dias teste',   limited: true,           unlimited: true },
   // ── Saúde ──
   { label: 'Evolução de peso com gráfico',             free: '7 dias teste',   limited: true,           unlimited: true },
   { label: 'Contador de água diário',                  free: '7 dias teste',   limited: true,           unlimited: true },

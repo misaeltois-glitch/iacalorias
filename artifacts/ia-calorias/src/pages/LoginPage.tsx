@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { Eye, EyeOff, ArrowLeft, CheckCircle2, Leaf, Dumbbell, BarChart2, Zap } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
@@ -23,7 +23,7 @@ const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | unde
 
 export default function LoginPage() {
   const [, navigate] = useLocation();
-  const { login, register, forgotPassword, loginWithData, isAuthenticated } = useAuth();
+  const { login, register, forgotPassword, isAuthenticated } = useAuth();
   const { sessionId } = useSession();
 
   const [tab, setTab] = useState<Tab>('login');
@@ -34,72 +34,9 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loginFailCount, setLoginFailCount] = useState(0);
-  const googleBtnRef = useRef<HTMLDivElement>(null);
-
-  // Carrega o script do Google Identity Services e renderiza o botão oficial
-  useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) return;
-
-    const initGoogleButton = () => {
-      const google = (window as any).google;
-      if (!google || !googleBtnRef.current) return;
-      google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: async (response: { credential: string }) => {
-          setGoogleLoading(true);
-          setError('');
-          try {
-            const r = await fetch(`${BASE}api/auth/google-oauth`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ credential: response.credential, sessionId }),
-            });
-            const data = await r.json();
-            if (!r.ok) throw new Error(data.message ?? 'Erro ao autenticar com Google.');
-            loginWithData(data.token, data.user);
-            trackEvent('CompleteRegistration');
-            navigate('/');
-          } catch (err: any) {
-            setError(err.message || 'Erro ao autenticar com Google.');
-          } finally {
-            setGoogleLoading(false);
-          }
-        },
-      });
-      google.accounts.id.renderButton(googleBtnRef.current, {
-        type: 'standard',
-        theme: 'outline',
-        size: 'large',
-        text: 'continue_with',
-        width: googleBtnRef.current.offsetWidth || 360,
-        logo_alignment: 'center',
-      });
-    };
-
-    if ((window as any).google) {
-      initGoogleButton();
-    } else {
-      if (!document.getElementById('gsi-script')) {
-        const script = document.createElement('script');
-        script.id = 'gsi-script';
-        script.src = 'https://accounts.google.com/gsi/client';
-        script.async = true;
-        script.defer = true;
-        script.onload = initGoogleButton;
-        document.head.appendChild(script);
-      } else {
-        // Script already added but not yet loaded — poll
-        const interval = setInterval(() => {
-          if ((window as any).google) { clearInterval(interval); initGoogleButton(); }
-        }, 100);
-        return () => clearInterval(interval);
-      }
-    }
-  }, [tab, sessionId]);
 
   useEffect(() => {
     if (isAuthenticated) navigate('/');
@@ -109,6 +46,10 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     const t = params.get('tab');
     if (t === 'register') setTab('register');
+    const err = params.get('error');
+    if (err === 'google_cancelled') setError('Login com Google cancelado. Tente novamente.');
+    else if (err === 'google_failed') setError('Falha ao autenticar com Google. Tente novamente.');
+    else if (err === 'not_configured') setError('Login com Google não está configurado no momento.');
   }, []);
 
   const reset = (t: Tab) => {
@@ -255,12 +196,29 @@ export default function LoginPage() {
                   : 'Comece grátis e transforme sua alimentação.'}
               </p>
 
-              {/* Botão Google — renderButton funciona em iOS Safari */}
+              {/* Botão Google — redirect flow (works on all browsers including mobile) */}
               {GOOGLE_CLIENT_ID && (
                 <>
-                  <div style={{ width: '100%', minHeight: '44px', marginBottom: '4px', opacity: googleLoading ? 0.6 : 1 }}>
-                    <div ref={googleBtnRef} style={{ width: '100%' }} />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { window.location.href = `${BASE}api/auth/google?sessionId=${sessionId ?? ''}`; }}
+                    style={{
+                      width: '100%', padding: '12px 16px', borderRadius: '12px',
+                      border: '1.5px solid var(--border-strong)',
+                      background: 'var(--bg-2)', color: 'var(--text-1)',
+                      fontSize: '15px', fontWeight: 600, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                      marginBottom: '4px', fontFamily: 'inherit', transition: 'opacity 0.15s',
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                      <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+                      <path d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
+                      <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+                    </svg>
+                    Continuar com Google
+                  </button>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '16px 0' }}>
                     <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
                     <span style={{ fontSize: '12px', color: 'var(--text-3)', fontWeight: 500 }}>ou</span>

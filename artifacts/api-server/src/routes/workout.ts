@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, workoutProfilesTable, workoutLogsTable, subscriptionsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, workoutProfilesTable, workoutLogsTable, subscriptionsTable, analysesTable, goalsTable } from "@workspace/db";
+import { eq, and, gte } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import OpenAI from "openai";
 import { getMasterTier } from "../lib/master-emails.js";
@@ -191,6 +191,44 @@ router.post("/ai-quick", async (req: Request, res: Response) => {
     ? `Restrições/lesões: ${(savedProfile.injuries as string[]).join(", ")}.`
     : "Sem lesões ou restrições.";
 
+  // ─── Today's nutritional intake ──────────────────────────────────────────────
+  let nutritionContext = "";
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayMeals = userId
+      ? await db.query.analysesTable.findMany({
+          where: and(eq(analysesTable.userId, userId), gte(analysesTable.createdAt, todayStart)),
+          columns: { calories: true, protein: true },
+        })
+      : sessionId
+      ? await db.query.analysesTable.findMany({
+          where: and(eq(analysesTable.sessionId, sessionId!), gte(analysesTable.createdAt, todayStart)),
+          columns: { calories: true, protein: true },
+        })
+      : [];
+
+    if (todayMeals.length > 0) {
+      const todayTotals = (todayMeals as { calories: number; protein: number }[]).reduce(
+        (acc, m) => ({ calories: acc.calories + m.calories, protein: acc.protein + m.protein }),
+        { calories: 0, protein: 0 }
+      );
+      // Fetch goals for comparison
+      const goals = userId
+        ? await db.query.goalsTable.findFirst({ where: eq(goalsTable.userId, userId) })
+        : sessionId
+        ? await db.query.goalsTable.findFirst({ where: eq(goalsTable.sessionId, sessionId!) })
+        : null;
+
+      const calStr = `${Math.round(todayTotals.calories)} kcal${goals?.calories ? ` de ${goals.calories} kcal` : ''}`;
+      const protStr = `${todayTotals.protein.toFixed(0)}g proteína${goals?.protein ? ` de ${goals.protein}g` : ''}`;
+      const isProteinLow = goals?.protein && todayTotals.protein < goals.protein * 0.5;
+      const isCalLow = goals?.calories && todayTotals.calories < goals.calories * 0.4;
+
+      nutritionContext = `\n- Consumido hoje: ${calStr} | ${protStr}${isProteinLow ? ' ⚠️ proteína baixa — considere sugerir refeição proteica pós-treino' : ''}${isCalLow ? ' ⚠️ calorias muito baixas — ajuste intensidade se necessário' : ''}`;
+    }
+  } catch {}
+
   const systemPrompt = `Você é um personal trainer experiente especializado em musculação. Gere treinos objetivos, seguros e eficientes baseados no perfil do aluno.`;
 
   const userPrompt = `Gere um treino de academia para HOJE com foco em: **${muscleGroup}**.
@@ -199,7 +237,7 @@ Perfil do aluno:
 - Nível: ${levelStr}
 - Objetivo: ${goalStr}
 - Local de treino: ${gymStr}
-- ${injuriesStr}
+- ${injuriesStr}${nutritionContext}
 
 Instruções:
 - Inclua 5 a 7 exercícios

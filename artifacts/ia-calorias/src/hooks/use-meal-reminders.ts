@@ -172,8 +172,8 @@ function checkStreakRisk(windowMinutes: number) {
 
   markNotified(notifiedKey);
 
-  const title = '🔥 Seu streak está em risco!';
-  const body = 'Você ainda não registrou nenhuma refeição hoje. Fotografe agora e mantenha sua sequência! 📸';
+  const title = '🔥 Sua sequência está em risco!';
+  const body = 'Você ainda não registrou nenhuma refeição hoje. Fotografe agora e mantenha seus dias seguidos! 📸';
 
   if (navigator.serviceWorker?.controller) {
     navigator.serviceWorker.controller.postMessage({

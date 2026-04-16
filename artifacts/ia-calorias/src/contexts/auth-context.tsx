@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 
 const AUTH_TOKEN_KEY = 'ia-calorias-auth-token';
 const AUTH_USER_KEY = 'ia-calorias-auth-user';
@@ -52,6 +52,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
   }, []);
+
+  // Handle Google OAuth redirect — parses #google_auth=<base64> placed by the backend callback
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.includes('google_auth=')) return;
+    const match = hash.match(/google_auth=([^&]+)/);
+    if (!match) return;
+    try {
+      const decoded = atob(match[1].replace(/-/g, '+').replace(/_/g, '/'));
+      const data = JSON.parse(decoded) as { token: string; user: AuthUser };
+      if (data.token && data.user) {
+        setAuth(data.token, data.user);
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    } catch { /* ignore malformed data */ }
+  }, [setAuth]);
 
   const updateLocalUser = useCallback((updates: Partial<AuthUser>) => {
     setUser(prev => {

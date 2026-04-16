@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import OpenAI from "openai";
 import { db, subscriptionsTable, analysesTable, goalsTable } from "@workspace/db";
-import { eq, and, gte, lt } from "drizzle-orm";
+import { eq, and, gte, lt, desc } from "drizzle-orm";
 import { getMasterTier } from "../lib/master-emails.js";
 
 const router: IRouter = Router();
@@ -64,7 +64,7 @@ router.post("/", async (req: Request, res: Response) => {
   type MealRow = { dishName: string; calories: number; protein: number; carbs: number; fat: number; fiber: number | null };
   let todayAnalyses: MealRow[] = [];
   let yesterdayAnalyses: MealRow[] = [];
-  let goals: { calories: number | null; protein: number | null; carbs: number | null; fat: number | null; fiber: number | null; objective: string | null } | null = null;
+  let goals: { calories: number | null; protein: number | null; carbs: number | null; fat: number | null; fiber: number | null; objective: string | null; mealsPerDay: number | null } | null = null;
 
   const mealCols = { dishName: true, calories: true, protein: true, carbs: true, fat: true, fiber: true } as const;
 
@@ -82,16 +82,17 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     const goalsRow = userId
-      ? await db.query.goalsTable.findFirst({ where: eq(goalsTable.userId, userId), orderBy: (t, { desc }) => [desc(t.updatedAt)] })
+      ? await db.query.goalsTable.findFirst({ where: eq(goalsTable.userId, userId), orderBy: (t, { desc: d }) => [d(t.updatedAt)] })
       : sessionId ? await db.query.goalsTable.findFirst({ where: eq(goalsTable.sessionId, sessionId!) }) : null;
 
     if (goalsRow) {
-      goals = { calories: goalsRow.calories ?? null, protein: goalsRow.protein ?? null, carbs: goalsRow.carbs ?? null, fat: goalsRow.fat ?? null, fiber: goalsRow.fiber ?? null, objective: goalsRow.objective ?? null };
+      goals = { calories: goalsRow.calories ?? null, protein: goalsRow.protein ?? null, carbs: goalsRow.carbs ?? null, fat: goalsRow.fat ?? null, fiber: goalsRow.fiber ?? null, objective: goalsRow.objective ?? null, mealsPerDay: goalsRow.mealsPerDay ?? null };
     }
   } catch {
     // Context fetch failed — continue without it
   }
 
+  // ─── Totals (needed by both situation detection and context builder) ──────────
   const sum = (meals: MealRow[]) => meals.reduce((a, m) => ({
     calories: a.calories + m.calories,
     protein:  a.protein  + m.protein,
@@ -100,8 +101,140 @@ router.post("/", async (req: Request, res: Response) => {
     fiber:    a.fiber    + (m.fiber ?? 0),
   }), { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
 
-  const todayTotals = sum(todayAnalyses);
+  const todayTotals     = sum(todayAnalyses);
   const yesterdayTotals = sum(yesterdayAnalyses);
+
+  // ─── Behavioral pattern detection ────────────────────────────────────────────
+  let lastAnalysisDate: Date | null = null;
+  let totalAnalysesCount = 0;
+  let streakDays = 0;
+
+  try {
+    const dateCols = { createdAt: true } as const;
+    let recentRows: { createdAt: Date }[] = [];
+
+    if (userId) {
+      recentRows = await db.query.analysesTable.findMany({
+        where: eq(analysesTable.userId, userId),
+        orderBy: [desc(analysesTable.createdAt)],
+        limit: 90,
+        columns: dateCols,
+      });
+    } else if (sessionId) {
+      recentRows = await db.query.analysesTable.findMany({
+        where: eq(analysesTable.sessionId, sessionId!),
+        orderBy: [desc(analysesTable.createdAt)],
+        limit: 90,
+        columns: dateCols,
+      });
+    }
+
+    totalAnalysesCount = recentRows.length;
+    if (recentRows.length > 0) lastAnalysisDate = recentRows[0].createdAt;
+
+    // Compute streak: consecutive days with ≥1 analysis going back from today
+    const daySet = new Set(recentRows.map(r => {
+      const d = new Date(r.createdAt.getTime() - tzOffsetMs);
+      return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+    }));
+    const todayKey = `${localNow.getUTCFullYear()}-${localNow.getUTCMonth()}-${localNow.getUTCDate()}`;
+    let checkDay = new Date(localNow);
+    while (true) {
+      const key = `${checkDay.getUTCFullYear()}-${checkDay.getUTCMonth()}-${checkDay.getUTCDate()}`;
+      if (daySet.has(key)) {
+        streakDays++;
+        checkDay = new Date(checkDay.getTime() - 86400000);
+      } else {
+        // Allow today if no log yet
+        if (key === todayKey && todayAnalyses.length === 0) {
+          checkDay = new Date(checkDay.getTime() - 86400000);
+          continue;
+        }
+        break;
+      }
+      if (streakDays > 365) break;
+    }
+  } catch {
+    // Continue without behavioral data
+  }
+
+  // ─── Situation taxonomy ───────────────────────────────────────────────────────
+  const msPerDay = 86400000;
+  const realNow = new Date();
+  const daysSinceLastLog = lastAnalysisDate !== null
+    ? Math.floor((realNow.getTime() - lastAnalysisDate.getTime()) / msPerDay)
+    : null;
+
+  const localHour = localNow.getUTCHours();
+  const isNewUser        = totalAnalysesCount <= 3;
+  const isLongAbsent     = !isNewUser && daysSinceLastLog !== null && daysSinceLastLog >= 3;
+  const returnedToday    = isLongAbsent && todayAnalyses.length > 0;
+  const goalsCalories    = goals?.calories ?? null;
+  const todayCalPct      = goalsCalories && todayTotals.calories > 0
+    ? todayTotals.calories / goalsCalories : null;
+  const isOverGoal       = todayCalPct !== null && todayCalPct > 1.2;
+  const isUnderGoal      = todayCalPct !== null && todayCalPct < 0.55 && todayAnalyses.length > 0;
+  const isOnTrack        = todayCalPct !== null && todayCalPct >= 0.55 && todayCalPct <= 1.2;
+  const isLateNight      = localHour >= 21 || localHour < 5;
+  const isEvening        = localHour >= 18 && localHour < 21;
+  const mealsPerDay      = goals?.mealsPerDay ?? 3;
+  const missingMeals     = Math.max(0, mealsPerDay - todayAnalyses.length);
+
+  let situationBlock = "";
+
+  if (isNewUser) {
+    situationBlock = `
+SITUAÇÃO DETECTADA → USUÁRIO NOVO (${totalAnalysesCount} registro(s) no total)
+Esta pessoa está dando os primeiros passos. Prioridade: fazê-la sentir que está no lugar certo. Celebre o fato de estar usando o app — registrar já é o maior obstáculo. Não sobrecarregue com informações. Se ela perguntar algo técnico, simplifique ao máximo. Tom: acolhedor, animado, sem pressão.`;
+
+  } else if (isLongAbsent && returnedToday) {
+    situationBlock = `
+SITUAÇÃO DETECTADA → RETORNO APÓS ${daysSinceLastLog} DIA(S) DE AUSÊNCIA — e já registrou algo hoje
+Ela sumiu por ${daysSinceLastLog} dias, mas VOLTOU — e a primeira coisa que fez foi registrar. Isso é enorme. Demonstre alívio genuíno pela volta, sem drama e sem cobrar a ausência. Não diga "sumiu" ou "cadê você". Foque em reconhecer o gesto de voltar e ajudar a retomar o ritmo sem pressão. Tom: aliviado, encorajador, sem julgamento.`;
+
+  } else if (isLongAbsent && todayAnalyses.length === 0) {
+    situationBlock = `
+SITUAÇÃO DETECTADA → ${daysSinceLastLog} DIA(S) SEM REGISTRAR — abriu o app mas ainda não registrou hoje
+Ela abriu o app depois de ${daysSinceLastLog} dias. Isso já é um sinal de intenção. Não mencione a ausência como falha — não pergunte "por que sumiu?". Ofereça a ação mínima para ela começar: "fotografa o próximo lanche, isso já conta". Se ela estiver conversando com você, provavelmente está procurando motivação ou permissão para recomeçar — dê isso a ela. Tom: gentil, prático, sem peso.`;
+
+  } else if (!isNewUser && daysSinceLastLog === 1 && todayAnalyses.length === 0) {
+    situationBlock = `
+SITUAÇÃO DETECTADA → NÃO REGISTROU ONTEM E AINDA NÃO REGISTROU HOJE
+Pode ser correria ou pode ser que desanimou. Não julgue nem dramatize. Se for ${isLateNight ? "noite" : isEvening ? "fim de tarde" : "início de dia"}, ajuste o tom: ${isLateNight || isEvening ? "o dia praticamente passou — ajude a planejar amanhã, sem culpa pelo hoje." : "o dia ainda é longo — encoraje o próximo registro de forma leve."}`;
+
+  } else if (todayAnalyses.length === 0 && !isNewUser && !isLongAbsent) {
+    situationBlock = `
+SITUAÇÃO DETECTADA → SEM REGISTRO HOJE (usuário ativo, streak de ${streakDays} dias)
+${isLateNight || isEvening
+  ? `Já é ${isLateNight ? "noite" : "fim de tarde"} e nada registrado hoje. Não cobre — pode ter sido um dia difícil. Mencione de forma leve que ainda dá para registrar o jantar se quiser, mas sem pressão.`
+  : `Ainda é cedo para o dia. Pode não ter comido ainda ou não ter registrado. Tom encorajador — o dia ainda está inteiro.`}`;
+
+  } else if (isOverGoal) {
+    const excessKcal = Math.round(todayTotals.calories - (goalsCalories ?? todayTotals.calories));
+    situationBlock = `
+SITUAÇÃO DETECTADA → ACIMA DA META CALÓRICA HOJE (+${excessKcal} kcal além da meta de ${goalsCalories} kcal)
+Não minimize, mas não dramatize. Honestidade com humor leve quando cabível. Foque no que ainda dá para fazer: jantar mais leve, hidratação, retomar amanhã. NUNCA sugira compensação severa (jejum, restrição drástica) — isso é gatilho de desistência. Tom: honesto, prático, sem alarme.`;
+
+  } else if (isUnderGoal) {
+    situationBlock = `
+SITUAÇÃO DETECTADA → COMENDO POUCO (${Math.round(todayTotals.calories)} kcal, menos de 55% da meta de ${goalsCalories} kcal)
+Comer muito pouco é tão problemático quanto comer demais. Pode ser correria, estresse ou tentativa de restrição excessiva. Pergunte com cuidado se está tudo bem — pode ser só correria. Sugira algo prático e rápido para complementar. Tom: preocupado mas sem alarme, prático.`;
+
+  } else if (isOnTrack && missingMeals > 0) {
+    situationBlock = `
+SITUAÇÃO DETECTADA → DIA NO CAMINHO CERTO — ainda faltam ${missingMeals} refeição(ões) para registrar
+Está indo bem. Reforce o positivo. Mencione de forma leve e sem cobrança que ainda faltam refeições para completar o dia — não como obrigação, mas como convite. Tom: encorajador, leve.`;
+
+  } else if (isOnTrack && missingMeals === 0) {
+    situationBlock = `
+SITUAÇÃO DETECTADA → DIA COMPLETO E DENTRO DA META${streakDays >= 7 ? ` — streak de ${streakDays} dias!` : ""}
+${streakDays >= 7 ? `Streak impressionante de ${streakDays} dias. Celebre genuinamente — esse nível de consistência já é excepcional. Ela está criando um hábito real.` : "Completou o dia dentro da meta. Celebre sem exagero — reforce que consistência é o que muda o resultado no longo prazo."}`;
+
+  } else if (streakDays >= 7) {
+    situationBlock = `
+SITUAÇÃO DETECTADA → USUÁRIO CONSISTENTE (streak de ${streakDays} dias)
+Esta pessoa está comprometida de verdade. Reconheça isso — não de forma genérica ("parabéns!"), mas específica para o momento dela. Ela merece insights mais avançados se perguntar algo técnico.`;
+  }
 
   const contextParts: string[] = [];
 
@@ -155,7 +288,7 @@ router.post("/", async (req: Request, res: Response) => {
     : "";
 
   const systemPrompt = supportMode
-    ? `Você é Evellyn, assistente de suporte do app IA Calorias. Responda em português brasileiro.
+    ? `Você é a Evellyn, assistente do app IA Calorias. Responda em português brasileiro informal.
 
 Sobre o IA Calorias:
 - App de nutrição com IA que analisa refeições por foto
@@ -167,7 +300,7 @@ Sobre o IA Calorias:
 
 Funcionalidades principais:
 - Análise de refeição por foto (IA identifica macros e calorias)
-- Chat com nutricionista Evellyn (plano pago ou teste)
+- Chat com a Evellyn (plano pago ou teste)
 - Cardápio semanal gerado por IA (plano Ilimitado)
 - Tracker de água, peso, streak de dias
 - Treino do Dia personalizado por IA
@@ -177,21 +310,47 @@ Regras:
 - Seja empática e direta, respostas de 2-4 frases
 - Para cancelamento, reembolso ou problemas de cobrança: SEMPRE oriente a contatar o suporte humano via WhatsApp (11) 95653-8845 ou email atendimento.iacalorias@hotmail.com
 - Não invente funcionalidades que não existem`
-    : `Você é Evellyn, nutricionista clínica especialista em alimentação saudável e emagrecimento. Você faz parte do app IA Calorias.
+    : `Você é a Evellyn — nutricionista do app IA Calorias. Mas não o tipo de nutricionista que prescreve dieta de papel e some. Você é a amiga mais inteligente em nutrição que essa pessoa tem, aquela que manda mensagem no WhatsApp e fala a verdade sem julgar.
 
-Seja empática, direta e prática. Responda em português brasileiro. Respostas curtas (2-4 frases no máximo), a não ser que o usuário peça mais detalhes. Use linguagem acessível, não técnica demais.
+QUEM É A PESSOA QUE FALA COM VOCÊ:
+- Tem rotina corrida. Come o que aparece, não o que planejou.
+- Sabe que deveria comer melhor, mas a vida não deixa ser perfeito.
+- Já tentou dieta antes e desistiu. Provavelmente mais de uma vez.
+- Não precisa de sermão — precisa de alguém que entenda a correria e dê saída prática.
+- Quando ela registrou a refeição no app, já foi um ato de cuidado consigo mesma.
 
-IMPORTANTE — use sempre o tempo verbal correto:
-- Ao falar do que aconteceu ONTEM use pretérito perfeito: "você consumiu", "você ficou abaixo", "ontem não bateu".
-- Ao falar do que está acontecendo HOJE use presente: "você está", "hoje você consumiu até agora".
-- Nunca confunda os dois dias.
+SUA MISSÃO:
+Ajudar essa pessoa a evoluir sem tornar a alimentação uma fonte de culpa. Pequenos ajustes consistentes valem mais que a dieta perfeita abandonada na semana dois.
+
+ESTILO DE COMUNICAÇÃO:
+- Português brasileiro informal. "tá", "né", "cara", "olha" quando soar natural.
+- Respostas curtas: 2-4 frases. Se o usuário pedir mais detalhes, aí você aprofunda.
+- NUNCA use termos clínicos: sem "ingesta", "lipídios", "macronutrientes", "micronutrientes", "carboidratos complexos". Fale "gordura", "proteína", "carboidrato", "caloria" — simples assim.
+- NUNCA comece com "Ótima pergunta!" ou variações. É falso.
+- NUNCA diga "você deveria" — diga "experimenta", "uma dica", "que tal".
+- Celebre consistência, não perfeição. Se a pessoa comeu mal um dia mas registrou, isso é progresso.
+- Quando a situação pedir honestidade dura, seja honesta — mas com empatia real, não julgamento.
+
+TEMPO VERBAL (CRÍTICO — nunca confunda):
+- ONTEM → pretérito perfeito: "você consumiu", "ficou abaixo", "não chegou na meta"
+- HOJE → presente: "você está", "hoje consumiu até agora", "ainda dá pra fechar bem"
 
 ${planNote}
 
-CONTEXTO NUTRICIONAL DO USUÁRIO:
+CONTEXTO NUTRICIONAL ATUAL DO USUÁRIO:
 ${contextParts.join("\n")}${foodPrefsContext}
+${situationBlock}
+O QUE VOCÊ PODE FAZER:
+- Analisar as refeições do dia/semana com base no contexto acima
+- Sugerir substituições realistas para quem não tem tempo de cozinhar
+- Receitas simples (máximo 5 ingredientes, menos de 15 min)
+- Timing de refeições, hidratação, suplementação básica (whey, creatina, vitaminas)
+- Interpretar os números de calorias e proteína de forma humana
+- Motivar sem mentir — se a semana foi ruim, reconheça e ajude a virar o jogo
 
-Você pode dar conselhos sobre alimentação, substituições, receitas, timing de refeições, hidratação, suplementação básica e interpretação dos macronutrientes. Não diagnostique doenças. Se a pergunta for médica ou clínica, oriente a consultar um profissional de saúde presencialmente.`;
+O QUE VOCÊ NÃO FAZ:
+- Não diagnostica doenças. Se a dúvida for clínica (diabetes, hipertensão, patologias), oriente a consultar médico.
+- Não prescreve medicamentos ou suplementos controlados.`;
 
   try {
     const completion = await openai.chat.completions.create({

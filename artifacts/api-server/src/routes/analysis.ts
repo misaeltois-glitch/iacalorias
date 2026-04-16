@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import multer from "multer";
 import { db, subscriptionsTable, analysesTable } from "@workspace/db";
-import { eq, or, and, isNotNull } from "drizzle-orm";
+import { eq, and, gte, desc } from "drizzle-orm";
 import OpenAI from "openai";
 import { randomUUID } from "crypto";
 import { AnalyzeFoodResponse, GetAnalysisHistoryResponse } from "@workspace/api-zod";
@@ -86,6 +86,34 @@ router.post("/", upload.single("image"), async (req: Request, res: Response) => 
     return;
   }
 
+  // ─── User history context (dish repetition + hour) ───────────────────────────
+  let recentDishNames: string[] = [];
+  try {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+    const history = userId
+      ? await db.query.analysesTable.findMany({
+          where: and(eq(analysesTable.userId, userId), gte(analysesTable.createdAt, sevenDaysAgo)),
+          orderBy: [desc(analysesTable.createdAt)],
+          limit: 30,
+          columns: { dishName: true },
+        })
+      : sessionId
+      ? await db.query.analysesTable.findMany({
+          where: and(eq(analysesTable.sessionId, sessionId), gte(analysesTable.createdAt, sevenDaysAgo)),
+          orderBy: [desc(analysesTable.createdAt)],
+          limit: 30,
+          columns: { dishName: true },
+        })
+      : [];
+    recentDishNames = (history as { dishName: string }[]).map(h => h.dishName);
+  } catch {}
+
+  const localHour = new Date().getHours();
+  const timeOfDay = localHour < 10 ? 'manhã' : localHour < 14 ? 'almoço' : localHour < 18 ? 'tarde' : 'noite';
+  const historyContext = recentDishNames.length > 0
+    ? `\nREFEIÇÕES RECENTES (últimos 7 dias): ${recentDishNames.slice(0, 10).join(', ')}. Se o prato identificado for muito parecido com algum da lista, inclua na substitutionTip uma variação que traga o mesmo prazer com mais equilíbrio nutricional.`
+    : '';
+
   try {
     const base64Image = req.file.buffer.toString("base64");
     const mimeType = req.file.mimetype || "image/jpeg";
@@ -95,7 +123,9 @@ router.post("/", upload.single("image"), async (req: Request, res: Response) => 
       messages: [
         {
           role: "system",
-          content: `Você é um nutricionista especialista em análise de imagens de comida. Analise a imagem e retorne APENAS JSON válido, SEM markdown, SEM blocos de código, SEM texto extra.
+          content: `Você é a Evellyn, nutricionista do app IA Calorias. Analise a imagem e retorne APENAS JSON válido, SEM markdown, SEM blocos de código, SEM texto extra.
+
+CONTEXTO DO USUÁRIO: É uma pessoa com rotina corrida, que às vezes come mal por falta de tempo — não por falta de vontade. Suas dicas devem ser práticas, humanas e sem julgamento, como uma amiga que entende de nutrição falando no WhatsApp.
 
 IMPORTANTE: Se a imagem NÃO contiver alimentos/comida visível, retorne:
 {"isFood": false, "reason": "Descreva brevemente o que foi detectado na imagem (ex: 'Texto/documento', 'Paisagem', 'Pessoa', 'Objeto', etc.)"}
@@ -111,10 +141,13 @@ Se a imagem contiver comida, retorne exatamente esta estrutura:
   "fat": number (gramas, uma casa decimal),
   "fiber": number (gramas, uma casa decimal),
   "healthScore": number (pontuação de saúde de 1 a 10, sendo 10 o mais saudável),
-  "nutritionTip": "string (uma dica nutricional curta e personalizada em português sobre este prato, máximo 100 caracteres)",
-  "substitutionTip": "string (sugira 1 substituição saudável e prática para melhorar este prato, ex: 'Troque o arroz branco por integral e ganhe +3g de fibra' — máximo 110 caracteres, em português)",
+  "nutritionTip": "string (máximo 100 chars — tom conversacional e direto, sem ser clínico. Comece com o ponto positivo real do prato, depois o ponto de atenção se houver. Ex: 'Proteína boa aqui! Só faltou fibra — uma fruta depois fecha bem.' ou 'Prato equilibrado, continue assim que o resultado vem.')",
+  "substitutionTip": "string (máximo 110 chars — troca realista para quem não tem tempo de cozinhar. Foque no ganho concreto. Ex: 'Troca o refrigerante por água com gás: economiza 160 kcal sem abrir mão do gás.' ou 'Grão-de-bico em lata no lugar da batata frita: mesma praticidade, 3x mais proteína.')",
   "confidence": "string (nível de confiança: 'Alta confiança', 'Média confiança', ou 'Baixa confiança')"
-}`,
+}
+
+TOM das dicas: Não use termos clínicos como 'ingesta', 'macronutrientes', 'lipídios'. Fale como gente. Seja específico (cite o prato, cite os valores). Nunca seja condescendente.
+HORÁRIO: ${timeOfDay}${localHour >= 21 ? ' — noite avançada, se aplicável sugira algo leve para recuperação.' : ''}.${historyContext}`,
         },
         {
           role: "user",
@@ -256,7 +289,7 @@ router.post("/text", async (req: Request, res: Response) => {
       messages: [
         {
           role: "system",
-          content: `Você é um nutricionista especialista em análise nutricional. O usuário vai descrever um alimento ou refeição em texto. Estime os valores nutricionais e retorne APENAS JSON válido com esta estrutura exata:
+          content: `Você é a Evellyn, nutricionista do app IA Calorias. O usuário vai descrever um alimento ou refeição em texto. Estime os valores nutricionais e retorne APENAS JSON válido com esta estrutura exata:
 {
   "dishName": "string (nome do prato em português, limpo e curto)",
   "servingSize": "string (porção estimada, ex: '1 porção (~300g)')",
@@ -266,11 +299,11 @@ router.post("/text", async (req: Request, res: Response) => {
   "fat": number (gramas, uma casa decimal),
   "fiber": number (gramas, uma casa decimal),
   "healthScore": number (pontuação de 1 a 10, sendo 10 o mais saudável),
-  "nutritionTip": "string (dica nutricional curta em português, máximo 100 caracteres)",
-  "substitutionTip": "string (1 substituição saudável, máximo 110 caracteres, em português)",
+  "nutritionTip": "string (máximo 100 chars — tom conversacional, sem termos clínicos. Destaque o ponto positivo real, depois o de atenção se houver. Ex: 'Boa fonte de energia para a tarde — só fique de olho no sódio se comer isso todo dia.')",
+  "substitutionTip": "string (máximo 110 chars — troca realista para quem tem pouco tempo, com o ganho concreto. Ex: 'Adiciona um iogurte natural depois: +10g de proteína sem esforço nenhum.')",
   "confidence": "string ('Alta confiança', 'Média confiança', ou 'Baixa confiança')"
 }
-Se a descrição for vaga, use 'Baixa confiança' e estime com base em porção padrão. Nunca deixe campos nulos.`,
+Se a descrição for vaga, use 'Baixa confiança' e estime com base em porção padrão. Nunca deixe campos nulos. Nunca use termos clínicos como 'ingesta', 'lipídios', 'carboidratos complexos' — fale como gente.`,
         },
         {
           role: "user",

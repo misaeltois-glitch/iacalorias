@@ -161,6 +161,93 @@ router.post("/reset-password", async (req: Request, res: Response) => {
   res.json({ message: "Senha alterada com sucesso. Faça login com sua nova senha." });
 });
 
+// ─── GET /api/auth/google ─────────────────────────────────────────────────────
+router.get("/google", (req: Request, res: Response) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    res.status(503).send("Google OAuth não configurado.");
+    return;
+  }
+
+  const sessionId = (req.query.sessionId as string) ?? "";
+  const APP_URL = process.env.APP_URL || "https://iacalorias.com.br";
+  const redirectUri = `${APP_URL}/api/auth/google-callback`;
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid email profile",
+    state: sessionId,
+    access_type: "online",
+    prompt: "select_account",
+  });
+
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+});
+
+// ─── GET /api/auth/google-callback ───────────────────────────────────────────
+router.get("/google-callback", async (req: Request, res: Response) => {
+  const { code, state: sessionId, error } = req.query as { code?: string; state?: string; error?: string };
+  const APP_URL = process.env.APP_URL || "https://iacalorias.com.br";
+
+  if (error || !code) {
+    res.redirect(`${APP_URL}/login?error=google_cancelled`);
+    return;
+  }
+
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    res.redirect(`${APP_URL}/login?error=not_configured`);
+    return;
+  }
+
+  try {
+    const { OAuth2Client } = await import("google-auth-library");
+    const redirectUri = `${APP_URL}/api/auth/google-callback`;
+    const client = new OAuth2Client(clientId, clientSecret, redirectUri);
+
+    const { tokens } = await client.getToken(code);
+
+    const ticket = await client.verifyIdToken({ idToken: tokens.id_token!, audience: clientId });
+    const payload = ticket.getPayload();
+
+    if (!payload?.email) {
+      res.redirect(`${APP_URL}/login?error=invalid_google_token`);
+      return;
+    }
+
+    const email = payload.email.toLowerCase();
+    const name = payload.name ?? payload.given_name ?? undefined;
+    const avatarUrl = payload.picture ?? undefined;
+
+    let user = await db.query.usersTable.findFirst({ where: eq(usersTable.email, email) });
+
+    if (!user) {
+      const userId = randomUUID();
+      const fakeHash = await bcrypt.hash(randomBytes(32).toString("hex"), SALT_ROUNDS);
+      await db.insert(usersTable).values({ id: userId, email, passwordHash: fakeHash, name, avatarUrl });
+      user = await db.query.usersTable.findFirst({ where: eq(usersTable.id, userId) });
+      if (sessionId && user) await migrateAnonymousData(sessionId, user.id);
+    } else {
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
+      if (!user.name && name) updates.name = name;
+      if (!user.avatarUrl && avatarUrl) updates.avatarUrl = avatarUrl;
+      await db.update(usersTable).set(updates).where(eq(usersTable.id, user.id));
+      if (sessionId) await migrateAnonymousData(sessionId, user.id);
+    }
+
+    const token = signToken({ userId: user!.id, email: user!.email });
+    const authData = Buffer.from(JSON.stringify({ token, user: { id: user!.id, email: user!.email } })).toString("base64url");
+    res.redirect(`${APP_URL}/#google_auth=${authData}`);
+  } catch (err: unknown) {
+    req.log?.error({ err }, "Google OAuth callback error");
+    res.redirect(`${APP_URL}/login?error=google_failed`);
+  }
+});
+
 // ─── POST /api/auth/google-oauth ─────────────────────────────────────────────
 router.post("/google-oauth", async (req: Request, res: Response) => {
   const { credential, sessionId } = req.body as { credential?: string; sessionId?: string };

@@ -68,6 +68,10 @@ router.post("/", async (req: Request, res: Response) => {
   // Last Sunday + 1 (exclusive end = this Monday)
   const thisMon = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysFromMon));
 
+  // Previous week boundaries (for comparison)
+  const prevMon = new Date(Date.UTC(lastMon.getUTCFullYear(), lastMon.getUTCMonth(), lastMon.getUTCDate() - 7));
+  const prevEnd = lastMon; // exclusive
+
   // Analyses from last week
   const analyses = await db.query.analysesTable.findMany({
     where: and(
@@ -120,22 +124,59 @@ router.post("/", async (req: Request, res: Response) => {
     }
   }
 
+  // Previous week analyses for comparison
+  let prevTotals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
+  let prevDaysWithData = 0;
+  try {
+    const prevAnalyses = await db.query.analysesTable.findMany({
+      where: and(
+        or(eq(analysesTable.userId, userId), ...(sessionId ? [eq(analysesTable.sessionId, sessionId as string)] : [])),
+        gte(analysesTable.createdAt, prevMon),
+        lt(analysesTable.createdAt, prevEnd),
+      ),
+      columns: { calories: true, protein: true, carbs: true, fat: true, fiber: true, createdAt: true },
+      limit: 300,
+    });
+    prevTotals = prevAnalyses.reduce((acc: typeof prevTotals, a: { calories: number; protein: number; carbs: number; fat: number; fiber: number | null }) => ({
+      calories: acc.calories + a.calories,
+      protein: acc.protein + a.protein,
+      carbs: acc.carbs + a.carbs,
+      fat: acc.fat + a.fat,
+      fiber: acc.fiber + (a.fiber ?? 0),
+    }), { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
+    prevDaysWithData = new Set(prevAnalyses.map((a: { createdAt: Date }) => a.createdAt.toISOString().slice(0, 10))).size;
+  } catch {}
+
+  const prevAvgCalories = prevDaysWithData > 0 ? prevTotals.calories / prevDaysWithData : null;
+  const calDiff = prevAvgCalories !== null ? Math.round(avgCalories - prevAvgCalories) : null;
+  const protDiff = prevDaysWithData > 0 ? +(totals.protein / 7 - prevTotals.protein / 7).toFixed(0) : null;
+  const comparisonBlock = prevDaysWithData > 0
+    ? `\nComparação com semana anterior: calorias ${calDiff !== null && calDiff >= 0 ? '+' : ''}${calDiff ?? '?'} kcal/dia | proteína ${protDiff !== null && protDiff >= 0 ? '+' : ''}${protDiff ?? '?'}g/dia | dias registrados: ${daysWithData} vs ${prevDaysWithData} na semana passada.`
+    : '';
+
+  // Pattern detection (low protein, low fiber, calorie gaps)
+  const avgProtein = daysWithData > 0 ? totals.protein / daysWithData : 0;
+  const avgFiber = daysWithData > 0 ? totals.fiber / daysWithData : 0;
+  const patternNotes: string[] = [];
+  if (goals?.protein && avgProtein < goals.protein * 0.75) patternNotes.push(`proteína consistentemente abaixo da meta (${avgProtein.toFixed(0)}g/dia vs ${goals.protein}g)`);
+  if (avgFiber < 15) patternNotes.push(`fibras abaixo do recomendado (${avgFiber.toFixed(0)}g/dia — ideal: 25g+)`);
+  if (daysWithData <= 3) patternNotes.push(`poucos dias registrados (${daysWithData}/7) — consistência é o maior gap`);
+  const patternBlock = patternNotes.length > 0 ? `\nPadrões identificados esta semana: ${patternNotes.join('; ')}.` : '';
+
   // AI summary (optional, non-blocking)
   let aiSummary: string | null = null;
   try {
     if (analyses.length > 0) {
-      const summaryPrompt = `Você é uma nutricionista chamada Evellyn. Escreva um parágrafo curto (2-3 frases, máx 120 palavras) de análise nutricional da semana de ${buildWeekLabel(lastMon, thisMon)} do usuário ${userName || "usuário"}, em tom encorajador e prático.
+      const summaryPrompt = `Você é a Evellyn, nutricionista do app IA Calorias. Escreva um parágrafo direto e humano (2-3 frases, máx 130 palavras) analisando a semana de ${buildWeekLabel(lastMon, thisMon)} do usuário ${userName || "usuário"}. Tom: amiga que entende de nutrição, sem julgamento, sem termos clínicos.
 
 Dados da semana:
 - Média de calorias: ${Math.round(avgCalories)} kcal/dia${goals?.calories ? ` (meta: ${goals.calories})` : ''}
-- Proteína total: ${totals.protein.toFixed(0)}g (${(totals.protein / 7).toFixed(0)}g/dia)${goals?.protein ? ` (meta: ${goals.protein}g/dia)` : ''}
-- Carboidratos: ${totals.carbs.toFixed(0)}g total
-- Gorduras: ${totals.fat.toFixed(0)}g total
-- Fibras: ${totals.fiber.toFixed(0)}g total
+- Proteína: ${(totals.protein / 7).toFixed(0)}g/dia${goals?.protein ? ` (meta: ${goals.protein}g/dia)` : ''}
+- Fibras: ${(totals.fiber / 7).toFixed(0)}g/dia
 - Dias com registro: ${daysWithData}/7
-- Refeições registradas: ${analyses.length}
+- Refeições registradas: ${analyses.length}${comparisonBlock}${patternBlock}
 
-Destaque pontos positivos e 1 sugestão prática para a próxima semana. Não use markdown.`;
+Regras: comece pelo que foi BEM (mesmo que pouco), depois 1 observação honesta e 1 ação específica e simples para a próxima semana. Cite números reais. Não use markdown. Não diga "olá" ou "prezado".`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",

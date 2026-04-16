@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, subscriptionsTable, goalsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, subscriptionsTable, goalsTable, analysesTable } from "@workspace/db";
+import { eq, and, gte, desc } from "drizzle-orm";
 import OpenAI from "openai";
 import { getMasterTier } from "../lib/master-emails.js";
 
@@ -153,10 +153,41 @@ router.post("/", async (req: Request, res: Response) => {
     ? `\n⚠️ RESTRIÇÃO OBRIGATÓRIA — DESPENSA DO USUÁRIO: Crie TODAS as refeições usando EXCLUSIVAMENTE estes ingredientes disponíveis: ${pantryIngredients!.join(", ")}. Você pode usar temperos básicos (sal, pimenta-do-reino, alho, cebola, azeite/óleo) mesmo que não listados. NÃO use nenhum ingrediente fora desta lista.`
     : "";
 
+  // ─── Last 14 days of actual meals eaten (variety awareness) ─────────────────
+  let recentMealsPrompt = "";
+  if (!isPantryMode) {
+    try {
+      const fourteenDaysAgo = new Date(Date.now() - 14 * 86400000);
+      const recentMeals = userId
+        ? await db.query.analysesTable.findMany({
+            where: and(eq(analysesTable.userId, userId), gte(analysesTable.createdAt, fourteenDaysAgo)),
+            orderBy: [desc(analysesTable.createdAt)],
+            limit: 40,
+            columns: { dishName: true },
+          })
+        : sessionId
+        ? await db.query.analysesTable.findMany({
+            where: and(eq(analysesTable.sessionId, sessionId!), gte(analysesTable.createdAt, fourteenDaysAgo)),
+            orderBy: [desc(analysesTable.createdAt)],
+            limit: 40,
+            columns: { dishName: true },
+          })
+        : [];
+      if (recentMeals.length > 0) {
+        const names = (recentMeals as { dishName: string }[]).map(m => m.dishName);
+        // Count frequency to detect repeated dishes
+        const freq = new Map<string, number>();
+        for (const n of names) freq.set(n, (freq.get(n) ?? 0) + 1);
+        const repeated = [...freq.entries()].filter(([, c]) => c >= 3).map(([n]) => n);
+        recentMealsPrompt = `\nREFEIÇÕES RECENTES DO USUÁRIO (últimos 14 dias — para garantir VARIEDADE no cardápio): ${names.slice(0, 20).join(", ")}.${repeated.length > 0 ? `\nPratos que ele/ela repete muito e devem ser EVITADOS ou variados no plano: ${repeated.join(", ")}.` : ""}`;
+      }
+    } catch {}
+  }
+
   const prompt = `Você é uma nutricionista brasileira chamada Evellyn. Crie um plano de refeições para 7 dias (segunda a domingo) em JSON, com culinária brasileira variada, saudável e gostosa.
 
 Metas nutricionais diárias: ${macroLine}.
-${restrictionLine}${foodPrefsPrompt}${weightProgressPrompt}${pantryPrompt}
+${restrictionLine}${foodPrefsPrompt}${weightProgressPrompt}${recentMealsPrompt}${pantryPrompt}
 Refeições por dia: ${mealNames.join(", ")}.
 
 Retorne APENAS o JSON no seguinte formato (sem markdown, sem explicações):

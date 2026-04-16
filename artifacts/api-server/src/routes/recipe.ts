@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import OpenAI from "openai";
-import { db, subscriptionsTable, goalsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, subscriptionsTable, goalsTable, analysesTable } from "@workspace/db";
+import { eq, and, gte } from "drizzle-orm";
 import { getMasterTier } from "../lib/master-emails.js";
 
 const router: IRouter = Router();
@@ -67,11 +67,47 @@ router.post("/", async (req: Request, res: Response) => {
     }
   } catch {}
 
+  // ─── Today's nutritional needs ───────────────────────────────────────────────
+  let todayConsumed = { calories: 0, protein: 0, fiber: 0 };
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayMeals = userId
+      ? await db.query.analysesTable.findMany({
+          where: and(eq(analysesTable.userId, userId), gte(analysesTable.createdAt, todayStart)),
+          columns: { calories: true, protein: true, fiber: true },
+        })
+      : sessionId
+      ? await db.query.analysesTable.findMany({
+          where: and(eq(analysesTable.sessionId, sessionId), gte(analysesTable.createdAt, todayStart)),
+          columns: { calories: true, protein: true, fiber: true },
+        })
+      : [];
+    todayConsumed = (todayMeals as { calories: number; protein: number; fiber: number | null }[]).reduce(
+      (acc: { calories: number; protein: number; fiber: number }, m) => ({
+        calories: acc.calories + m.calories,
+        protein: acc.protein + m.protein,
+        fiber: acc.fiber + (m.fiber ?? 0),
+      }),
+      { calories: 0, protein: 0, fiber: 0 }
+    );
+  } catch {}
+
+  const localHour = new Date().getHours();
+  const timeOfDay = localHour < 10 ? 'café da manhã ou lanche da manhã' : localHour < 14 ? 'almoço' : localHour < 18 ? 'lanche da tarde' : 'jantar';
+
+  const remainingCalories = goals?.calories ? Math.max(0, goals.calories - todayConsumed.calories) : null;
+  const remainingProtein = goals?.protein ? Math.max(0, goals.protein - todayConsumed.protein) : null;
+  const todayContext = goals?.calories
+    ? `Consumido hoje: ${Math.round(todayConsumed.calories)} kcal${goals.protein ? ` | ${todayConsumed.protein.toFixed(0)}g proteína` : ''}. Faltam: ${Math.round(remainingCalories ?? 0)} kcal${remainingProtein !== null ? ` | ${remainingProtein.toFixed(0)}g proteína` : ''}.`
+    : '';
+
   const goalContext = goals?.calories
-    ? `O usuário tem meta de aproximadamente ${goals.calories} kcal/dia${goals.protein ? ` e ${goals.protein}g de proteína/dia` : ""}.`
+    ? `Meta: ~${goals.calories} kcal/dia${goals.protein ? ` e ${goals.protein}g proteína/dia` : ""}. ${todayContext}`
     : "";
 
-  const prompt = `Você é um chef e nutricionista. Crie uma receita prática e saborosa usando PRINCIPALMENTE os seguintes ingredientes: ${cleanIngredients.join(", ")}.
+  const prompt = `Você é a Evellyn, nutricionista e chef do app IA Calorias. Crie uma receita prática e saborosa usando PRINCIPALMENTE estes ingredientes: ${cleanIngredients.join(", ")}.
+Horário provável: ${timeOfDay}.
 ${goalContext}
 
 Retorne APENAS JSON válido, sem markdown, sem texto extra:
