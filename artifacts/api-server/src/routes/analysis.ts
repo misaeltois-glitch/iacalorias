@@ -81,7 +81,7 @@ router.post("/", upload.single("image"), async (req: Request, res: Response) => 
       return;
     }
   }
-  if (!isDevAccount && tier === "limited" && sub.analysisCount >= LIMITED_PLAN_LIMIT) {
+  if (tier === "limited" && sub.analysisCount >= LIMITED_PLAN_LIMIT) {
     res.status(402).json({ error: "payment_required", message: "Você atingiu o limite mensal.", requiresUpgrade: true, trialUsed: sub.analysisCount, trialLimit: LIMITED_PLAN_LIMIT });
     return;
   }
@@ -276,7 +276,7 @@ router.post("/text", async (req: Request, res: Response) => {
       return;
     }
   }
-  if (!isDevAccount && tier === "limited" && sub.analysisCount >= LIMITED_PLAN_LIMIT) {
+  if (tier === "limited" && sub.analysisCount >= LIMITED_PLAN_LIMIT) {
     res.status(402).json({ error: "payment_required", message: "Você atingiu o limite mensal.", requiresUpgrade: true });
     return;
   }
