@@ -11,6 +11,12 @@ function loadFoodPrefs(): MealFoodPrefs | null {
   } catch { return null; }
 }
 
+// iOS detection helpers
+const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isIOSStandalone = isIOS && (window.navigator as any).standalone === true;
+// Can show native notification prompt: not iOS browser (needs PWA), or regular desktop/Android
+const canUseNativeNotifications = 'Notification' in window && (!isIOS || isIOSStandalone);
+
 export function MealReminders() {
   const [settings, setSettings] = useState<ReminderSettings>(() => loadReminders());
   const [permission, setPermission] = useState<NotificationPermission>('default');
@@ -19,6 +25,7 @@ export function MealReminders() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newTime, setNewTime] = useState('08:00');
+  const [showIOSGuide, setShowIOSGuide] = useState(false);
 
   useEffect(() => {
     if ('Notification' in window) setPermission(Notification.permission);
@@ -35,9 +42,18 @@ export function MealReminders() {
   };
 
   const toggleGlobal = async () => {
-    if (!settings.globalEnabled && permission !== 'granted') {
-      const granted = await requestPermission();
-      if (!granted) return;
+    if (!settings.globalEnabled) {
+      // iOS Safari browser: não suporta notificações — mostra guia de instalação,
+      // mas ainda permite ativar os lembretes in-app (quando o app está aberto)
+      if (isIOS && !isIOSStandalone) {
+        setShowIOSGuide(true);
+        persist({ ...settings, globalEnabled: true });
+        return;
+      }
+      if (canUseNativeNotifications && permission !== 'granted') {
+        const granted = await requestPermission();
+        if (!granted) return;
+      }
     }
     persist({ ...settings, globalEnabled: !settings.globalEnabled });
   };
@@ -90,8 +106,6 @@ export function MealReminders() {
     setNewTime('08:00');
     setShowAddForm(false);
   };
-
-  if (!('Notification' in window)) return null;
 
   const enabledCount = settings.slots.filter(s => s.enabled).length;
 
@@ -173,7 +187,38 @@ export function MealReminders() {
           >
             <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
 
-              {permission === 'denied' && (
+              {/* iOS Safari browser: notificações não disponíveis sem PWA instalado */}
+              {isIOS && !isIOSStandalone && settings.globalEnabled && (
+                <div style={{
+                  padding: '10px 12px', borderRadius: '12px',
+                  background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+                  fontSize: '12px', color: 'var(--text-1)', lineHeight: 1.55,
+                }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>📲 Ative notificações no iPhone</div>
+                  <div style={{ color: 'var(--text-2)' }}>
+                    No Safari, toque em <strong>Compartilhar</strong> → <strong>Adicionar à Tela de Início</strong>. Abra o app pela tela inicial e os lembretes funcionarão normalmente.
+                  </div>
+                  {showIOSGuide && (
+                    <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+                      <span style={{ fontSize: '18px' }}>1️⃣</span><span style={{ color: 'var(--text-2)' }}>Toque no ícone de compartilhar (□↑) no Safari</span>
+                    </div>
+                  )}
+                  {showIOSGuide && (
+                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                      <span style={{ fontSize: '18px' }}>2️⃣</span><span style={{ color: 'var(--text-2)' }}>Selecione "Adicionar à Tela de Início" e confirme</span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setShowIOSGuide((v: boolean) => !v)}
+                    style={{ marginTop: 8, background: 'none', border: 'none', color: '#3B82F6', fontSize: '12px', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                  >
+                    {showIOSGuide ? 'Ocultar passo a passo ▲' : 'Ver passo a passo ▼'}
+                  </button>
+                </div>
+              )}
+
+              {/* Notificações bloqueadas no navegador (não iOS) */}
+              {permission === 'denied' && !isIOS && (
                 <div style={{
                   padding: '8px 10px', borderRadius: '10px',
                   background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
@@ -183,7 +228,7 @@ export function MealReminders() {
                 </div>
               )}
 
-              {permission !== 'granted' && !settings.globalEnabled && (
+              {!isIOS && permission !== 'granted' && !settings.globalEnabled && (
                 <div style={{ fontSize: '11px', color: 'var(--text-3)', textAlign: 'center', padding: '4px 0' }}>
                   Ative o toggle acima para habilitar lembretes.
                 </div>
