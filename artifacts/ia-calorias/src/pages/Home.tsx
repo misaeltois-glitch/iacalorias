@@ -1282,7 +1282,7 @@ export default function Home() {
               </div>
 
               {/* Meal Reminders */}
-              <MealReminders />
+              <div data-tour="reminders"><MealReminders /></div>
 
               {/* Nutrition Calendar */}
               <NutritionCalendar
@@ -1304,7 +1304,7 @@ export default function Home() {
               />
 
               {/* Water Tracker */}
-              <WaterTracker weightKg={savedGoals?.weight ?? null} />
+              <div data-tour="water"><WaterTracker weightKg={savedGoals?.weight ?? null} /></div>
 
               {/* Weight Tracker */}
               <WeightTracker sessionId={sessionId} />
@@ -1316,7 +1316,7 @@ export default function Home() {
               {isAuthenticated && <ReferralCard />}
 
               {/* Ferramentas IA — bloco recolhível */}
-              <div id="ai-tools-section" style={{ borderRadius: '18px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+              <div id="ai-tools-section" data-tour="ai-tools" style={{ borderRadius: '18px', border: '1px solid var(--border)', overflow: 'hidden' }}>
                 <style>{`
                   @keyframes iac-pulse-ring {
                     0% { box-shadow: 0 0 0 0 rgba(13,159,110,0.55); }
@@ -1433,11 +1433,14 @@ export default function Home() {
                 <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-1)', marginBottom: '14px', letterSpacing: '-0.3px' }}>
                   Como funciona
                 </h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
                   {[
-                    { num: '01', title: 'Fotografe', desc: 'Tire uma foto clara da sua refeição ou faça upload de uma imagem.', emoji: '📸' },
-                    { num: '02', title: 'IA analisa', desc: 'GPT-4o Vision identifica os alimentos e calcula calorias, proteínas, carboidratos e gordura automaticamente.', emoji: '⚡' },
-                    { num: '03', title: 'Acompanhe', desc: 'Acumule refeições e veja seu progresso diário em tempo real.', emoji: '📊' },
+                    { num: '01', title: 'Fotografe', desc: 'Tire uma foto da refeição ou descreva em texto — a IA identifica tudo em segundos.', emoji: '📸' },
+                    { num: '02', title: 'IA analisa', desc: 'Calorias, proteínas, carboidratos, fibras, gorduras e dicas de substituição saudável automáticas.', emoji: '⚡' },
+                    { num: '03', title: 'Hidratação', desc: 'Registre a água do dia em ml com containers prontos ou valor livre. Meta calculada pelo seu peso.', emoji: '💧' },
+                    { num: '04', title: 'Cardápio & Receitas', desc: 'Gere cardápio semanal personalizado por IA ou receba receitas com o que você já tem em casa.', emoji: '🥗' },
+                    { num: '05', title: 'Treino do Dia', desc: 'Plano de exercícios gerado por IA com base no seu objetivo, nível e músculo do dia.', emoji: '💪' },
+                    { num: '06', title: 'Progresso', desc: 'Histórico, gráficos de nutrição e relatório semanal com análise da Evellyn por e-mail.', emoji: '📊' },
                   ].map(({ num, title, desc, emoji }) => (
                     <div key={num} style={{
                       padding: '16px', borderRadius: '16px',

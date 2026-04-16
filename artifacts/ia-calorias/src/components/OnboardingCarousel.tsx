@@ -9,17 +9,28 @@ const slides = [
   {
     emoji: '📸',
     title: 'Fotografe seu prato',
-    desc: 'Tire uma foto da sua refeição e descubra os nutrientes em segundos com o poder da IA.',
+    desc: 'Tire uma foto da refeição ou descreva em texto. A IA identifica tudo e calcula os nutrientes em segundos.',
   },
   {
-    emoji: '📊',
-    title: 'Veja o que tem no seu prato',
-    desc: 'Veja proteína, carboidrato, fibra e gordura de cada refeição de forma clara e visual.',
+    emoji: '⚡',
+    title: 'IA analisa na hora',
+    desc: 'Calorias, proteínas, carboidratos, fibras e gorduras de cada refeição — com dicas de substituição saudável automáticas.',
+  },
+  {
+    emoji: '💧',
+    title: 'Hidratação e lembretes',
+    desc: 'Registre a água do dia em ml e configure lembretes para refeições, suplementos e qualquer hábito que quiser manter.',
+  },
+  {
+    emoji: '🥗',
+    title: 'Cardápio e treino com IA',
+    desc: 'Gere um cardápio semanal personalizado, peça receitas com o que você tem em casa e monte seu treino do dia.',
+    badge: '⭐ Disponível no plano Premium',
   },
   {
     emoji: '🎯',
-    title: 'Atinja suas metas',
-    desc: 'Defina metas diárias e receba alertas como um nutricionista pessoal no seu bolso.',
+    title: 'Acompanhe seu progresso',
+    desc: 'Gráficos, histórico completo e relatório semanal com análise da Evellyn entregue no seu e-mail toda semana.',
     badge: '⭐ Disponível no plano Premium',
   },
 ];
