@@ -198,6 +198,37 @@ router.post("/checkout", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/cancel", async (req: Request, res: Response) => {
+  const userId = req.user?.userId;
+  const { sessionId } = req.body;
+
+  if (!userId) {
+    res.status(401).json({ error: "unauthorized", message: "Login necessário" });
+    return;
+  }
+
+  const sub = await resolveSub(userId, sessionId);
+  if (!sub?.stripeSubscriptionId) {
+    res.status(400).json({ error: "no_subscription", message: "Nenhuma assinatura recorrente encontrada" });
+    return;
+  }
+
+  try {
+    // Cancela no fim do período — usuário mantém acesso até a data de renovação
+    const updated = await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+      cancel_at_period_end: true,
+    });
+    res.json({
+      ok: true,
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: new Date(updated.current_period_end * 1000),
+    });
+  } catch (err: any) {
+    req.log.error({ err }, "Error cancelling subscription");
+    res.status(500).json({ error: "internal_error", message: err?.raw?.message ?? err?.message ?? "Erro ao cancelar" });
+  }
+});
+
 router.post("/webhook", async (req: Request, res: Response) => {
   const sig = req.headers["stripe-signature"] as string;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;

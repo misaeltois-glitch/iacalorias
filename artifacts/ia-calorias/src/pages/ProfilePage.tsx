@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { ArrowLeft, Camera, Check, Eye, EyeOff, LogOut, Trash2, User, Lock, Activity, AlertTriangle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Camera, Check, Eye, EyeOff, LogOut, Trash2, User, Lock, Activity, AlertTriangle, Loader2, CreditCard, XCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useSession } from '@/hooks/use-session';
 import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
@@ -69,12 +69,31 @@ export default function ProfilePage() {
   const [passMsg, setPassMsg] = useState('');
   const [passErr, setPassErr] = useState('');
 
+  const [subStatus, setSubStatus] = useState<{ tier: string; stripeSubscriptionId: string | null; currentPeriodEnd: string | null; paymentType?: string } | null>(null);
+  const [cancelStep, setCancelStep] = useState<'idle' | 'confirm'>('idle');
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelDone, setCancelDone] = useState(false);
+  const [cancelErr, setCancelErr] = useState('');
+
   const [deleteStep, setDeleteStep] = useState<'idle' | 'confirm' | 'password'>('idle');
   const [deletePassword, setDeletePassword] = useState('');
   const [deletePasswordErr, setDeletePasswordErr] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch(`${BASE}api/subscription/status?sessionId=${sessionId}`, { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => setSubStatus({
+        tier: d.tier,
+        stripeSubscriptionId: d.stripeSubscriptionId ?? null,
+        currentPeriodEnd: d.currentPeriodEnd ?? null,
+        paymentType: d.paymentType,
+      }))
+      .catch(() => {});
+  }, [user]);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -154,6 +173,29 @@ export default function ProfilePage() {
     } catch (err: any) {
       setPassErr(err.message);
     } finally { setPassLoading(false); }
+  };
+
+  const handleCancelSubscription = async () => {
+    setCancelLoading(true);
+    setCancelErr('');
+    try {
+      const r = await fetch(`${BASE}api/subscription/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ sessionId }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message || 'Erro ao cancelar');
+      setCancelDone(true);
+      setCancelStep('idle');
+      if (d.currentPeriodEnd) {
+        setSubStatus(prev => prev ? { ...prev, currentPeriodEnd: d.currentPeriodEnd } : prev);
+      }
+    } catch (err: any) {
+      setCancelErr(err.message);
+    } finally {
+      setCancelLoading(false);
+    }
   };
 
   const handleDeleteVerifyPassword = async () => {
@@ -374,6 +416,88 @@ export default function ProfilePage() {
             </form>
           )}
         </Section>
+
+        {/* ── SECTION: ASSINATURA ── */}
+        {subStatus && subStatus.tier !== 'free' && (
+          <Section icon={<CreditCard size={16} />} title="Assinatura">
+            {/* Plan info */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-1)' }}>
+                  {subStatus.tier === 'unlimited' ? '⭐ Plano Ilimitado' : '🔹 Plano Limitado'}
+                </div>
+                {subStatus.currentPeriodEnd && (
+                  <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '3px' }}>
+                    {cancelDone ? 'Acesso até ' : 'Renova em '}
+                    {new Date(subStatus.currentPeriodEnd).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  </div>
+                )}
+              </div>
+              <span style={{
+                padding: '4px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 700,
+                background: cancelDone ? 'rgba(239,68,68,0.1)' : 'rgba(13,159,110,0.1)',
+                color: cancelDone ? '#f87171' : ACCENT,
+              }}>
+                {cancelDone ? 'Cancelado' : 'Ativo'}
+              </span>
+            </div>
+
+            {/* Cancel error */}
+            {cancelErr && (
+              <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(239,68,68,0.09)', color: '#f87171', fontSize: '13px' }}>
+                {cancelErr}
+              </div>
+            )}
+
+            {/* Cancel button — only for recurring subscriptions, not yet cancelled */}
+            {!cancelDone && subStatus.stripeSubscriptionId && cancelStep === 'idle' && (
+              <button
+                onClick={() => setCancelStep('confirm')}
+                style={{
+                  width: '100%', padding: '12px 14px', borderRadius: '10px',
+                  background: 'rgba(239,68,68,0.07)', border: '1.5px solid rgba(239,68,68,0.2)',
+                  color: '#f87171', fontSize: '14px', fontWeight: 600,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'inherit',
+                }}
+              >
+                <XCircle size={16} /> Cancelar assinatura
+              </button>
+            )}
+
+            {/* Confirm cancel */}
+            {cancelStep === 'confirm' && (
+              <div style={{ padding: '14px', borderRadius: '12px', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <p style={{ fontSize: '14px', color: '#f87171', margin: '0 0 6px', fontWeight: 700 }}>Cancelar assinatura?</p>
+                <p style={{ fontSize: '13px', color: 'var(--text-2)', margin: '0 0 14px', lineHeight: 1.5 }}>
+                  Você continuará com acesso até o fim do período já pago. Após isso, sua conta volta ao plano grátis.
+                </p>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => { setCancelStep('idle'); setCancelErr(''); }}
+                    style={{ flex: 1, padding: '11px', borderRadius: '9px', border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)', fontSize: '14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    Manter plano
+                  </button>
+                  <button
+                    onClick={handleCancelSubscription}
+                    disabled={cancelLoading}
+                    style={{ flex: 1, padding: '11px', borderRadius: '9px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: cancelLoading ? 'not-allowed' : 'pointer', opacity: cancelLoading ? 0.7 : 1, fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  >
+                    {cancelLoading ? <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> : null}
+                    {cancelLoading ? 'Cancelando...' : 'Confirmar'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* PIX / one-time — no cancel button, just info */}
+            {!subStatus.stripeSubscriptionId && (
+              <div style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: 1.5 }}>
+                Acesso avulso (PIX) — sem renovação automática.
+              </div>
+            )}
+          </Section>
+        )}
 
         {/* ── SECTION: CONTA ── */}
         <Section icon={<AlertTriangle size={16} />} title="Conta" accent="rgba(239,68,68,0.12)" borderColor="rgba(239,68,68,0.2)">
