@@ -208,11 +208,10 @@ HORÁRIO: ${timeOfDay}${localHour >= 21 ? ' — noite avançada, se aplicável s
       confidence: parsed.confidence ?? null,
     });
 
-    if (!isDevAccount) {
-      await db.update(subscriptionsTable)
-        .set({ analysisCount: sub.analysisCount + 1, updatedAt: new Date() })
-        .where(eq(subscriptionsTable.sessionId, sub.sessionId));
-    }
+    // Incrementa sempre — contas master também contam, mas nunca são bloqueadas
+    await db.update(subscriptionsTable)
+      .set({ analysisCount: sub.analysisCount + 1, updatedAt: new Date() })
+      .where(eq(subscriptionsTable.sessionId, sub.sessionId));
 
     const result = AnalyzeFoodResponse.parse({
       id: analysisId,
@@ -352,11 +351,10 @@ Se a descrição for vaga, use 'Baixa confiança' e estime com base em porção 
       confidence: parsed.confidence ?? null,
     });
 
-    if (!isDevAccount) {
-      await db.update(subscriptionsTable)
-        .set({ analysisCount: sub.analysisCount + 1, updatedAt: new Date() })
-        .where(eq(subscriptionsTable.sessionId, sub.sessionId));
-    }
+    // Incrementa sempre — contas master também contam, mas nunca são bloqueadas
+    await db.update(subscriptionsTable)
+      .set({ analysisCount: sub.analysisCount + 1, updatedAt: new Date() })
+      .where(eq(subscriptionsTable.sessionId, sub.sessionId));
 
     const result = AnalyzeFoodResponse.parse({
       id: analysisId,

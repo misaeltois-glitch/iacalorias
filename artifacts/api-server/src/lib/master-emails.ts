@@ -12,7 +12,7 @@ const MASTER_ACCOUNTS: Record<string, MasterConfig> = {
   "dev@iacalorias.com.br":        { tier: "unlimited" },
   "evellyngibulo@gmail.com":      { tier: "unlimited" },
   "brunogibulo@gmail.com":        { tier: "unlimited" },
-  "misaeltois@gmail.com":         { tier: "unlimited" },
+  "misaeltois@gmail.com":         { tier: "limited" },
   "comercial@comercial.com.br":   { tier: "unlimited", expiresAt: "2026-04-17" },
 };
 

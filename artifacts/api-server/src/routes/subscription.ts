@@ -67,14 +67,15 @@ router.get("/status", async (req: Request, res: Response) => {
     return;
   }
 
-  // Dev/QA bypass — conta de desenvolvedor sempre retorna o tier master
+  // Dev/QA bypass — tier fixo, mas analysisCount real do DB (para testar o contador)
   const masterTier = getMasterTier(req.user?.email);
   if (masterTier) {
+    const masterSub = await resolveSub(userId, sessionId);
     res.json(GetSubscriptionStatusResponse.parse({
-      sessionId: sessionId ?? `dev-${req.user?.userId}`,
+      sessionId: masterSub?.sessionId ?? sessionId ?? `dev-${userId}`,
       tier: masterTier,
-      analysisCount: 0,
-      analysisLimit: null,
+      analysisCount: masterSub?.analysisCount ?? 0,
+      analysisLimit: masterTier === "limited" ? LIMITED_PLAN_LIMIT : null,
       trialRemaining: 0,
       stripeCustomerId: null,
       stripeSubscriptionId: null,
