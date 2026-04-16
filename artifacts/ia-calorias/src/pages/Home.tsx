@@ -35,7 +35,6 @@ import { useCheatDays } from '@/hooks/use-cheat-days';
 import { MealFoodPrefsModal } from '@/components/MealFoodPrefsModal';
 import { ManualFoodModal } from '@/components/ManualFoodModal';
 import { BarcodeScanModal } from '@/components/BarcodeScanModal';
-import { SupportChat } from '@/components/SupportChat';
 import { trackEvent } from '@/lib/tracking';
 
 // Lazy-loaded: carregados apenas quando a aba é aberta pela primeira vez (~40% menos JS inicial)
@@ -224,7 +223,6 @@ export default function Home() {
   const [showRecipeSuggestor, setShowRecipeSuggestor] = useState(false);
   const [showPantryPlan, setShowPantryPlan] = useState(false);
   const [showFoodPrefs, setShowFoodPrefs] = useState(false);
-  const [showSupport, setShowSupport] = useState(false);
   const [logoutStep, setLogoutStep] = useState<0 | 1>(0);
   const [showAITools, setShowAITools] = useState(() => {
     try { return localStorage.getItem('iac-ai-tools-expanded') === 'true'; } catch { return false; }
@@ -884,7 +882,7 @@ export default function Home() {
                         Tour do aplicativo
                       </button>
                       <button
-                        onClick={() => { setShowUserMenu(false); setShowSupport(true); }}
+                        onClick={() => { setShowUserMenu(false); window.open('https://wa.me/5511956538845?text=Ol%C3%A1%2C+preciso+de+ajuda+com+o+IA+Calorias', '_blank'); }}
                         style={{
                           width: '100%', padding: '8px 12px',
                           background: 'none', border: 'none', color: 'var(--text-2)',
@@ -1576,11 +1574,6 @@ export default function Home() {
         />
       </Suspense>
 
-      <SupportChat
-        isOpen={showSupport}
-        onClose={() => setShowSupport(false)}
-        sessionId={sessionId}
-      />
 
       <PaywallModal
         isOpen={showPaywall}
