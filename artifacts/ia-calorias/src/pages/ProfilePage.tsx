@@ -70,7 +70,9 @@ export default function ProfilePage() {
   const [passErr, setPassErr] = useState('');
 
   const [subStatus, setSubStatus] = useState<{ tier: string; stripeSubscriptionId: string | null; currentPeriodEnd: string | null; paymentType?: string } | null>(null);
-  const [cancelStep, setCancelStep] = useState<'idle' | 'confirm'>('idle');
+  const [cancelStep, setCancelStep] = useState<'idle' | 'confirm' | 'discount'>('idle');
+  const [discountLoading, setDiscountLoading] = useState(false);
+  const [discountDone, setDiscountDone] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelDone, setCancelDone] = useState(false);
   const [cancelErr, setCancelErr] = useState('');
@@ -173,6 +175,27 @@ export default function ProfilePage() {
     } catch (err: any) {
       setPassErr(err.message);
     } finally { setPassLoading(false); }
+  };
+
+
+  const handleApplyDiscount = async () => {
+    setDiscountLoading(true);
+    setCancelErr('');
+    try {
+      const r = await fetch(`${BASE}api/subscription/discount`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ sessionId }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message || 'Erro ao aplicar desconto');
+      setDiscountDone(true);
+      setCancelStep('idle');
+    } catch (err: any) {
+      setCancelErr(err.message);
+    } finally {
+      setDiscountLoading(false);
+    }
   };
 
   const handleCancelSubscription = async () => {
@@ -479,7 +502,7 @@ export default function ProfilePage() {
                     Manter plano
                   </button>
                   <button
-                    onClick={handleCancelSubscription}
+                    onClick={() => setCancelStep('discount')}
                     disabled={cancelLoading}
                     style={{ flex: 1, padding: '11px', borderRadius: '9px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: cancelLoading ? 'not-allowed' : 'pointer', opacity: cancelLoading ? 0.7 : 1, fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                   >
@@ -487,6 +510,47 @@ export default function ProfilePage() {
                     {cancelLoading ? 'Cancelando...' : 'Confirmar'}
                   </button>
                 </div>
+              </div>
+            )}
+
+
+            {/* Anti-churn discount offer */}
+            {cancelStep === 'discount' && (
+              <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(13,159,110,0.07)', border: '1.5px solid rgba(13,159,110,0.25)' }}>
+                <div style={{ fontSize: '20px', marginBottom: '8px' }}>🎁</div>
+                <p style={{ fontSize: '15px', color: 'var(--text-1)', margin: '0 0 6px', fontWeight: 700 }}>Que tal 50% de desconto?</p>
+                <p style={{ fontSize: '13px', color: 'var(--text-2)', margin: '0 0 14px', lineHeight: 1.55 }}>
+                  Sabemos que a vida muda. Por isso, antes de você ir embora, gostaríamos de oferecer <strong style={{ color: '#0D9F6E' }}>50% de desconto nos próximos 3 meses</strong> — sem nenhum compromisso adicional.
+                </p>
+                <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                  <button
+                    onClick={handleApplyDiscount}
+                    disabled={discountLoading}
+                    style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #0D9F6E, #057A55)', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: discountLoading ? 'not-allowed' : 'pointer', opacity: discountLoading ? 0.7 : 1, fontFamily: 'inherit' }}
+                  >
+                    {discountLoading ? 'Aplicando...' : 'Aceitar 50% de desconto'}
+                  </button>
+                  <button
+                    onClick={handleCancelSubscription}
+                    disabled={cancelLoading}
+                    style={{ width: '100%', padding: '11px', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.3)', background: 'transparent', color: '#f87171', fontSize: '13px', fontWeight: 600, cursor: cancelLoading ? 'not-allowed' : 'pointer', opacity: cancelLoading ? 0.7 : 1, fontFamily: 'inherit' }}
+                  >
+                    {cancelLoading ? 'Cancelando...' : 'Não, quero cancelar mesmo assim'}
+                  </button>
+                  <button
+                    onClick={() => { setCancelStep('idle'); setCancelErr(''); }}
+                    style={{ width: '100%', padding: '9px', borderRadius: '10px', border: 'none', background: 'none', color: 'var(--text-3)', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    Voltar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Discount accepted banner */}
+            {discountDone && (
+              <div style={{ padding: '12px 14px', borderRadius: '12px', background: 'rgba(13,159,110,0.08)', border: '1px solid rgba(13,159,110,0.22)', fontSize: '13px', color: '#0D9F6E', fontWeight: 600 }}>
+                🎉 Desconto aplicado! 50% off nos próximos 3 meses.
               </div>
             )}
 

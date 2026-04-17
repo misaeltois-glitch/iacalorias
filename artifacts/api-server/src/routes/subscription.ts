@@ -198,6 +198,39 @@ router.post("/checkout", async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/subscription/discount — apply 50% off for 3 months as anti-churn offer
+router.post("/discount", async (req: Request, res: Response) => {
+  const userId = req.user?.userId;
+  const { sessionId } = req.body;
+
+  if (!userId) { res.status(401).json({ error: "unauthorized" }); return; }
+
+  const sub = await resolveSub(userId, sessionId);
+  if (!sub?.stripeSubscriptionId) {
+    res.status(400).json({ error: "no_subscription", message: "Nenhuma assinatura recorrente encontrada" });
+    return;
+  }
+
+  try {
+    let coupon: Stripe.Coupon;
+    try {
+      coupon = await stripe.coupons.retrieve("ANTICHURN_50_3M");
+    } catch {
+      coupon = await stripe.coupons.create({
+        id: "ANTICHURN_50_3M",
+        percent_off: 50,
+        duration: "repeating",
+        duration_in_months: 3,
+        name: "50% por 3 meses",
+      });
+    }
+    await stripe.subscriptions.update(sub.stripeSubscriptionId, { coupon: coupon.id });
+    res.json({ ok: true, discountApplied: true, percentOff: 50, months: 3 });
+  } catch (err: any) {
+    res.status(500).json({ error: "stripe_error", message: err?.message ?? "Erro ao aplicar desconto" });
+  }
+});
+
 router.post("/cancel", async (req: Request, res: Response) => {
   const userId = req.user?.userId;
   const { sessionId } = req.body;

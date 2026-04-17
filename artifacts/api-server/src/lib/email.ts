@@ -290,6 +290,67 @@ export async function sendFreeWeeklyReport(email: string, data: FreeWeeklyReport
   });
 }
 
+export interface TrialExpiringData {
+  userName: string;
+  daysLeft: number;   // 2 (day 5) or 1 (day 6)
+  totalMeals: number;
+  streak: number;
+}
+
+export async function sendTrialExpiringEmail(email: string, data: TrialExpiringData, logger?: any): Promise<void> {
+  const urgency = data.daysLeft === 1 ? '🚨 Último dia' : '⏰ Faltam 2 dias';
+  const subject = data.daysLeft === 1
+    ? `Último dia do seu teste grátis — não perca seu progresso 🚨`
+    : `Faltam 2 dias para o fim do seu teste — garanta seu acesso ⏰`;
+
+  const featureList = ['📊 Histórico completo de refeições', '🤖 Cardápio semanal personalizado por IA', '📬 Relatório semanal da Evellyn por e-mail', '🏋️ Treino do dia gerado por IA', '🥘 Receitas com o que você tem em casa'];
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0a0f0d;font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif">
+  <div style="max-width:560px;margin:32px auto;background:#0f1a16;border-radius:20px;border:1px solid #1e3028;overflow:hidden">
+    <div style="background:linear-gradient(135deg,#0D9F6E,#057A55);padding:32px 32px 28px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+        <div style="width:36px;height:36px;background:rgba(255,255,255,0.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px">🥗</div>
+        <span style="font-size:16px;font-weight:700;color:#fff">IA Calorias</span>
+      </div>
+      <h1 style="color:#fff;font-size:24px;font-weight:800;margin:0 0 6px;letter-spacing:-0.5px">${urgency} do teste grátis</h1>
+      <p style="color:rgba(255,255,255,0.75);font-size:14px;margin:0">Sua jornada começou bem — não pare agora!</p>
+    </div>
+    <div style="padding:28px 32px 0">
+      <p style="color:#ccc;font-size:15px;line-height:1.7;margin:0 0 20px">
+        Olá, <strong style="color:#fff">${data.userName}</strong>! 👋<br><br>
+        Seu teste gratuito termina em <strong style="color:#F59E0B">${data.daysLeft === 1 ? 'hoje' : '2 dias'}</strong>. Você já registrou <strong style="color:#0D9F6E">${data.totalMeals} refeição${data.totalMeals !== 1 ? 'ões' : ''}</strong>${data.streak > 1 ? ` e mantém uma sequência de <strong style="color:#F59E0B">${data.streak} dias</strong>` : ''} — esse progresso fica salvo na sua conta.
+      </p>
+      <div style="background:#111e18;border:1px solid #1e3028;border-radius:14px;padding:20px;margin-bottom:24px">
+        <p style="color:#ccc;font-size:14px;line-height:1.65;margin:0">
+          <strong style="color:#fff">Evellyn diz:</strong> "${data.totalMeals > 0 ? 'Em poucos dias você já construiu um hábito incrível. Com o plano completo, continuo te orientando com relatórios semanais, cardápio personalizado e muito mais.' : 'Você está começando uma jornada de saúde incrível. Com o plano completo, tenho todas as ferramentas para te ajudar a chegar lá.'}"
+        </p>
+      </div>
+      <div style="margin-bottom:24px">
+        <div style="font-size:12px;font-weight:700;color:#0D9F6E;letter-spacing:0.5px;margin-bottom:12px">O QUE VOCÊ MANTÉM COM O PLANO COMPLETO</div>
+        ${featureList.map(f => `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #1e3028"><span style="font-size:15px">${f.split(' ')[0]}</span><span style="font-size:14px;color:#ccc">${f.slice(f.indexOf(' ') + 1)}</span></div>`).join('\n        ')}
+      </div>
+      <a href="${APP_URL}/?upgrade=1" style="display:block;background:linear-gradient(135deg,#0D9F6E,#057A55);color:#fff;font-size:16px;font-weight:700;padding:16px;border-radius:14px;text-decoration:none;text-align:center;margin-bottom:16px">Continuar minha jornada →</a>
+      <p style="color:#555;font-size:12px;text-align:center;margin:0 0 28px">Cancele quando quiser. Sem multas.</p>
+    </div>
+    <div style="padding:16px 32px;border-top:1px solid #1e3028;text-align:center">
+      <p style="color:#444;font-size:12px;margin:0">IA Calorias · <a href="${APP_URL}" style="color:#555">Abrir app</a></p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  if (!resend) {
+    const log = logger || console;
+    log.warn?.({ email, daysLeft: data.daysLeft }, "RESEND_API_KEY not set — trial expiring email skipped (dev)");
+    return;
+  }
+
+  await resend.emails.send({ from: FROM_EMAIL, to: email, subject, html });
+}
+
 export async function sendPasswordResetEmail(email: string, token: string, logger?: any): Promise<void> {
   const resetUrl = `${APP_URL}/reset-password?token=${token}`;
 

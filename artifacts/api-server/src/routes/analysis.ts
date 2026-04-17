@@ -383,6 +383,53 @@ Se a descrição for vaga, use 'Baixa confiança' e estime com base em porção 
   }
 });
 
+// POST /api/analysis/relog — re-log a saved favourite without an image
+router.post("/relog", async (req: Request, res: Response) => {
+  const sessionId = req.body.sessionId as string;
+  const userId = req.user?.userId;
+  if (!sessionId && !userId) { res.status(400).json({ error: "bad_request", message: "sessionId required" }); return; }
+
+  const { dishName, calories, protein, carbs, fat, fiber, healthScore, nutritionTip, servingSize } = req.body;
+  if (!dishName || calories == null) { res.status(400).json({ error: "bad_request", message: "dishName and calories required" }); return; }
+
+  const effectiveSessionId = sessionId ?? ;
+  const sub = await resolveSub(userId, effectiveSessionId);
+  if (!sub) { res.status(400).json({ error: "bad_request", message: "session not found" }); return; }
+
+  const newId = randomUUID();
+  await db.insert(analysesTable).values({
+    id: newId,
+    sessionId: effectiveSessionId,
+    userId: userId ?? null,
+    dishName: String(dishName).trim().slice(0, 200),
+    calories: Math.round(Number(calories)),
+    protein: Number(protein ?? 0),
+    carbs: Number(carbs ?? 0),
+    fat: Number(fat ?? 0),
+    fiber: fiber != null ? Number(fiber) : null,
+    healthScore: healthScore != null ? Number(healthScore) : null,
+    nutritionTip: nutritionTip ?? null,
+    servingSize: servingSize ?? null,
+  });
+
+  await db.update(subscriptionsTable)
+    .set({ analysisCount: (sub.analysisCount ?? 0) + 1 })
+    .where(eq(subscriptionsTable.sessionId, effectiveSessionId));
+
+  res.json({
+    id: newId,
+    dishName: String(dishName).trim(),
+    calories: Math.round(Number(calories)),
+    macros: { protein: Number(protein ?? 0), carbs: Number(carbs ?? 0), fat: Number(fat ?? 0) },
+    fiber: fiber != null ? Number(fiber) : 0,
+    healthScore: healthScore ?? null,
+    nutritionTip: nutritionTip ?? null,
+    servingSize: servingSize ?? null,
+    confidence: null,
+    imageUrl: null,
+  });
+});
+
 // PATCH /api/analysis/:id — edit analysis fields
 router.patch("/:id", async (req: Request, res: Response) => {
   const { id } = req.params;

@@ -9,20 +9,38 @@ interface Message {
   ts: number;
 }
 
+interface WeeklyContext {
+  streak?: number;
+  avgCalories?: number;
+  goalCalories?: number;
+  daysWithData?: number;
+  totalMeals?: number;
+}
+
 interface NutritionistChatProps {
   isOpen: boolean;
   onClose: () => void;
   sessionId: string;
   isPremium: boolean;
   onUpgrade: () => void;
+  weeklyContext?: WeeklyContext;
 }
 
-
-const WELCOME: Message = {
-  role: 'assistant',
-  content: 'Olá! Sou a Evellyn, sua nutricionista IA. 🌿\n\nPosso ajudar com dúvidas sobre sua alimentação de hoje, sugestões de refeições, substituições saudáveis ou qualquer outra questão nutricional. Como posso te ajudar?',
-  ts: Date.now(),
-};
+function buildWelcome(ctx?: WeeklyContext): Message {
+  let content = 'Olá! Sou a Evellyn, sua nutricionista IA. 🌿\n\n';
+  if (ctx && (ctx.totalMeals ?? 0) > 0) {
+    const streakLine = (ctx.streak ?? 0) > 1 ? ` Você está em uma sequência de **${ctx.streak} dias** — isso é consistência de verdade! 🔥` : '';
+    const calLine = ctx.avgCalories && ctx.goalCalories
+      ? ` Nos últimos dias você ficou em média **${Math.round(ctx.avgCalories)} kcal/dia** (meta: ${ctx.goalCalories} kcal).`
+      : ctx.avgCalories
+      ? ` Sua média dos últimos dias foi de **${Math.round(ctx.avgCalories)} kcal/dia**.`
+      : '';
+    content += `Já vi seu histórico da semana.${streakLine}${calLine}\n\nO que você gostaria de trabalhar hoje?`;
+  } else {
+    content += 'Posso ajudar com dúvidas sobre sua alimentação, sugestões de refeições, substituições saudáveis ou qualquer questão nutricional. Como posso te ajudar?';
+  }
+  return { role: 'assistant', content, ts: Date.now() };
+}
 
 const SUGGESTIONS = [
   'O que eu deveria comer no pré-treino?',
@@ -49,8 +67,8 @@ function TypingDots() {
 
 const FREE_CHAT_LIMIT = 3;
 
-export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgrade }: NutritionistChatProps) {
-  const [messages, setMessages] = useState<Message[]>([WELCOME]);
+export function NutritionistChat({ isOpen, onClose, sessionId, isPremium, onUpgrade, weeklyContext }: NutritionistChatProps) {
+  const [messages, setMessages] = useState<Message[]>(() => [buildWelcome(weeklyContext)]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);

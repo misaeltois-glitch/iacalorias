@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { db, pool, usersTable, analysesTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { maybeRunWeeklyReportCron } from "./lib/weekly-report-cron.js";
+import { maybeRunTrialReminderCron } from "./lib/trial-reminder-cron.js";
 
 const rawPort = process.env["PORT"];
 
@@ -103,5 +104,10 @@ app.listen(port, async (err) => {
   // Cron: verifica a cada hora se é hora de enviar relatórios semanais (domingo 7h BRT)
   setInterval(() => {
     maybeRunWeeklyReportCron().catch(err => logger.error({ err }, "weekly report cron error"));
+  }, 60 * 60 * 1000);
+
+  // Cron: envia emails de trial expirando (dias 5 e 6 do teste grátis)
+  setInterval(() => {
+    maybeRunTrialReminderCron().catch(err => logger.error({ err }, "trial reminder cron error"));
   }, 60 * 60 * 1000);
 });

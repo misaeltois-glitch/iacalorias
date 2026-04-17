@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCcw, Sparkles, Share2, Pencil, Check, X, Loader2 } from 'lucide-react';
+import { RotateCcw, Sparkles, Share2, Pencil, Check, X, Loader2, Star } from 'lucide-react';
 import type { AnalysisResult } from '@workspace/api-client-react/src/generated/api.schemas';
 import { shareResult } from '@/lib/share-card';
 import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
+import { useFavorites } from '@/hooks/use-favorites';
 
 
 const MEAL_TYPES = [
@@ -35,6 +36,15 @@ interface ResultCardProps {
   isCheatDay?: boolean;
   onToggleCheatDay?: () => void;
 }
+
+const PORTIONS = [
+  { mult: 0.5,  label: '½×'  },
+  { mult: 0.75, label: '¾×'  },
+  { mult: 1,    label: '1×'  },
+  { mult: 1.25, label: '1¼×' },
+  { mult: 1.5,  label: '1½×' },
+  { mult: 2,    label: '2×'  },
+] as const;
 
 const MACROS = [
   { key: 'protein', label: 'Proteínas', emoji: '🥩', color: '#EF4444', bg: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.20)' },
@@ -93,6 +103,38 @@ export function ResultCard({ result, onReset, photoUrl, sessionId, isCheatDay, o
     fiber: result.fiber ?? 0,
   });
   const [liveResult, setLiveResult] = useState(result);
+  const [portionMult, setPortionMult] = useState(1);
+  const portionSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { isFavorited, addFavorite, removeFavorite, favorites } = useFavorites();
+  const [favMsg, setFavMsg] = useState<string | null>(null);
+
+  // Debounced save when portion changes (skip default 1×)
+  useEffect(() => {
+    if (portionMult === 1) return;
+    if (portionSaveRef.current) clearTimeout(portionSaveRef.current);
+    portionSaveRef.current = setTimeout(async () => {
+      try {
+        const token = localStorage.getItem(AUTH_TOKEN_KEY);
+        await fetch(`${BASE}api/analysis/${liveResult.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            calories: Math.round(liveResult.calories * portionMult),
+            protein: Math.round(liveResult.macros.protein * portionMult * 10) / 10,
+            carbs: Math.round(liveResult.macros.carbs * portionMult * 10) / 10,
+            fat: Math.round(liveResult.macros.fat * portionMult * 10) / 10,
+            fiber: Math.round((liveResult.fiber ?? 0) * portionMult * 10) / 10,
+            sessionId,
+          }),
+        });
+      } catch {}
+    }, 1200);
+    return () => { if (portionSaveRef.current) clearTimeout(portionSaveRef.current); };
+  }, [portionMult, liveResult, sessionId]);
 
   const handleSaveEdit = useCallback(async () => {
     setSaving(true);
@@ -160,11 +202,12 @@ export function ResultCard({ result, onReset, photoUrl, sessionId, isCheatDay, o
     }
   }, [liveResult.id, mealType, sessionId]);
 
+  const dispCalories = Math.round(liveResult.calories * portionMult);
   const macroValues = {
-    protein: liveResult.macros.protein,
-    carbs: liveResult.macros.carbs,
-    fiber: liveResult.fiber ?? 0,
-    fat: liveResult.macros.fat,
+    protein: Math.round(liveResult.macros.protein * portionMult * 10) / 10,
+    carbs:   Math.round(liveResult.macros.carbs   * portionMult * 10) / 10,
+    fiber:   Math.round((liveResult.fiber ?? 0)   * portionMult * 10) / 10,
+    fat:     Math.round(liveResult.macros.fat      * portionMult * 10) / 10,
   };
 
   const maxMacro = Math.max(...Object.values(macroValues), 1);
@@ -300,13 +343,48 @@ export function ResultCard({ result, onReset, photoUrl, sessionId, isCheatDay, o
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
               }}>
-                <CountUpNumber value={liveResult.calories} />
+                <CountUpNumber value={dispCalories} />
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-2)', fontWeight: 600, letterSpacing: '0.5px' }}>
                 KCAL
               </div>
             </div>
           </div>
+        </div>
+      </motion.div>
+
+      {/* Portion Selector */}
+      <motion.div variants={item} style={{
+        borderRadius: '18px',
+        background: 'var(--bg-2)',
+        border: '1px solid var(--border)',
+        padding: '12px 14px',
+        display: 'flex', flexDirection: 'column', gap: '8px',
+      }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.5px' }}>
+          🍽️ AJUSTAR PORÇÃO
+        </span>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {PORTIONS.map(({ mult, label }) => {
+            const active = portionMult === mult;
+            return (
+              <button
+                key={mult}
+                onClick={() => setPortionMult(mult)}
+                style={{
+                  flex: 1, padding: '7px 0',
+                  borderRadius: '10px',
+                  border: active ? '1.5px solid #0D9F6E' : '1px solid var(--border)',
+                  background: active ? 'rgba(13,159,110,0.13)' : 'var(--bg-3)',
+                  color: active ? '#0D9F6E' : 'var(--text-2)',
+                  fontSize: '12px', fontWeight: active ? 700 : 500,
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </motion.div>
 
@@ -539,6 +617,52 @@ export function ResultCard({ result, onReset, photoUrl, sessionId, isCheatDay, o
             style={{ fontSize: '12px', color: '#0D9F6E', textAlign: 'center', margin: 0 }}
           >
             {shareMsg}
+          </motion.p>
+        )}
+      </motion.div>
+
+      {/* Favoritar Button */}
+      <motion.div variants={item} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <button
+          onClick={() => {
+            const favd = isFavorited(liveResult.dishName);
+            if (favd) {
+              const fav = favorites.find(f => f.dishName === liveResult.dishName);
+              if (fav) removeFavorite(fav.id);
+              setFavMsg('Removido dos favoritos');
+            } else {
+              addFavorite({
+                dishName: liveResult.dishName,
+                calories: dispCalories,
+                protein: macroValues.protein,
+                carbs: macroValues.carbs,
+                fat: macroValues.fat,
+                fiber: macroValues.fiber,
+                healthScore: liveResult.healthScore,
+                nutritionTip: liveResult.nutritionTip,
+                servingSize: liveResult.servingSize,
+              });
+              setFavMsg('Salvo nos favoritos ⭐');
+            }
+            setTimeout(() => setFavMsg(null), 2500);
+          }}
+          style={{
+            width: '100%', padding: '13px',
+            borderRadius: '14px',
+            background: isFavorited(liveResult.dishName) ? 'rgba(245,158,11,0.12)' : 'var(--bg-2)',
+            border: isFavorited(liveResult.dishName) ? '1.5px solid rgba(245,158,11,0.4)' : '1px solid var(--border)',
+            color: isFavorited(liveResult.dishName) ? '#F59E0B' : 'var(--text-2)',
+            fontSize: '14px', fontWeight: 600,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          }}
+        >
+          <Star size={15} fill={isFavorited(liveResult.dishName) ? '#F59E0B' : 'none'} />
+          {isFavorited(liveResult.dishName) ? 'Salvo nos favoritos' : 'Salvar como favorito'}
+        </button>
+        {favMsg && (
+          <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            style={{ fontSize: '12px', color: '#F59E0B', textAlign: 'center', margin: 0 }}>
+            {favMsg}
           </motion.p>
         )}
       </motion.div>

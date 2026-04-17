@@ -32,6 +32,7 @@ import { ReferralCard, applyPendingReferral, REFERRAL_CODE_KEY } from '@/compone
 import { MealReminders } from '@/components/MealReminders';
 import { useMealReminders, loadReminders, incrementDailyAnalysesCount } from '@/hooks/use-meal-reminders';
 import { useCheatDays } from '@/hooks/use-cheat-days';
+import { useFavorites } from '@/hooks/use-favorites';
 import { MealFoodPrefsModal } from '@/components/MealFoodPrefsModal';
 import { ManualFoodModal } from '@/components/ManualFoodModal';
 import { BarcodeScanModal } from '@/components/BarcodeScanModal';
@@ -170,6 +171,8 @@ export default function Home() {
   const { showTour, maybeStartTour, endTour, resetTour } = useTour();
   useMealReminders();
   const { isCheatDay, toggleCheatDay } = useCheatDays();
+  const { favorites, addFavorite, removeFavorite } = useFavorites();
+  const [relogging, setRelogging] = React.useState<string | null>(null);
 
   useEffect(() => {
     const checkMissed = () => {
@@ -521,6 +524,29 @@ export default function Home() {
     setPhotoUrl(url);
   };
 
+
+  const handleRelog = async (fav: typeof favorites[0]) => {
+    if (!sessionId) return;
+    setRelogging(fav.id);
+    try {
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      const r = await fetch(`${BASE}api/analysis/relog`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ sessionId, dishName: fav.dishName, calories: fav.calories, protein: fav.protein, carbs: fav.carbs, fat: fav.fat, fiber: fav.fiber, healthScore: fav.healthScore, nutritionTip: fav.nutritionTip, servingSize: fav.servingSize }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        incrementDailyAnalysesCount();
+        await refreshSummary();
+        setCurrentResult(data);
+        setTab('analyze');
+        toast({ title: 'Refeição registrada!', description: fav.dishName });
+      }
+    } catch {}
+    finally { setRelogging(null); }
+  };
+
   const handleGoalsSave = async (goals: CalculatedGoals) => {
     if (!sessionId) return;
     await saveGoals(sessionId, goals);
@@ -590,12 +616,28 @@ export default function Home() {
     const mandatoryDone = localStorage.getItem(MANDATORY_ONBOARDING_KEY);
     if (mandatoryDone) return; // Already completed — nothing to do
     if (isAuthenticated) {
-      // Authenticated user — skip goals flow, just mark as done
+      // New authenticated user without goals → show TDEE wizard
+      if (goalsLoaded && !savedGoals?.calories) {
+        setTimeout(() => setMandatoryStep('goals'), 400);
+        return;
+      }
       localStorage.setItem(MANDATORY_ONBOARDING_KEY, 'true');
       return;
     }
     setTimeout(() => setMandatoryStep('goals'), 400);
-  }, [endTour, isAuthenticated]);
+  }, [endTour, isAuthenticated, goalsLoaded, savedGoals]);
+
+  // If tour ended before goals loaded, trigger wizard once goals are confirmed absent
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (!goalsLoaded) return;
+    if (savedGoals?.calories) return;
+    if (showTour) return; // tour still active
+    if (mandatoryStep) return; // already showing a step
+    const mandatoryDone = localStorage.getItem(MANDATORY_ONBOARDING_KEY);
+    if (mandatoryDone) return;
+    setTimeout(() => setMandatoryStep('goals'), 400);
+  }, [isAuthenticated, goalsLoaded, savedGoals, showTour, mandatoryStep]);
 
   const handleMandatoryGoalsDone = useCallback(async (goals: CalculatedGoals) => {
     if (!sessionId) return;
@@ -1145,6 +1187,53 @@ export default function Home() {
                 </div>
               </div>
 
+
+              {/* Favorites Section */}
+              {favorites.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.5px', paddingLeft: '2px' }}>
+                    ⭐ REFEIÇÕES FAVORITAS
+                  </div>
+                  {favorites.slice(0, 5).map(fav => (
+                    <div key={fav.id} style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      padding: '12px 14px', borderRadius: '14px',
+                      background: 'var(--bg-2)', border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {fav.dishName}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
+                          {fav.calories} kcal · P {fav.protein}g · C {fav.carbs}g · G {fav.fat}g
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRelog(fav)}
+                        disabled={relogging === fav.id}
+                        style={{
+                          padding: '7px 13px', borderRadius: '10px',
+                          background: relogging === fav.id ? 'var(--bg-3)' : 'rgba(13,159,110,0.12)',
+                          border: '1px solid rgba(13,159,110,0.25)',
+                          color: '#0D9F6E', fontSize: '12px', fontWeight: 700,
+                          cursor: relogging === fav.id ? 'not-allowed' : 'pointer',
+                          flexShrink: 0, opacity: relogging === fav.id ? 0.6 : 1,
+                        }}
+                      >
+                        {relogging === fav.id ? '…' : '+ Registrar'}
+                      </button>
+                      <button
+                        onClick={() => removeFavorite(fav.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '4px', borderRadius: '6px', flexShrink: 0 }}
+                        title="Remover favorito"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Profile setup banner */}
               {goalsLoaded && (!isAuthenticated || !savedGoals?.calories || !hasWorkoutPlan) && (
                 <ProfileSetupBanner
@@ -1639,6 +1728,13 @@ export default function Home() {
             sessionId={sessionId}
             isPremium={isPremium}
             onUpgrade={() => { setShowChat(false); setPaywallDisableClose(false); setShowPaywall(true); }}
+            weeklyContext={todaySummary ? {
+              streak: todaySummary.streak ?? 0,
+              avgCalories: dailySummary?.avgCalories ?? undefined,
+              goalCalories: savedGoals?.calories ?? undefined,
+              daysWithData: dailySummary?.daysWithData ?? undefined,
+              totalMeals: todaySummary.analysesCount ?? undefined,
+            } : undefined}
           />
         </Suspense>
       )}

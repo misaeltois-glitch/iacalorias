@@ -60,24 +60,28 @@ router.post("/", async (req: Request, res: Response) => {
   const todayStart  = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate(),     0, 0, 0, 0) + tzOffsetMs);
   const todayEnd    = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate() + 1, 0, 0, 0, 0) + tzOffsetMs);
   const yesterStart = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate() - 1, 0, 0, 0, 0) + tzOffsetMs);
+  const weekStart   = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate() - 6, 0, 0, 0, 0) + tzOffsetMs);
 
   type MealRow = { dishName: string; calories: number; protein: number; carbs: number; fat: number; fiber: number | null };
   let todayAnalyses: MealRow[] = [];
   let yesterdayAnalyses: MealRow[] = [];
+  let weekAnalyses: MealRow[] = [];
   let goals: { calories: number | null; protein: number | null; carbs: number | null; fat: number | null; fiber: number | null; objective: string | null; mealsPerDay: number | null } | null = null;
 
   const mealCols = { dishName: true, calories: true, protein: true, carbs: true, fat: true, fiber: true } as const;
 
   try {
     if (userId) {
-      [todayAnalyses, yesterdayAnalyses] = await Promise.all([
+      [todayAnalyses, yesterdayAnalyses, weekAnalyses] = await Promise.all([
         db.query.analysesTable.findMany({ where: and(eq(analysesTable.userId, userId), gte(analysesTable.createdAt, todayStart),  lt(analysesTable.createdAt, todayEnd)),  columns: mealCols }),
         db.query.analysesTable.findMany({ where: and(eq(analysesTable.userId, userId), gte(analysesTable.createdAt, yesterStart), lt(analysesTable.createdAt, todayStart)), columns: mealCols }),
+        db.query.analysesTable.findMany({ where: and(eq(analysesTable.userId, userId), gte(analysesTable.createdAt, weekStart),   lt(analysesTable.createdAt, todayStart)), columns: mealCols, limit: 200 }),
       ]);
     } else if (sessionId) {
-      [todayAnalyses, yesterdayAnalyses] = await Promise.all([
+      [todayAnalyses, yesterdayAnalyses, weekAnalyses] = await Promise.all([
         db.query.analysesTable.findMany({ where: and(eq(analysesTable.sessionId, sessionId!), gte(analysesTable.createdAt, todayStart),  lt(analysesTable.createdAt, todayEnd)),  columns: mealCols }),
         db.query.analysesTable.findMany({ where: and(eq(analysesTable.sessionId, sessionId!), gte(analysesTable.createdAt, yesterStart), lt(analysesTable.createdAt, todayStart)), columns: mealCols }),
+        db.query.analysesTable.findMany({ where: and(eq(analysesTable.sessionId, sessionId!), gte(analysesTable.createdAt, weekStart),   lt(analysesTable.createdAt, todayStart)), columns: mealCols, limit: 200 }),
       ]);
     }
 
@@ -255,6 +259,21 @@ Esta pessoa está comprometida de verdade. Reconheça isso — não de forma gen
       if (diff < -50) contextParts.push(`Ontem o usuário ficou ${Math.abs(Math.round(diff))} kcal abaixo da meta calórica.`);
       else if (diff > 50) contextParts.push(`Ontem o usuário consumiu ${Math.round(diff)} kcal acima da meta calórica.`);
       else contextParts.push("Ontem o usuário bateu a meta calórica.");
+    }
+  }
+
+  // Last 7 days (excluding today)
+  if (weekAnalyses.length > 0) {
+    const weekTotals = weekAnalyses.reduce((a, m) => ({ calories: a.calories + m.calories, protein: a.protein + m.protein }), { calories: 0, protein: 0 });
+    const weekDaysWithData = Math.min(6, new Set(weekAnalyses.map((m: any) => (m as any).createdAt?.toISOString?.()?.slice(0,10) ?? '')).size || Math.ceil(weekAnalyses.length / 3));
+    const avgCal = Math.round(weekTotals.calories / Math.max(weekDaysWithData, 1));
+    const avgProt = (weekTotals.protein / Math.max(weekDaysWithData, 1)).toFixed(1);
+    contextParts.push(`Últimos 6 dias (excl. hoje): ${weekAnalyses.length} refeições em ${weekDaysWithData} dia(s) — média de ${avgCal} kcal/dia | Prot média ${avgProt}g/dia`);
+    if (goals?.calories && avgCal > 0) {
+      const pct = Math.round((avgCal / goals.calories) * 100);
+      if (pct < 80) contextParts.push(`Na semana o usuário ficou em média ${100 - pct}% abaixo da meta calórica.`);
+      else if (pct > 115) contextParts.push(`Na semana o usuário ficou em média ${pct - 100}% acima da meta calórica.`);
+      else contextParts.push(`Na semana o usuário ficou dentro da meta calórica (${pct}% da meta).`);
     }
   }
 
