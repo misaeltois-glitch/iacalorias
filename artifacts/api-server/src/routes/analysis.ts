@@ -392,7 +392,7 @@ router.post("/relog", async (req: Request, res: Response) => {
   const { dishName, calories, protein, carbs, fat, fiber, healthScore, nutritionTip, servingSize } = req.body;
   if (!dishName || calories == null) { res.status(400).json({ error: "bad_request", message: "dishName and calories required" }); return; }
 
-  const effectiveSessionId = sessionId ?? ;
+  const effectiveSessionId = sessionId ?? `user-${userId}`;
   const sub = await resolveSub(userId, effectiveSessionId);
   if (!sub) { res.status(400).json({ error: "bad_request", message: "session not found" }); return; }
 
