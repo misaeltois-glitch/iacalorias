@@ -18,7 +18,7 @@ const FEATURES = [
 ];
 
 const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)
-  || '210315717128-1htdab52e5eateekrbeieuvi6gtt53rg.apps.googleusercontent.com';
+  || '830136911303-e7aa0h6hn3pko2amb7r2b0iv1tv26fij.apps.googleusercontent.com';
 
 
 export default function LoginPage() {
