@@ -64,8 +64,8 @@ router.get("/leads", async (req: Request, res: Response) => {
         <td><span class="sensitive">${escapeHtml(s.sessionId.slice(0, 12))}…</span></td>
         <td>${s.userId ? "conta" : "anônimo"}</td>
         <td>${escapeHtml(s.tier)}</td>
-        <td>${s.analysisCount}</td>
-        <td>${s.workoutCount}</td>
+        <td><span class="sensitive">${s.analysisCount}</span></td>
+        <td><span class="sensitive">${s.workoutCount}</span></td>
         <td>${s.stripeCustomerId ? "sim" : "não"}</td>
       </tr>`
     )
@@ -106,15 +106,15 @@ router.get("/leads", async (req: Request, res: Response) => {
     </button>
   </div>
   <div class="stats">
-    <div class="stat"><div class="n">${totalUsers}</div><div class="l">usuários cadastrados</div></div>
-    <div class="stat"><div class="n">${totalSessions}</div><div class="l">sessões (leads totais)</div></div>
-    <div class="stat"><div class="n">${converted}</div><div class="l">converteram em conta</div></div>
-    <div class="stat"><div class="n">${stripeCustomers}</div><div class="l">viraram cliente Stripe</div></div>
-    <div class="stat"><div class="n">${activePaid}</div><div class="l">assinatura paga ativa</div></div>
-    <div class="stat"><div class="n">${engaged}</div><div class="l">usaram análise/treino</div></div>
+    <div class="stat"><div class="n sensitive">${totalUsers}</div><div class="l">usuários cadastrados</div></div>
+    <div class="stat"><div class="n sensitive">${totalSessions}</div><div class="l">sessões (leads totais)</div></div>
+    <div class="stat"><div class="n sensitive">${converted}</div><div class="l">converteram em conta</div></div>
+    <div class="stat"><div class="n sensitive">${stripeCustomers}</div><div class="l">viraram cliente Stripe</div></div>
+    <div class="stat"><div class="n sensitive">${activePaid}</div><div class="l">assinatura paga ativa</div></div>
+    <div class="stat"><div class="n sensitive">${engaged}</div><div class="l">usaram análise/treino</div></div>
   </div>
 
-  <h2>Usuários cadastrados (${totalUsers})</h2>
+  <h2>Usuários cadastrados (<span class="sensitive">${totalUsers}</span>)</h2>
   <div class="wrap">
     <table>
       <thead><tr><th>Criado em</th><th>Email</th><th>Nome</th></tr></thead>
@@ -122,7 +122,7 @@ router.get("/leads", async (req: Request, res: Response) => {
     </table>
   </div>
 
-  <h2>Sessões recentes (últimas ${Math.min(subs.length, 100)} de ${totalSessions})</h2>
+  <h2>Sessões recentes (últimas <span class="sensitive">${Math.min(subs.length, 100)}</span> de <span class="sensitive">${totalSessions}</span>)</h2>
   <div class="wrap">
     <table>
       <thead><tr><th>Criado em</th><th>Sessão</th><th>Tipo</th><th>Tier</th><th>Análises</th><th>Treinos</th><th>Stripe</th></tr></thead>
