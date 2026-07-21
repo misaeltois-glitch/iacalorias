@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, ChevronLeft, Target, Loader2, Check, X } from 'lucide-react';
+import { BR_STATES } from '@/lib/br-states';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export interface CalculatedGoals {
   objective: string;
   activityLevel: number;
   restrictions: string[];
+  state?: string;
   // Workout fields (collected in onboarding step)
   workoutGoal?: string;
   workoutLevel?: string;
@@ -127,6 +129,7 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
   const [height, setHeight] = useState('');
   const [age, setAge] = useState('');
   const [sex, setSex] = useState('');
+  const [estado, setEstado] = useState('');
   const [activityLevel, setActivityLevel] = useState(0);
   const [restrictions, setRestrictions] = useState<string[]>([]);
   const [calculated, setCalculated] = useState<ReturnType<typeof calcGoals> | null>(null);
@@ -178,6 +181,7 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
       ...manualGoals,
       weight: parseFloat(weight), height: parseFloat(height),
       age: parseInt(age), sex, objective, activityLevel, restrictions,
+      state: estado || undefined,
       workoutGoal: workoutGoal || mapObjectiveToWorkoutGoal(objective),
       workoutLevel: workoutLevel || mapActivityToLevel(activityLevel),
       workoutGym,
@@ -338,6 +342,23 @@ export function OnboardingModal({ isOpen, onComplete, onSkip, mandatory }: Onboa
                         />
                       </div>
                     ))}
+                    <div>
+                      <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: '6px' }}>Estado (opcional)</label>
+                      <select
+                        value={estado} onChange={e => setEstado(e.target.value)}
+                        style={{
+                          width: '100%', padding: '12px 14px', borderRadius: '10px',
+                          border: '1.5px solid var(--border-strong)', background: 'var(--bg-2)',
+                          color: 'var(--text-1)', fontSize: '15px', boxSizing: 'border-box',
+                          outline: 'none',
+                        }}
+                      >
+                        <option value="">Selecione…</option>
+                        {BR_STATES.map(s => (
+                          <option key={s.code} value={s.code}>{s.label}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               )}

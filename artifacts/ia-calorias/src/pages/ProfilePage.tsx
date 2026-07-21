@@ -4,6 +4,7 @@ import { ArrowLeft, Camera, Check, Eye, EyeOff, LogOut, Trash2, User, Lock, Acti
 import { useAuth } from '@/hooks/use-auth';
 import { useSession } from '@/hooks/use-session';
 import { BASE, AUTH_TOKEN_KEY, authHeaders } from '@/lib/api';
+import { BR_STATES } from '@/lib/br-states';
 
 const ACCENT = '#0D9F6E';
 
@@ -35,6 +36,7 @@ interface ProfileData {
   age: string;
   sex: string;
   objective: string;
+  estado: string;
 }
 
 const OBJECTIVES = [
@@ -54,10 +56,10 @@ export default function ProfilePage() {
   const [saveError, setSaveError] = useState('');
 
   const [profile, setProfile] = useState<ProfileData>({
-    name: '', avatarUrl: '', weight: '', height: '', age: '', sex: '', objective: '',
+    name: '', avatarUrl: '', weight: '', height: '', age: '', sex: '', objective: '', estado: '',
   });
   const [savedProfile, setSavedProfile] = useState<ProfileData>({
-    name: '', avatarUrl: '', weight: '', height: '', age: '', sex: '', objective: '',
+    name: '', avatarUrl: '', weight: '', height: '', age: '', sex: '', objective: '', estado: '',
   });
 
   const [passSection, setPassSection] = useState(false);
@@ -110,6 +112,7 @@ export default function ProfilePage() {
           age: d.biometrics?.age?.toString() ?? '',
           sex: d.biometrics?.sex ?? '',
           objective: d.biometrics?.objective ?? '',
+          estado: d.biometrics?.state ?? '',
         };
         setProfile(loaded);
         setSavedProfile(loaded);
@@ -140,6 +143,7 @@ export default function ProfilePage() {
       if (profile.age) body.age = parseInt(profile.age);
       if (profile.sex) body.sex = profile.sex;
       if (profile.objective) body.objective = profile.objective;
+      if (profile.estado) body.state = profile.estado;
 
       const r = await fetch(`${BASE}api/user/profile`, {
         method: 'PATCH',
@@ -369,6 +373,14 @@ export default function ProfilePage() {
                 <option value="">Selecione</option>
                 <option value="male">Masculino</option>
                 <option value="female">Feminino</option>
+              </select>
+            </Field>
+            <Field label="Estado">
+              <select value={profile.estado} onChange={e => setProfile(p => ({ ...p, estado: e.target.value }))} style={{ ...inputStyle, appearance: 'none' }}>
+                <option value="">Selecione</option>
+                {BR_STATES.map(s => (
+                  <option key={s.code} value={s.code}>{s.label}</option>
+                ))}
               </select>
             </Field>
           </div>

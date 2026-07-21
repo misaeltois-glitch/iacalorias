@@ -3,6 +3,7 @@ import { db, subscriptionsTable, analysesTable, goalsTable } from "@workspace/db
 import { eq, gte, and, lt, or, inArray, isNull } from "drizzle-orm";
 import OpenAI from "openai";
 import { getMasterTier } from "../lib/master-emails.js";
+import { BR_STATE_CODES } from "../lib/br-states.js";
 
 const router: IRouter = Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -109,12 +110,13 @@ router.post("/", async (req: Request, res: Response) => {
   const restrictions = Array.isArray(body.restrictions)
     ? JSON.stringify(body.restrictions.slice(0, 20).map(String))
     : (typeof body.restrictions === "string" ? body.restrictions.slice(0, 500) : undefined);
+  const state = validStr(body.state, [...BR_STATE_CODES]);
 
   const existing = await findGoals(userId, sessionId);
 
   if (existing) {
     await db.update(goalsTable)
-      .set({ calories, protein, carbs, fat, fiber, mealsPerDay: mealsPerDay ?? existing.mealsPerDay ?? 3, weight, height, age, sex, objective, activityLevel, restrictions, userId: userId ?? existing.userId, updatedAt: new Date() })
+      .set({ calories, protein, carbs, fat, fiber, mealsPerDay: mealsPerDay ?? existing.mealsPerDay ?? 3, weight, height, age, sex, objective, activityLevel, restrictions, state, userId: userId ?? existing.userId, updatedAt: new Date() })
       .where(eq(goalsTable.sessionId, existing.sessionId));
   } else {
     const effectiveSessionId = sessionId ?? `user-${userId}`;
@@ -124,6 +126,7 @@ router.post("/", async (req: Request, res: Response) => {
       calories, protein, carbs, fat, fiber, mealsPerDay: mealsPerDay ?? 3,
       weight, height, age, sex, objective, activityLevel,
       restrictions,
+      state,
       updatedAt: new Date(),
     });
   }

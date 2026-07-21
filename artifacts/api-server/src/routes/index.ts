@@ -18,6 +18,7 @@ import recipeRouter from "./recipe";
 import mealFeedbackRouter from "./meal-feedback";
 import measurementsRouter from "./measurements";
 import adminRouter from "./admin";
+import adminDashboardRouter from "./admin-dashboard";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use("/recipe", analysisRateLimit, recipeRouter);
 router.use("/meal-feedback", analysisRateLimit, mealFeedbackRouter);
 router.use("/measurements", generalRateLimit, measurementsRouter);
 router.use("/admin", generalRateLimit, adminRouter);
+router.use("/admin", generalRateLimit, adminDashboardRouter);
 
 export default router;

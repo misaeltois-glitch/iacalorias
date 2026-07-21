@@ -21,6 +21,7 @@ export const goalsTable = pgTable("goals", {
   objective: text("objective"),
   activityLevel: real("activity_level"),
   restrictions: text("restrictions"),
+  state: text("state"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

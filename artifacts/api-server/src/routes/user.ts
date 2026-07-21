@@ -3,6 +3,7 @@ import { db, subscriptionsTable, analysesTable, usersTable, goalsTable } from "@
 import { eq, or, and } from "drizzle-orm";
 import { GetMeResponse } from "@workspace/api-zod";
 import bcrypt from "bcryptjs";
+import { BR_STATE_CODES } from "../lib/br-states.js";
 
 const router: IRouter = Router();
 
@@ -95,6 +96,7 @@ router.get("/profile", async (req: Request, res: Response) => {
       sex: goals.sex,
       objective: goals.objective,
       activityLevel: goals.activityLevel,
+      state: goals.state,
     } : null,
   });
 });
@@ -109,7 +111,7 @@ router.patch("/profile", async (req: Request, res: Response) => {
     return;
   }
 
-  const { name, avatarUrl, weight, height, age, sex, objective, activityLevel } = req.body as {
+  const { name, avatarUrl, weight, height, age, sex, objective, activityLevel, state } = req.body as {
     name?: string;
     avatarUrl?: string;
     weight?: number;
@@ -118,6 +120,7 @@ router.patch("/profile", async (req: Request, res: Response) => {
     sex?: string;
     objective?: string;
     activityLevel?: number;
+    state?: string;
   };
 
   const userUpdate: Record<string, any> = { updatedAt: new Date() };
@@ -135,6 +138,7 @@ router.patch("/profile", async (req: Request, res: Response) => {
   if (sex !== undefined) biometrics.sex = sex;
   if (objective !== undefined) biometrics.objective = objective;
   if (activityLevel !== undefined) biometrics.activityLevel = activityLevel;
+  if (state !== undefined && (BR_STATE_CODES as readonly string[]).includes(state)) biometrics.state = state;
 
   if (Object.keys(biometrics).length > 0) {
     const existing = await db.query.goalsTable.findFirst({
