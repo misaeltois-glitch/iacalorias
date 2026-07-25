@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { existsSync } from "fs";
 import router from "./routes";
+import blogRouter from "./routes/blog";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
@@ -41,6 +42,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api", router);
+app.use(blogRouter);
 
 // Serve React SPA in production
 if (process.env.NODE_ENV === "production") {
