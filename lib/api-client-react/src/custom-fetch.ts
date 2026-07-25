@@ -17,6 +17,7 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _deviceFingerprint: string | null = null;
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -39,6 +40,15 @@ export function setBaseUrl(url: string | null): void {
  */
 export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
+}
+
+/**
+ * Register a device fingerprint to attach as `X-Device-Fingerprint` on every
+ * request — used purely as an anti-abuse signal (never as session identity).
+ * Pass `null` to clear it.
+ */
+export function setDeviceFingerprint(fingerprint: string | null): void {
+  _deviceFingerprint = fingerprint;
 }
 
 function isRequest(input: RequestInfo | URL): input is Request {
@@ -353,6 +363,12 @@ export async function customFetch<T = unknown>(
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
     }
+  }
+
+  // Attach the device fingerprint (anti-abuse signal only, never identity)
+  // when configured and not already explicitly provided.
+  if (_deviceFingerprint && !headers.has("x-device-fingerprint")) {
+    headers.set("x-device-fingerprint", _deviceFingerprint);
   }
 
   const requestInfo = { method, url: resolveUrl(input) };

@@ -7,6 +7,7 @@ export type Tier = "free" | "limited" | "unlimited";
 export const subscriptionsTable = pgTable("subscriptions", {
   sessionId: text("session_id").primaryKey(),
   userId: text("user_id"),
+  deviceFingerprint: text("device_fingerprint"),
   tier: text("tier").notNull().default("free"),
   analysisCount: integer("analysis_count").notNull().default(0),
   workoutCount: integer("workout_count").notNull().default(0),

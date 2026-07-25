@@ -7,6 +7,7 @@ import {
   CreateCheckoutSessionResponse,
 } from "@workspace/api-zod";
 import { getMasterTier } from "../lib/master-emails.js";
+import { resolveOrCreateSubscription, FREE_TRIAL_DAYS } from "../lib/subscription-resolver.js";
 
 const router: IRouter = Router();
 
@@ -22,45 +23,26 @@ const PRICE_UNLIMITED_ONETIME = process.env.STRIPE_PRICE_UNLIMITED_ONETIME ?? "p
 const PRICE_LIMITED_ANNUAL   = process.env.STRIPE_PRICE_LIMITED_ANNUAL   ?? "price_1THqc98HTXQYSfx5nO7hpskC";
 const PRICE_UNLIMITED_ANNUAL = process.env.STRIPE_PRICE_UNLIMITED_ANNUAL ?? "price_1THqaZ8HTXQYSfx5Y7dJcFGq";
 
-const FREE_TRIAL_DAYS = 7;
 const LIMITED_PLAN_LIMIT = 20;
 
-async function resolveSub(userId?: string, sessionId?: string) {
-  if (userId) {
-    const sub = await db.query.subscriptionsTable.findFirst({
-      where: eq(subscriptionsTable.userId, userId),
-      orderBy: (t, { desc }) => [desc(t.updatedAt)],
-    });
-    if (sub) return sub;
-  }
-  const effectiveSessionId = sessionId ?? (userId ? `user-${userId}` : undefined);
-  if (!effectiveSessionId) return null;
-
-  let sub = await db.query.subscriptionsTable.findFirst({
-    where: eq(subscriptionsTable.sessionId, effectiveSessionId),
-  });
-  if (!sub) {
-    await db.insert(subscriptionsTable).values({ sessionId: effectiveSessionId, userId: userId ?? null, tier: "free", analysisCount: 0 });
-    sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.sessionId, effectiveSessionId) });
-  } else if (userId && !sub.userId) {
-    await db.update(subscriptionsTable).set({ userId }).where(eq(subscriptionsTable.sessionId, effectiveSessionId));
-    sub = { ...sub, userId };
-  }
+async function resolveSub(userId?: string, sessionId?: string, deviceFingerprint?: string) {
+  const sub = await resolveOrCreateSubscription(userId, sessionId, deviceFingerprint);
 
   // Expirar acesso avulso (one_time) quando currentPeriodEnd tiver passado
   if (sub && sub.paymentType === "one_time" && sub.currentPeriodEnd && sub.currentPeriodEnd < new Date()) {
     await db.update(subscriptionsTable)
       .set({ tier: "free", paymentType: "subscription", currentPeriodEnd: null, updatedAt: new Date() })
       .where(eq(subscriptionsTable.sessionId, sub.sessionId));
-    sub = { ...sub, tier: "free", paymentType: "subscription", currentPeriodEnd: null };
+    return { ...sub, tier: "free", paymentType: "subscription", currentPeriodEnd: null };
   }
 
-  return sub!;
+  return sub;
 }
 
 router.get("/status", async (req: Request, res: Response) => {
   const sessionId = req.query.sessionId as string;
   const userId = req.user?.userId;
+  const deviceFingerprint = req.headers["x-device-fingerprint"] as string | undefined;
 
   if (!sessionId && !userId) {
     res.status(400).json({ error: "bad_request", message: "sessionId is required" });
@@ -70,7 +52,7 @@ router.get("/status", async (req: Request, res: Response) => {
   // Dev/QA bypass — tier fixo, mas analysisCount real do DB (para testar o contador)
   const masterTier = getMasterTier(req.user?.email);
   if (masterTier) {
-    const masterSub = await resolveSub(userId, sessionId);
+    const masterSub = await resolveSub(userId, sessionId, deviceFingerprint);
     res.json(GetSubscriptionStatusResponse.parse({
       sessionId: masterSub?.sessionId ?? sessionId ?? `dev-${userId}`,
       tier: masterTier,
@@ -84,7 +66,7 @@ router.get("/status", async (req: Request, res: Response) => {
     return;
   }
 
-  const sub = await resolveSub(userId, sessionId);
+  const sub = await resolveSub(userId, sessionId, deviceFingerprint);
   if (!sub) {
     const tier = "free";
     const result = GetSubscriptionStatusResponse.parse({

@@ -1,3 +1,28 @@
+const DEVICE_FP_KEY = 'ia-calorias-device-fp';
+
+export function getCachedDeviceFingerprint(): string | null {
+  try {
+    return localStorage.getItem(DEVICE_FP_KEY);
+  } catch {
+    return null;
+  }
+}
+
+// Fingerprint is used purely as an anti-abuse signal sent alongside requests
+// (never as session identity — see use-session.ts) so it only needs to be
+// computed once per browser install; cache it and reuse.
+export async function ensureDeviceFingerprint(): Promise<string> {
+  const cached = getCachedDeviceFingerprint();
+  if (cached) return cached;
+  const fp = await generateDeviceFingerprint();
+  try {
+    localStorage.setItem(DEVICE_FP_KEY, fp);
+  } catch {
+    // ignore — worst case we recompute next time
+  }
+  return fp;
+}
+
 export async function generateDeviceFingerprint(): Promise<string> {
   const signals: string[] = [];
 

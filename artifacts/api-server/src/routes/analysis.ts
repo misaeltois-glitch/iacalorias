@@ -6,38 +6,16 @@ import OpenAI from "openai";
 import { randomUUID } from "crypto";
 import { AnalyzeFoodResponse, GetAnalysisHistoryResponse } from "@workspace/api-zod";
 import { getMasterTier } from "../lib/master-emails.js";
+import { resolveOrCreateSubscription, FREE_TRIAL_DAYS } from "../lib/subscription-resolver.js";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-const FREE_TRIAL_DAYS = 7;
 const LIMITED_PLAN_LIMIT = 20;
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-async function resolveSub(userId?: string, sessionId?: string) {
-  if (userId) {
-    const sub = await db.query.subscriptionsTable.findFirst({
-      where: eq(subscriptionsTable.userId, userId),
-      orderBy: (t, { desc }) => [desc(t.updatedAt)],
-    });
-    if (sub) return sub;
-  }
-  const effectiveSessionId = sessionId ?? (userId ? `user-${userId}` : undefined);
-  if (!effectiveSessionId) return null;
-
-  let sub = await db.query.subscriptionsTable.findFirst({
-    where: eq(subscriptionsTable.sessionId, effectiveSessionId),
-  });
-  if (!sub) {
-    await db.insert(subscriptionsTable).values({ sessionId: effectiveSessionId, userId: userId ?? null, tier: "free", analysisCount: 0 });
-    sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.sessionId, effectiveSessionId) });
-  } else if (userId && !sub.userId) {
-    await db.update(subscriptionsTable).set({ userId }).where(eq(subscriptionsTable.sessionId, effectiveSessionId));
-    sub = { ...sub, userId };
-  }
-  return sub!;
-}
+const resolveSub = resolveOrCreateSubscription;
 
 router.post("/", upload.single("image"), async (req: Request, res: Response) => {
   const sessionId = req.body.sessionId as string;

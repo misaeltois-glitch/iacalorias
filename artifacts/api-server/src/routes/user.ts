@@ -1,39 +1,26 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, subscriptionsTable, analysesTable, usersTable, goalsTable } from "@workspace/db";
+import { db, analysesTable, usersTable, goalsTable } from "@workspace/db";
 import { eq, or, and } from "drizzle-orm";
 import { GetMeResponse } from "@workspace/api-zod";
 import bcrypt from "bcryptjs";
 import { BR_STATE_CODES } from "../lib/br-states.js";
+import { resolveOrCreateSubscription, FREE_TRIAL_DAYS } from "../lib/subscription-resolver.js";
 
 const router: IRouter = Router();
 
-const FREE_TRIAL_DAYS = 7;
 const LIMITED_PLAN_LIMIT = 20;
 
 router.get("/me", async (req: Request, res: Response) => {
   const userId = req.user?.userId;
   const sessionId = req.headers["x-session-id"] as string || req.query.sessionId as string;
+  const deviceFingerprint = req.headers["x-device-fingerprint"] as string | undefined;
 
   if (!userId && !sessionId) {
     res.status(401).json({ error: "unauthorized", message: "Session ID or auth token required" });
     return;
   }
 
-  let sub;
-
-  if (userId) {
-    sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.userId, userId) });
-  }
-
-  const effectiveSessionId = sessionId ?? (userId ? `user-${userId}` : undefined);
-
-  if (!sub && effectiveSessionId) {
-    sub = await db.query.subscriptionsTable.findFirst({ where: eq(subscriptionsTable.sessionId, effectiveSessionId) });
-    if (!sub) {
-      await db.insert(subscriptionsTable).values({ sessionId: effectiveSessionId, userId: userId ?? null, tier: "free", analysisCount: 0 });
-      sub = { sessionId: effectiveSessionId, userId: userId ?? null, tier: "free", analysisCount: 0, stripeCustomerId: null, stripeSubscriptionId: null, currentPeriodEnd: null, createdAt: new Date(), updatedAt: new Date() };
-    }
-  }
+  const sub = await resolveOrCreateSubscription(userId, sessionId, deviceFingerprint);
 
   if (!sub) {
     res.status(404).json({ error: "not_found", message: "Session not found" });
